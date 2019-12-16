@@ -3,7 +3,6 @@
 默认地，PaddlePaddle大规模分类库构建基于ResNet50模型的训练模型。
 
 PLSC提供了模型基类plsc.models.base_model.BaseModel，用户可以基于该基类构建自己的网络模型。用户自定义的模型类需要继承自该基类，并实现build_network方法，该方法用于构建用户自定义模型。
-用户在使用时需要调用类的get_output方法，该方法在用户自定义模型的尾端自动添加分布式FC层。
 
 下面的例子给出如何使用BaseModel基类定义用户自己的网络模型, 以及如何使用。
 ```python

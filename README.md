@@ -23,7 +23,7 @@ PLSC具备以下特点：
 ### 基础功能
 
 * [API简介](docs/api_intro.md)
-* [自定义模型](docs/custom_modes.md)
+* [自定义模型](docs/custom_models.md)
 * [自定义Reader接口]
 
 ### 预测部署
@@ -34,5 +34,5 @@ PLSC具备以下特点：
 ### 高级功能
 
 * [混合精度训练]
-* [分布式参数转换]
-* [Base64格式图像预处理]
+* [分布式参数转换](docs/distributed_params.md)
+* [Base64格式图像预处理](docs/base64_preprocessor.md)

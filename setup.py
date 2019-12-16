@@ -22,6 +22,6 @@ setup(name="plsc",
       license="Apache",
       #packages=['paddleXML'],
       packages=find_packages(),
-      #install_requires=['paddlepaddle>=1.6.1'],
+      install_requires=['paddlepaddle>=1.6.2', 'sklearn', 'easydict'],
       python_requires='>=2'
      )
