@@ -168,24 +168,23 @@ class PLSCServer():
 
     def get_model(self, model_name):
         server_path = self.get_path()
-        if True:
-            tar_name = model_name + '.tar.gz'
-            model_url = self.model_url + '/' + tar_name
+        tar_name = model_name + '.tar.gz'
+        model_url = self.model_url + '/' + tar_name
 
-            model_path = os.path.join(server_path, 'data/model/paddle/fluid')
-            if not os.path.exists(model_path):
-                os.makedirs('data/model/paddle/fluid')
-            os.chdir(model_path)
-            if os.path.exists(model_name):
-                pass
-            else:
-                os.system('wget ' + model_url + ' --no-check-certificate')
-                print('Decompressing files ..')
-                tar = tarfile.open(tar_name)
-                tar.extractall()
-                tar.close()
-                os.remove(tar_name)
+        model_path = os.path.join(server_path, 'data/model/paddle/fluid')
+        if not os.path.exists(model_path):
+            os.makedirs('data/model/paddle/fluid')
+        os.chdir(model_path)
+        if os.path.exists(model_name):
+            pass
+        else:
+            os.system('wget ' + model_url + ' --no-check-certificate')
+            print('Decompressing files ..')
+            tar = tarfile.open(tar_name)
+            tar.extractall()
+            tar.close()
+            os.remove(tar_name)
 
-            self.model_path_str = r'model_data_path: "./data/model/paddle/fluid/' + model_name + r'"'
+        self.model_path_str = r'model_data_path: "./data/model/paddle/fluid/' + model_name + r'"'
 
         os.chdir(self.get_path())

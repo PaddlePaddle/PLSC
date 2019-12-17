@@ -18,7 +18,6 @@ if is_py3:
 
 class FaceService():
     def __init__(self):
-        self.batch_size = 16
         self.con_list = []
         self.con_index = 0
         self.server_list = []
@@ -58,10 +57,9 @@ class FaceService():
                 return 'retry'
 
     def encode(self, images):
-        self.batch_size = len(images)
         request = []
-        for si in range(self.batch_size):
-            request.append(b64encode(images[si]).decode('ascii'))
+        for image in range(images):
+            request.append(b64encode(image).decode('ascii'))
 
         #request
         request = {"base64_string": request}
@@ -81,10 +79,12 @@ class FaceService():
 
 
 def test():
-    with open('./data/00000000.jpg', 'rb') as f:
+    with open('./data/00001464.jpg', 'rb') as f:
         image = f.read()
     bc = FaceService()
-    bc.connect('127.0.0.1:8866')
+    for i in image:
+        print("%x" % i)
+    bc.connect('127.0.0.1:8010')
     result = bc.encode([image])
     print(result[0])
     bc.close()
