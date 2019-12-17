@@ -8,7 +8,7 @@ server端
 
 https://paddle-serving.bj.bcebos.com/paddle-gpu-serving/wheel/plsc_serving-0.1.4-py3-none-any.whl
 
-pip3 install face_serving-0.1.3-py3-none-any.whl
+pip3 install plsc_serving-0.1.4-py3-none-any.whl
 
 client端
 
