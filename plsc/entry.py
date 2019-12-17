@@ -99,9 +99,6 @@ class Entry(object):
         self.fs_ugi = None
         self.fs_dir = None
 
-        self.use_fp16 = False
-        self.init_loss_scaling = 1.0
-
         self.val_targets = self.config.val_targets
         self.dataset_dir = self.config.dataset_dir
         self.num_classes = self.config.num_classes
@@ -146,15 +143,6 @@ class Entry(object):
         self.train_batch_size = batch_size
         self.global_train_batch_size = batch_size * self.num_trainers
         logger.info("Set train batch size to {}.".format(batch_size))
-
-    def set_mixed_precision(self, use_fp16, loss_scaling):
-        """
-        Whether to use mixed precision training.
-        """
-        self.use_fp16 = use_fp16
-        self.init_loss_scaling = loss_scaling
-        logger.info("Use mixed precision training: {}.".format(use_fp16))
-        logger.info("Set init loss scaling to {}.".format(loss_scaling))
 
     def set_test_batch_size(self, batch_size):
         self.test_batch_size = batch_size
@@ -296,12 +284,8 @@ class Entry(object):
     
         if self.loss_type in ["dist_softmax", "dist_arcface"]:
             self.optimizer = DistributedClassificationOptimizer(
-                self.optimizer, global_batch_size, use_fp16=self.use_fp16,
-                loss_type=self.loss_type,
-                init_loss_scaling=self.init_loss_scaling)
-        elif self.use_fp16:
-            self.optimizer = fluid.contrib.mixed_precision.decorate(
-                optimizer=optimizer, init_loss_scaling=self.init_loss_scaling)
+                self.optimizer, global_batch_size)
+
         return self.optimizer
 
     def build_program(self,
@@ -359,7 +343,7 @@ class Entry(object):
                     dist_optimizer = self.fleet.distributed_optimizer(
                         optimizer, strategy=self.strategy)
                     dist_optimizer.minimize(loss)
-                    if "dist" in self.loss_type or self.use_fp16:
+                    if "dist" in self.loss_type:
                         optimizer = optimizer._optimizer
                 elif use_parallel_test:
                     emb = fluid.layers.collective._c_allgather(emb,
