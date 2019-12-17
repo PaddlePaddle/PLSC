@@ -33,6 +33,5 @@ PLSC具备以下特点：
 
 ### 高级功能
 
-* [混合精度训练]
 * [分布式参数转换](docs/distributed_params.md)
 * [Base64格式图像预处理](docs/base64_preprocessor.md)
