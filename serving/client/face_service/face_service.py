@@ -79,7 +79,7 @@ class FaceService():
 
 
 def test():
-    with open('./data/00001464.jpg', 'rb') as f:
+    with open('./data/00000000.jpg', 'rb') as f:
         image = f.read()
     bc = FaceService()
     for i in image:
