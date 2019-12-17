@@ -867,7 +867,14 @@ class Entry(object):
                 model_save_dir = os.path.join(
                     self.model_save_dir, str(pass_id))
                 if not os.path.exists(model_save_dir):
-                    os.makedirs(model_save_dir)
+                    # may be more than one processes trying 
+                    # to create the directory
+                    try:
+                        os.makedirs(model_save_dir)
+                    except OSError as exc:
+                        if exc.errno != errno.EEXIST:
+                            raise
+                        pass
                 if trainer_id == 0:
                     fluid.io.save_persistables(exe,
                         model_save_dir,
