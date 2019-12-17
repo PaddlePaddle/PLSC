@@ -50,13 +50,9 @@ class DistributedClassificationOptimizer(Optimizer):
                  incr_ratio=2.0,
                  decr_ratio=0.5,
                  use_dynamic_loss_scaling=True):
-        super(DistributedClassificationOptimizer, self).__init__(
-            learning_rate=0.1)
-
         self._optimizer = optimizer
         self._batch_size = batch_size
         self._use_fp16 = use_fp16
-
         self._amp_lists = amp_lists
         if amp_lists is None:
             self._amp_lists = AutoMixedPrecisionLists()
@@ -71,6 +67,7 @@ class DistributedClassificationOptimizer(Optimizer):
             value=init_loss_scaling,
             dtype='float32',
             persistable=True)
+
         self._use_dynamic_loss_scaling = use_dynamic_loss_scaling
         if self._use_dynamic_loss_scaling:
             self._incr_every_n_steps = layers.fill_constant(
@@ -340,8 +337,7 @@ class DistributedClassificationOptimizer(Optimizer):
 
             optimize_ops = self._optimizer.apply_gradients(scaled_params_grads)
             ret = optimize_ops, scaled_params_grads
-
-        return ret
+            return ret
 
 
 class DistributedClassifier(object):
