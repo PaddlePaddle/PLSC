@@ -14,9 +14,6 @@
 
 import setuptools
 
-with open("README.md", "r") as fh:
-    long_description = fh.read()
-
 #read info
 info_py = './plsc_serving/__init__.py'
 info_content = open(info_py, 'r').readlines()
@@ -31,8 +28,6 @@ setuptools.setup(
     author="MRXLT",
     author_email="xlt2024@gmail.com",
     description="package for plsc serving",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
     url="https://github.com/PaddlePaddle/PLSC",
     packages=setuptools.find_packages(),
     classifiers=[
