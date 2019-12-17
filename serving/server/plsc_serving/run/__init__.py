@@ -35,9 +35,6 @@ class PLSCServer():
         self.model_path_str = ''
         self.get_exe()
 
-    def help(self):
-        print("hello")
-
     def get_exe(self):
         exe_path = './bin'
         module_version = face_serving.__version__
