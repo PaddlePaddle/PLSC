@@ -29,7 +29,7 @@ PLSC具备以下特点：
 ### 预测部署
 
 * [模型导出](docs/export_for_infer.md)
-* [C++预测库使用]
+* [C++预测库使用](docs/serving.md)
 
 ### 高级功能
 
