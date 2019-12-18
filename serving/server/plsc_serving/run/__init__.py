@@ -15,7 +15,7 @@
 import os
 import re
 import tarfile
-import face_serving
+import plsc_serving
 import subprocess
 import imp
 import time
@@ -37,7 +37,7 @@ class PLSCServer():
 
     def get_exe(self):
         exe_path = './bin'
-        module_version = face_serving.__version__
+        module_version = plsc_serving.__version__
         target_version_list = module_version.strip().split('.')
         target_version = target_version_list[0] + '.' + target_version_list[1]
         need_download = False
@@ -162,7 +162,7 @@ class PLSCServer():
         self.get_model(model_name)
 
     def get_path(self):
-        py_path = os.path.dirname(face_serving.__file__)
+        py_path = os.path.dirname(plsc_serving.__file__)
         server_path = os.path.join(py_path, 'server')
         return server_path
 
