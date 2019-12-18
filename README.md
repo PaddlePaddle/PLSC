@@ -48,6 +48,15 @@ PaddlePaddle大规模分类库(PLSC: PaddlePaddle Large Scale Classification)是
 
 ![FC计算公示展开](images/fc_computing_block.png)
 
+这里，_n_是分块的块数。因此，我们可以将神经网络的最后一层全连接参数分布到多张GPU卡，
+并在每张卡上分别完成全连接层的部分计算，从而实现整个全连接层的计算，并解决大规模分
+类问题面临的GPU显存空间不足的问题。
+
+需要注意的是，由于将神经网络模型最后一层全连接层参数划分到多张GPU卡，因此需要汇总
+各个GPU上的_X_参数，得到全连接层的全局输入_X_’(可以通过集合通信allgather实现)，并
+计算全连接层输出:
+
+![全局FC计算公示](images/fc_computing_block_global.png)
 
 PLSC具备以下特点：
 
