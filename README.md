@@ -41,7 +41,7 @@ PaddlePaddle大规模分类库(PLSC: PaddlePaddle Large Scale Classification)是
 
 对于全连接层计算，可以表示为矩阵乘法和加法，如下面的公示所示：
 
-![](http://latex.codecogs.com/gif.latex?\\y=XW+b)
+![](images/fc_computing_1.png)
 
 PLSC具备以下特点：
 
