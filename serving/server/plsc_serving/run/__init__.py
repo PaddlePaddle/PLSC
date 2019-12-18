@@ -186,5 +186,4 @@ class PLSCServer():
             os.remove(tar_name)
 
         self.model_path_str = r'model_data_path: "./data/model/paddle/fluid/' + model_name + r'"'
-
         os.chdir(self.get_path())

@@ -82,8 +82,6 @@ def test():
     with open('./data/00000000.jpg', 'rb') as f:
         image = f.read()
     bc = FaceService()
-    for i in image:
-        print("%x" % i)
     bc.connect('127.0.0.1:8010')
     result = bc.encode([image])
     print(result[0])
