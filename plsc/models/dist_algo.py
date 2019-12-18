@@ -97,6 +97,7 @@ class DistributedClassificationOptimizer(Optimizer):
                             value=float(optimizer._learning_rate),
                             dtype='float32',
                             persistable=True)
+
     def fp16_backward(self,
                       block,
                       scalar,
@@ -128,9 +129,13 @@ class DistributedClassificationOptimizer(Optimizer):
                                         op_role_key,
                                         backward_role,
                                         loss_backward_role):
-        shard_one_hot = fluid.layers.create_tensor(shard_logit.dtype, name='shard_one_hot')
-        shard_one_hot_fp32 = fluid.layers.create_tensor(fluid.core.VarDesc.VarType.FP32,
-                                                 name=(shard_one_hot.name+".cast_fp32"))
+        shard_one_hot = block.create_var(
+                        name=fluid.unique_name.generate('shard_one_hot'),
+                        dtype=shard_logit.dtype)
+        shard_one_hot_fp32 = block.create_var(
+                        name=fluid.unique_name.generate(shard_one_hot.name+'.cast_fp32'),
+                        dtype=shard_logit.dtype)
+        # input var of elementwise_add_grad op after scale
         shard_logit_grad_fp32 = block.var('tmp_3@GRAD')
 
         block._insert_op(
@@ -187,10 +192,12 @@ class DistributedClassificationOptimizer(Optimizer):
                                         op_role_key,
                                         backward_role,
                                         loss_backward_role):
-        shard_one_hot = fluid.layers.create_tensor(
-            fluid.core.VarDesc.VarType.FP32, name='shard_one_hot')
-        shard_one_hot_fp32 = fluid.layers.create_tensor(
-            fluid.core.VarDesc.VarType.FP32, name=(shard_one_hot.name + ".cast_fp32"))
+        shard_one_hot = block.create_var(
+                        name=fluid.unique_name.generate('shard_one_hot'),
+                        dtype=fluid.core.VarDesc.VarType.FP32)
+        shard_one_hot_fp32 = block.create_var(
+                        name=fluid.unique_name.generate(shard_one_hot.name+'.cast_fp32'),
+                        dtype=fluid.core.VarDesc.VarType.FP32)
         shard_logit_grad_fp32 = block.var(shard_logit.name + ".cast_fp32@GRAD")
 
         block._insert_op(
