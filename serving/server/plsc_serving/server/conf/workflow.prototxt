@@ -1,0 +1,8 @@
+workflows {
+  name: "workflow10"
+  workflow_type: "Sequence"
+  nodes {
+    name: "face_classify_op"
+    type: "FaceClassifyOp"
+  }
+}

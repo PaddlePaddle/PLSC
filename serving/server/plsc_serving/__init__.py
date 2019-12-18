@@ -12,6 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .entry import Entry
-
-__all__ = ['Entry']
+__version__ = '0.1.4'

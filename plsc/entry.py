@@ -24,6 +24,7 @@ import pickle
 import subprocess
 import shutil
 import logging
+import tempfile
 
 import paddle
 import paddle.fluid as fluid
@@ -43,7 +44,8 @@ from paddle.fluid.optimizer import Optimizer
 
 
 logging.basicConfig(
-    format='[%(asctime)s %(levelname)s line:%(lineno)d] %(message)s',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%d %b %Y %H:%M:%S')
 logger = logging.getLogger(__name__)
         
@@ -57,6 +59,9 @@ class Entry(object):
         """
         Check the validation of parameters.
         """
+        assert os.getenv("PADDLE_TRAINERS_NUM") is not None, \
+            "Please start script using paddle.distributed.launch module."
+
         supported_types = ["softmax", "arcface",
                            "dist_softmax", "dist_arcface"]
         assert self.loss_type in supported_types, \
@@ -70,10 +75,8 @@ class Entry(object):
     def __init__(self):
         self.config = config.config
         super(Entry, self).__init__()
-        assert os.getenv("PADDLE_TRAINERS_NUM") is not None, \
-            "Please start script using paddle.distributed.launch module."
-        num_trainers = int(os.getenv("PADDLE_TRAINERS_NUM"))
-        trainer_id = int(os.getenv("PADDLE_TRAINER_ID"))
+        num_trainers = int(os.getenv("PADDLE_TRAINERS_NUM", 1))
+        trainer_id = int(os.getenv("PADDLE_TRAINER_ID", 0))
 
         self.trainer_id = trainer_id
         self.num_trainers = num_trainers
@@ -114,8 +117,15 @@ class Entry(object):
         self.model_save_dir = self.config.model_save_dir
         self.warmup_epochs = self.config.warmup_epochs
 
+        if self.checkpoint_dir:
+            self.checkpoint_dir = os.path.abspath(self.checkpoint_dir)
+        if self.model_save_dir:
+            self.model_save_dir = os.path.abspath(self.model_save_dir)
+        if self.dataset_dir:
+            self.dataset_dir = os.path.abspath(self.dataset_dir)
+
         logger.info('=' * 30)
-        logger.info("Default configuration: ")
+        logger.info("Default configuration:")
         for key in self.config:
             logger.info('\t' + str(key) + ": " + str(self.config[key]))
         logger.info('trainer_id: {}, num_trainers: {}'.format(
@@ -123,18 +133,21 @@ class Entry(object):
         logger.info('=' * 30)
 
     def set_val_targets(self, targets):
+        """
+        Set the names of validation datasets, separated by comma.
+        """
         self.val_targets = targets
-        logger.info("Set val_targets to {} by user.".format(targets))
+        logger.info("Set val_targets to {}.".format(targets))
 
     def set_train_batch_size(self, batch_size):
         self.train_batch_size = batch_size
         self.global_train_batch_size = batch_size * self.num_trainers
-        logger.info("Set train batch size to {} by user.".format(batch_size))
+        logger.info("Set train batch size to {}.".format(batch_size))
 
     def set_test_batch_size(self, batch_size):
         self.test_batch_size = batch_size
         self.global_test_batch_size = batch_size * self.num_trainers
-        logger.info("Set test batch size to {} by user.".format(batch_size))
+        logger.info("Set test batch size to {}.".format(batch_size))
 
     def set_hdfs_info(self, fs_name, fs_ugi, directory):
         """
@@ -153,38 +166,42 @@ class Entry(object):
 
     def set_model_save_dir(self, directory):
         """
-        Set the directory to save model.
+        Set the directory to save models.
         """
+        if directory:
+            directory = os.path.abspath(directory)
         self.model_save_dir = directory
-        logger.info("Set model_save_dir to {} by user.".format(directory))
+        logger.info("Set model_save_dir to {}.".format(directory))
 
     def set_dataset_dir(self, directory):
         """
         Set the root directory for datasets.
         """
+        if directory:
+            directory = os.path.abspath(directory)
         self.dataset_dir = directory
-        logger.info("Set dataset_dir to {} by user.".format(directory))
+        logger.info("Set dataset_dir to {}.".format(directory))
 
     def set_train_image_num(self, num):
         """
         Set the total number of images for train.
         """
         self.train_image_num = num
-        logger.info("Set train_image_num to {} by user.".format(num))
+        logger.info("Set train_image_num to {}.".format(num))
 
     def set_class_num(self, num):
         """
         Set the number of classes.
         """
         self.num_classes = num
-        logger.info("Set num_classes to {} by user.".format(num))
+        logger.info("Set num_classes to {}.".format(num))
 
     def set_emb_size(self, size):
         """
         Set the size of the last hidding layer before the distributed fc-layer.
         """
         self.emb_size = size
-        logger.info("Set emb_size to {} by user.".format(size))
+        logger.info("Set emb_size to {}.".format(size))
 
     def set_model(self, model):
         """
@@ -194,25 +211,27 @@ class Entry(object):
         if not isinstance(model, base_model.BaseModel):
             raise ValueError("The parameter for set_model must be an "
                              "instance of BaseModel.")
-        logger.info("Set model to {} by user.".format(model))
+        logger.info("Set model to {}.".format(model))
 
     def set_train_epochs(self, num):
         """
         Set the number of epochs to train.
         """
         self.train_epochs = num
-        logger.info("Set train_epochs to {} by user.".format(num))
+        logger.info("Set train_epochs to {}.".format(num))
 
     def set_checkpoint_dir(self, directory):
         """
         Set the directory for checkpoint loaded before training/testing.
         """
+        if directory:
+            directory = os.path.abspath(directory)
         self.checkpoint_dir = directory
-        logger.info("Set checkpoint_dir to {} by user.".format(directory))
+        logger.info("Set checkpoint_dir to {}.".format(directory))
 
     def set_warmup_epochs(self, num):
         self.warmup_epochs = num
-        logger.info("Set warmup_epochs to {} by user.".format(num))
+        logger.info("Set warmup_epochs to {}.".format(num))
 
     def set_loss_type(self, type):
         supported_types = ["dist_softmax", "dist_arcface", "softmax", "arcface"]
@@ -220,54 +239,53 @@ class Entry(object):
             raise ValueError("All supported loss types: {}".format(
                 supported_types))
         self.loss_type = type
-        logger.info("Set loss_type to {} by user.".format(type))
+        logger.info("Set loss_type to {}.".format(type))
 
     def set_image_shape(self, shape):
         if not isinstance(shape, (list, tuple)):
-            raise ValueError("shape must be of type list or tuple")
+            raise ValueError("Shape must be of type list or tuple")
         self.image_shape = shape
-        logger.info("Set image_shape to {} by user.".format(shape))
+        logger.info("Set image_shape to {}.".format(shape))
 
     def set_optimizer(self, optimizer):
         if not isinstance(optimizer, Optimizer):
-            raise ValueError("optimizer must be as type of Optimizer")
+            raise ValueError("Optimizer must be type of Optimizer")
         self.optimizer = optimizer
         logger.info("User manually set optimizer")
 
-    def get_optimizer(self):
-        if self.optimizer:
-            return self.optimizer
-
-        bd = [step for step in self.lr_steps]
-        start_lr = self.lr
+    def _get_optimizer(self):
+        if not self.optimizer:
+            bd = [step for step in self.lr_steps]
+            start_lr = self.lr
     
-        global_batch_size = self.global_train_batch_size
-        train_image_num = self.train_image_num
-        images_per_trainer = int(math.ceil(
-            train_image_num * 1.0 / self.num_trainers))
-        steps_per_pass = int(math.ceil(
-            images_per_trainer * 1.0 / self.train_batch_size)) 
-        logger.info("steps per epoch: %d" % steps_per_pass)
-        warmup_steps = steps_per_pass * self.warmup_epochs
-        batch_denom = 1024
-        base_lr = start_lr * global_batch_size / batch_denom
-        lr = [base_lr * (0.1 ** i) for i in range(len(bd) + 1)]
-        logger.info("lr boundaries: {}".format(bd))
-        logger.info("lr_step: {}".format(lr))
-        if self.warmup_epochs:
-            lr_val = lr_warmup(fluid.layers.piecewise_decay(boundaries=bd,
-                values=lr), warmup_steps, start_lr, base_lr)
-        else:
-            lr_val = fluid.layers.piecewise_decay(boundaries=bd, values=lr)
+            global_batch_size = self.global_train_batch_size
+            train_image_num = self.train_image_num
+            images_per_trainer = int(math.ceil(
+                train_image_num * 1.0 / self.num_trainers))
+            steps_per_pass = int(math.ceil(
+                images_per_trainer * 1.0 / self.train_batch_size)) 
+            logger.info("Steps per epoch: %d" % steps_per_pass)
+            warmup_steps = steps_per_pass * self.warmup_epochs
+            batch_denom = 1024
+            base_lr = start_lr * global_batch_size / batch_denom
+            lr = [base_lr * (0.1 ** i) for i in range(len(bd) + 1)]
+            logger.info("LR boundaries: {}".format(bd))
+            logger.info("lr_step: {}".format(lr))
+            if self.warmup_epochs:
+                lr_val = lr_warmup(fluid.layers.piecewise_decay(boundaries=bd,
+                    values=lr), warmup_steps, start_lr, base_lr)
+            else:
+                lr_val = fluid.layers.piecewise_decay(boundaries=bd, values=lr)
     
-        optimizer = fluid.optimizer.Momentum(
-            learning_rate=lr_val, momentum=0.9,
-            regularization=fluid.regularizer.L2Decay(5e-4))
-        self.optimizer = optimizer
+            optimizer = fluid.optimizer.Momentum(
+                learning_rate=lr_val, momentum=0.9,
+                regularization=fluid.regularizer.L2Decay(5e-4))
+            self.optimizer = optimizer
     
         if self.loss_type in ["dist_softmax", "dist_arcface"]:
             self.optimizer = DistributedClassificationOptimizer(
                 self.optimizer, global_batch_size)
+
         return self.optimizer
 
     def build_program(self,
@@ -302,6 +320,7 @@ class Entry(object):
                         loss_type=self.loss_type,
                         margin=self.margin,
                         scale=self.scale)
+
                 if self.loss_type in ["dist_softmax", "dist_arcface"]:
                     shard_prob = loss._get_info("shard_prob")
 
@@ -320,10 +339,12 @@ class Entry(object):
                 optimizer = None
                 if is_train:
                     # initialize optimizer
-                    optimizer = self.get_optimizer()
+                    optimizer = self._get_optimizer()
                     dist_optimizer = self.fleet.distributed_optimizer(
                         optimizer, strategy=self.strategy)
                     dist_optimizer.minimize(loss)
+                    if "dist" in self.loss_type:
+                        optimizer = optimizer._optimizer
                 elif use_parallel_test:
                     emb = fluid.layers.collective._c_allgather(emb,
                         nranks=num_trainers, use_calc_stream=True)
@@ -361,11 +382,7 @@ class Entry(object):
     def preprocess_distributed_params(self,
                                       local_dir):
         local_dir = os.path.abspath(local_dir)
-        output_dir = local_dir + "_@tmp"
-        assert not os.path.exists(output_dir), \
-            "The temp directory {} for distributed params exists.".format(
-                output_dir)
-        os.makedirs(output_dir)
+        output_dir = tempfile.mkdtemp()
         cmd = sys.executable + ' -m plsc.utils.process_distfc_parameter '
         cmd += "--nranks {} ".format(self.num_trainers)
         cmd += "--num_classes {} ".format(self.num_classes)
@@ -388,13 +405,11 @@ class Entry(object):
                 file = os.path.join(output_dir, file)
                 shutil.move(file, local_dir)
         shutil.rmtree(output_dir)
-        file_name = os.path.join(local_dir, '.lock')
-        with open(file_name, 'w') as f:
-            pass
 
-    def append_broadcast_ops(self, program):
+    def _append_broadcast_ops(self, program):
         """
-        Before test, we broadcast bn-related parameters to all other trainers.
+        Before test, we broadcast bathnorm-related parameters to all 
+        other trainers from trainer-0.
         """
         bn_vars = [var for var in program.list_vars() 
                    if 'batch_norm' in var.name and var.persistable]
@@ -420,40 +435,42 @@ class Entry(object):
             checkpoint_dir = self.checkpoint_dir
 
         if self.fs_name is not None:
+            ans = 'y'
             if os.path.exists(checkpoint_dir):
-                ans = input("Downloading pretrained model, but the local "
+                ans = input("Downloading pretrained models, but the local "
                             "checkpoint directory ({}) exists, overwrite it "
                             "or not? [Y/N]".format(checkpoint_dir))
 
-                if ans.lower() == n:
-                    logger.info("Using the local checkpoint directory, instead"
-                                " of the remote one.")
-                else:
-                    logger.info("Overwriting the local checkpoint directory.")
+            if ans.lower() == 'y':
+                if os.path.exists(checkpoint_dir):
+                    logger.info("Using the local checkpoint directory.")
                     shutil.rmtree(checkpoint_dir)
-                    os.makedirs(checkpoint_dir)
-                    file_name = os.path.join(checkpoint_dir, '.lock')
-                    if self.trainer_id == 0:
-                        self.get_files_from_hdfs(checkpoint_dir)
-                        with open(file_name, 'w') as f:
-                            pass
-                        time.sleep(5)
-                        os.remove(file_name)     
-                    else:
-                        while True:
-                            if not os.path.exists(file_name):
-                                time.sleep(1)
-                            else:
-                                break
-            else:
+                os.makedirs(checkpoint_dir)
+
+                # sync all trainers to avoid loading checkpoints before 
+                # parameters are downloaded
+                file_name = os.path.join(checkpoint_dir, '.lock')
+                if self.trainer_id == 0:
                     self.get_files_from_hdfs(checkpoint_dir)
+                    with open(file_name, 'w') as f:
+                        pass
+                    time.sleep(10)
+                    os.remove(file_name)     
+                else:
+                    while True:
+                        if not os.path.exists(file_name):
+                            time.sleep(1)
+                        else:
+                            break
         
         # Preporcess distributed parameters.
         file_name = os.path.join(checkpoint_dir, '.lock')
         distributed = self.loss_type in ["dist_softmax", "dist_arcface"]
         if load_for_train and self.trainer_id == 0 and distributed:
             self.preprocess_distributed_params(checkpoint_dir)
-            time.sleep(5)
+            with open(file_name, 'w') as f:
+                pass
+            time.sleep(10)
             os.remove(file_name)     
         elif load_for_train and distributed:
             # wait trainer_id (0) to complete
@@ -503,11 +520,11 @@ class Entry(object):
             load_for_train=False)
 
         assert self.model_save_dir, \
-            "Does not set model_save_dir for inference."
+            "Does not set model_save_dir for inference model converting."
         if os.path.exists(self.model_save_dir):
             ans = input("model_save_dir for inference model ({}) exists, "
                         "overwrite it or not? [Y/N]".format(model_save_dir))
-            if ans.lower() == n:
+            if ans.lower() == 'n':
                 logger.error("model_save_dir for inference model exists, "
                             "and cannot overwrite it.")
                 exit()
@@ -551,17 +568,17 @@ class Entry(object):
             load_for_train=False)
 
         if self.train_reader is None:
-            train_reader = paddle.batch(reader.arc_train(
+            predict_reader = paddle.batch(reader.arc_train(
                 self.dataset_dir, self.num_classes),
                 batch_size=self.train_batch_size)
         else:
-            train_reader = self.train_reader
+            predict_reader = self.train_reader
 
         feeder = fluid.DataFeeder(place=place,
             feed_list=['image', 'label'], program=main_program)
     
         fetch_list = [emb.name]
-        for data in train_reader():
+        for data in predict_reader():
             emb = exe.run(main_program, feed=feeder.feed(data),
                 fetch_list=fetch_list, use_program_cache=True)
             print("emb: ", emb)
@@ -684,18 +701,14 @@ class Entry(object):
             self.build_program(True, False)
         if self.with_test:
             test_emb, test_loss, test_acc1, test_acc5, _ = \
-                self.build_program(False, True)
+                self.build_program(False, self.num_trainers > 1)
             test_list, test_name_list = reader.test(
                 self.dataset_dir, self.val_targets)
             test_program = self.test_program
-            self.append_broadcast_ops(test_program)
+            self._append_broadcast_ops(test_program)
     
-        if self.loss_type in ["dist_softmax", "dist_arcface"]:
-            global_lr = optimizer._optimizer._global_learning_rate(
-                program=self.train_program)
-        else:
-            global_lr = optimizer._global_learning_rate(
-                program=self.train_program)
+        global_lr = optimizer._global_learning_rate(
+            program=self.train_program)
     
         origin_prog = fleet._origin_program
         train_prog = fleet.main_program
@@ -720,10 +733,10 @@ class Entry(object):
             fetch_list_test = [test_emb.name, test_acc1.name, test_acc5.name]
             real_test_batch_size = self.global_test_batch_size
     
-        if self.checkpoint_dir == "":
-            load_checkpoint = False
-        else:
+        if self.checkpoint_dir:
             load_checkpoint = True
+        else:
+            load_checkpoint = False
         if load_checkpoint:
             self.load_checkpoint(executor=exe, main_program=origin_prog)
     
@@ -839,7 +852,14 @@ class Entry(object):
                 model_save_dir = os.path.join(
                     self.model_save_dir, str(pass_id))
                 if not os.path.exists(model_save_dir):
-                    os.makedirs(model_save_dir)
+                    # may be more than one processes trying 
+                    # to create the directory
+                    try:
+                        os.makedirs(model_save_dir)
+                    except OSError as exc:
+                        if exc.errno != errno.EEXIST:
+                            raise
+                        pass
                 if trainer_id == 0:
                     fluid.io.save_persistables(exe,
                         model_save_dir,
