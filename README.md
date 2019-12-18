@@ -100,7 +100,7 @@ softmax的计算公示如下图所示：
 ### 快速入门
 
 * [安装说明](docs/installation.md)
-* [训练/评估/部署](docs/usage.md)
+* [训练和验证](docs/usage.md)
 
 ### 基础功能
 
