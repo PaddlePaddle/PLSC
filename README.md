@@ -90,6 +90,26 @@ softmax的计算公示如下图所示：
 	模分类问题全流程解决方案，用户可以基于PLSC库快速、便捷地搭建大规模分类问题解决
 	方案。
 
+## 预训练模型和性能
+
+### 预训练模型
+
+我们提供了下面的预训练模型，以帮助用户对下游任务进行fine-tuning。
+
+| 模型             | 描述           |
+| :--------------- | :------------- |
+| [resnet50_distarcface_ms1m_v2](http://icm.baidu-int.com/user-center/account) | 该模型使用ResNet50网络训练，数据集为MS1M_v2，训练阶段使用的loss_type为'dist_arcface'，预训练模型在lfw验证集上的验证精度为0.99817。 | 
+
+### 训练性能
+
+| 模型             | 训练集   | lfw  | agendb_30 | cfp_ff | cfp_fp |
+| :--------------- | :------------- | :------ | :----- | :------ | :----  |
+| ResNet50 | MS1M-ArcFace | 0.99817 | 0.99827 | 0.99857 | 0.96314 |
+| ResNet50 | CASIA | 0.9895 | 0.9095 | 0.99057 | 0.915 |
+
+备注：上述模型训练使用的loss_type为'dist_arcface'。更多关于ArcFace的内容请
+参考[ArcFace: Additive Angular Margin Loss for Deep Face Recognition](https://arxiv.org/abs/1801.07698)
+
 ## 使用教程
 
 我们提供了一系列使用教程，来帮助用户完成使用PLSC大规模分类库进行训练、评估和部署。
