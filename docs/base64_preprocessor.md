@@ -37,7 +37,12 @@ dataset.part10
 
 ## 工具使用方法
 
-工具位于tools目录下。
+工具位于tools目录下。使用该工具时，需要安装sqlite3模块，可以通过下面的命令安装：
+
+```shell
+pip install sqlite3
+```
+
 可以通过下面的命令行查看工具的使用帮助信息：
 
 ```python
