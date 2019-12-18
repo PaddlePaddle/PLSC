@@ -29,7 +29,13 @@ conda install -c paddle paddlepaddle-gpu cudatoolkit=9.0
 
 更多安装方式和信息请参考[PaddlePaddle安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/beginners_guide/install/index_cn.html)
 
-## 2. 安装大规模分类库
+## 2. 安装依赖包
+
+```shell
+pip install -r requirements.txt
+```
+
+## 3. 安装大规模分类库
 
 ```shell
 pip install plsc
