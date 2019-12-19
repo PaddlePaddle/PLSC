@@ -5,3 +5,4 @@ scipy ; python_version>="3.5"
 Pillow
 sklearn
 easydict
+six
