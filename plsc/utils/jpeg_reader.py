@@ -244,7 +244,7 @@ def load_bin(path, image_size):
         data_list.append(data)
     for i in range(len(issame_list)*2):
         _bin = bins[i]
-        if not isinstance(_bin, basestring):
+        if not isinstance(_bin, six.string_types):
             _bin = _bin.tostring()
         img_ori = Image.open(StringIO(_bin))
         for flip in [0, 1]:
