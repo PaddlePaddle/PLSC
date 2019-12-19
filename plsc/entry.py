@@ -625,7 +625,7 @@ class Entry(object):
         real_test_batch_size = self.global_test_batch_size
 
         test_start = time.time()
-        for i in xrange(len(test_list)):
+        for i in range(len(test_list)):
             data_list, issame_list = test_list[i]
             embeddings_list = []
             for j in xrange(len(data_list)):
