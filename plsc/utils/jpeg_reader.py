@@ -5,6 +5,7 @@ import pickle
 import functools
 import numpy as np
 import paddle
+import six
 from PIL import Image, ImageEnhance
 try:
     from StringIO import StringIO
@@ -233,12 +234,15 @@ def arc_iterator(data,
 
 
 def load_bin(path, image_size):
-    bins, issame_list = pickle.load(open(path, 'rb'))
+    if six.PY2:
+        bins, issame_list = pickle.load(open(path, 'rb'))
+    else:
+        bins, issame_list = pickle.load(open(path, 'rb'), encoding='latin1')
     data_list = []
     for flip in [0, 1]:
         data = np.empty((len(issame_list)*2, 3, image_size[0], image_size[1]))
         data_list.append(data)
-    for i in xrange(len(issame_list)*2):
+    for i in range(len(issame_list)*2):
         _bin = bins[i]
         if not isinstance(_bin, basestring):
             _bin = _bin.tostring()
