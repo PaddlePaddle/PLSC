@@ -23,6 +23,7 @@ import math
 import logging
 import sqlite3
 import tempfile
+import six
 
 
 logging.basicConfig(level=logging.INFO,
@@ -85,6 +86,13 @@ class Base64Preprocessor(object):
         self.conn = None
         self.cursor = None
 
+    def insert_to_db(self, cnt, line):
+        label = int(line[0])
+        data = line[1]
+        sql_cmd = "INSERT INTO DATASET (ID, DATA, LABEL) "
+        sql_cmd += "VALUES ({}, '{}', {});".format(cnt, data, label)
+        self.cursor.execute(sql_cmd)
+
     def create_db(self):
         start = time.time()
         print(self.sqlite3_file)
@@ -98,19 +106,26 @@ class Base64Preprocessor(object):
         file_list_path = os.path.join(self.data_dir, self.file_list)
         with open(file_list_path, 'r') as f:
             cnt = 0
-            for line in f.xreadlines():
-                line = line.strip()
-                file_path = os.path.join(self.data_dir, line)
-                with open(file_path, 'r') as df:
-                    for line in df.xreadlines():
-                        line = line.strip().split('\t')
-                        label = int(line[0])
-                        data = line[1]
-                        sql_cmd = "INSERT INTO DATASET (ID, DATA, LABEL) "
-                        sql_cmd += "VALUES ({}, '{}', {});".format(cnt, data, label)
-                        self.cursor.execute(sql_cmd)
-                        cnt += 1
-                os.remove(file_path)
+            if six.PY2:
+                for line in f.xreadlines():
+                    line = line.strip()
+                    file_path = os.path.join(self.data_dir, line)
+                    with open(file_path, 'r') as df:
+                        for line in df.xreadlines():
+                            line = line.strip().split('\t')
+                            self.insert_to_db(cnt, line)
+                            cnt += 1
+                    os.remove(file_path)
+            else:
+                for line in f:
+                    line = line.strip()
+                    file_path = os.path.join(self.data_dir, line)
+                    with open(file_path, 'r') as df:
+                        for line in df:
+                            line = line.strip().split('\t')
+                            self.insert_to_db(cnt, line)
+                            cnt += 1
+                    os.remove(file_path)
 
         self.conn.commit()
         diff = time.time() - start
