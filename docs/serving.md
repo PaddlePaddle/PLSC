@@ -6,9 +6,9 @@ server端
 
 需要python3环境，下载whl包
 
-https://paddle-serving.bj.bcebos.com/paddle-gpu-serving/wheel/plsc_serving-0.1.4-py3-none-any.whl
+https://paddle-serving.bj.bcebos.com/paddle-gpu-serving/wheel/plsc_serving-0.1.6-py3-none-any.whl
 
-pip3 install plsc_serving-0.1.4-py3-none-any.whl
+pip3 install plsc_serving-0.1.6-py3-none-any.whl
 
 client端
 
@@ -25,7 +25,8 @@ server端
 ```python
 from plsc_serving.run import PLSCServer
 fs = PLSCServer()
-fs.with_model(model_name = 'face_resnet50')
+#设定使用的模型文路径，str类型，绝对路径
+fs.with_model(model_path = '/XXX/XXX')
 #跑单个进程,gpu_index指定使用的gpu，int类型，默认为0；port指定使用的端口，int类型，默认为8866
 fs.run(gpu_index = 0, port = 8010)
 ```
