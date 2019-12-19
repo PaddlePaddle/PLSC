@@ -63,6 +63,9 @@ class PLSCServer():
     def modify_conf(self, gpu_index=0):
         os.chdir(self.get_path())
         engine_name = 'name: "face_resnet50"'
+        if self.model_path_str == '':
+            print('Please set model path using with_model.')
+            return -1
         if not self.with_gpu_flag:
             with open('./conf/model_toolkit.prototxt', 'r') as f:
                 conf_str = f.read()
@@ -86,6 +89,8 @@ class PLSCServer():
                               'enable_memory_optimization: 1', conf_str)
             open(conf_file, 'w').write(conf_str)
 
+        return 0
+
     def hold(self):
         try:
             while True:
@@ -98,6 +103,10 @@ class PLSCServer():
 
         os.chdir(self.get_path())
         self.modify_conf(gpu_index)
+
+        if self.modify_conf(gpu_index) != 0:
+            print('Modify conf files failed')
+            return -1
 
         if self.with_gpu_flag == True:
             gpu_msg = '--gpuid=' + str(gpu_index) + ' '
@@ -150,16 +159,13 @@ class PLSCServer():
         print(conf_str)
         '''
 
-    def with_model(self, model_name=None, model_url=None):
-        '''
-        if model_url != None:
-            self.mode_url = model_url
-            self.use_other_model = True
-        '''
-        if model_name == None or type(model_name) != str:
-            print('Please set model name string')
+    def with_model(self, model_path=None):
+        if not (os.path.isabs(model_path) and os.path.exists(model_path)):
+            print('Please set correct absolute path for model file')
+            return -1
+
+        self.model_path_str = r'model_data_path: "' + model_path + r'"'
         os.chdir(self.get_path())
-        self.get_model(model_name)
 
     def get_path(self):
         py_path = os.path.dirname(plsc_serving.__file__)
