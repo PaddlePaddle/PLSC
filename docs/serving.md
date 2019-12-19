@@ -6,9 +6,7 @@ server端
 
 需要python3环境，下载whl包
 
-https://paddle-serving.bj.bcebos.com/paddle-gpu-serving/wheel/plsc_serving-0.1.6-py3-none-any.whl
-
-pip3 install plsc_serving-0.1.6-py3-none-any.whl
+pip3 install plsc-serving
 
 client端
 
