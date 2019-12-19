@@ -4,13 +4,16 @@
 
 server端
 
-需要python3环境，下载whl包
-
+需要python3环境运行
+```bash
 pip3 install plsc-serving
-
+```
 client端
 
-需要安装ujson，pip install ujson
+需要安装ujson
+```bash
+pip install ujson
+```
 
 复制[client脚本](./serving/client/face_service/face_service.py)到使用路径
 
