@@ -74,7 +74,7 @@ PLSC大规模分类库提供了默认配置参数，用于设置训练、评估�
 
 备注：
 
-当设置set_calc_acc的参数值为True，会在训练是计算acc1和acc5的值，但这回占用额外的显存空间。
+当设置set_calc_acc的参数值为True，会在训练是计算acc1和acc5的值，但这会占用额外的显存空间。
 
 上述API均为PaddlePaddle大规模分类库PLSC的Entry类的方法，需要通过该类的实例
 调用，例如：
