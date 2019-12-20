@@ -2,12 +2,14 @@
 
 默认地，PaddlePaddle大规模分类库构建基于ResNet50模型的训练模型。
 
-PLSC提供了模型基类plsc.models.base_model.BaseModel，用户可以基于该基类构建自己的网络模型。用户自定义的模型类需要继承自该基类，并实现build_network方法，该方法用于构建用户自定义模型。
+PLSC提供了模型基类plsc.models.base_model.BaseModel，用户可以基于该基类构建自己的
+网络模型。用户自定义的模型类需要继承自该基类，并实现build_network方法，该方法用
+于构建用户自定义模型。
 
 下面的例子给出如何使用BaseModel基类定义用户自己的网络模型, 以及如何使用。
 ```python
 import paddle.fluid as fluid
-import plsc.entry as entry
+from plsc import Entry
 from plsc.models.base_model import BaseModel
 
 class ResNet(BaseModel):
@@ -64,20 +66,22 @@ class ResNet(BaseModel):
             is_test=False if is_train else True)
         return emb
 
+	def conv_bn_layer(
         ... ...
 
 if __name__ == "__main__":
-    ins = entry.Entry()
+    ins = Entry()
     ins.set_model(ResNet())
     ins.train()
 ```
 
-用户自定义模型类需要继承自基类BaseModel，并实现build_network方法，实现用户的自定义模型。
+用户自定义模型类需要继承自基类BaseModel，并实现build_network方法，实现用户的自定
+义模型。
 
 build_network方法的输入如下：
 * input: 输入图像数据
 * label: 图像类别
 * is_train: 表示训练阶段还是测试/预测阶段
 
-build_network方法返回用户自定义组网的输出变量，BaseModel类的get_output方法将调用该方法获取用户自定义组网的输出，并自动在其后添加分布式FC层。
+build_network方法返回用户自定义组网的输出变量。
 

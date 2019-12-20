@@ -2,7 +2,8 @@
 
 ## 默认配置参数
 
-PLSC大规模分类库提供了默认配置参数，用于设置训练、评估和模型相关的信息，如训练数据集目录、训练轮数等。
+PLSC大规模分类库提供了默认配置参数，用于设置训练、评估和模型相关的信息，如训练数
+据集目录、训练轮数等。
 
 这些参数信息位于plsc.config模块中，下面给出这些参数的含义和默认值。
 
@@ -64,19 +65,19 @@ PLSC大规模分类库提供了默认配置参数，用于设置训练、评估�
 | set_checkpoint_dir(dir) | 设置用于加载的预训练模型的目录 | 类型为字符串 |
 | set_warmup_epochs(num) | 设置warmup的轮数 | 类型为int |
 | set_loss_type(loss_type) | 设置模型的loss类型 | 类型为字符串 |
-| set_image_size(size) | 设置图像尺寸，格式为CHW | 类型为元组 |
+| set_image_shape(size) | 设置图像尺寸，格式为CHW | 类型为元组 |
 | set_optimizer(optimizer) | 设置训练阶段的optimizer | Optimizer类实例 |
 | convert_for_prediction() | 将预训练模型转换为预测模型 | None |
-| predict() | 离线预测接口，用于验证线上模型的正确性 | None |
 | test() | 模型评估 | None |
 | train() | 模型训练 | None |
 
-备注：上述API均为PaddlePaddle大规模分类库PLSC的plsc.entry.Entry类的方法，需要通过该类的实例调用，例如：
+备注：上述API均为PaddlePaddle大规模分类库PLSC的Entry类的方法，需要通过该类的实例
+调用，例如：
 
-```shell
-import plsc.entry as entry
+```python
+from plsc import Entry
 
-ins = entry.Entry()
+ins = Entry()
 ins.set_class_num(85742)
 ins.train()
 ```
