@@ -48,7 +48,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%d %b %Y %H:%M:%S')
 logger = logging.getLogger(__name__)
-        
+ 
 
 class Entry(object):
     """
@@ -330,6 +330,9 @@ class Entry(object):
                         margin=self.margin,
                         scale=self.scale)
 
+                acc1 = None
+                acc5 = None
+
                 if self.loss_type in ["dist_softmax", "dist_arcface"]:
                     if self.calc_train_acc:
                         shard_prob = loss._get_info("shard_prob")
@@ -343,16 +346,11 @@ class Entry(object):
                             nranks=num_trainers, use_calc_stream=True)
                         acc1 = fluid.layers.accuracy(input=prob, label=label_all, k=1)
                         acc5 = fluid.layers.accuracy(input=prob, label=label_all, k=5)
-                    else:
-                        acc1 = None
-                        acc5 = None
                 else:
                     if self.calc_train_acc:
                         acc1 = fluid.layers.accuracy(input=prob, label=label, k=1)
                         acc5 = fluid.layers.accuracy(input=prob, label=label, k=5)
-                    else:
-                        acc1 = None
-                        acc5 = None
+
                 optimizer = None
                 if is_train:
                     # initialize optimizer
