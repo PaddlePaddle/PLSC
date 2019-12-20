@@ -234,10 +234,7 @@ def arc_iterator(data,
 
 
 def load_bin(path, image_size):
-    if six.PY2:
-        bins, issame_list = pickle.load(open(path, 'rb'))
-    else:
-        bins, issame_list = pickle.load(open(path, 'rb'), encoding='latin1')
+    bins, issame_list = pickle.load(open(path, 'rb'))
     data_list = []
     for flip in [0, 1]:
         data = np.empty((len(issame_list)*2, 3, image_size[0], image_size[1]))
