@@ -786,9 +786,8 @@ class Entry(object):
                         feed=feeder.feed(data), fetch_list=fetch_list,
                         use_program_cache=True)
                 else:
-                    loss, lr, = exe.run(train_prog,
-                        feed=feeder.feed(data), fetch_list=fetch_list,
-                        use_program_cache=True)
+                    loss, lr = exe.run(train_prog, feed=feeder.feed(data),
+                        fetch_list=fetch_list, use_program_cache=True)
                 t2 = time.time()
                 period = t2 - t1
                 local_time += period
@@ -800,12 +799,13 @@ class Entry(object):
                     avg_loss = np.mean(local_train_info[0])
                     avg_lr = np.mean(local_train_info[1])
                     if self.calc_train_acc:
-                        print("Pass:%d batch:%d lr:%f loss:%f qps:%.2f acc1:%.4f acc5:%.4f" % (
-                            pass_id, batch_id, avg_lr, avg_loss, nsamples / local_time,
-                            acc1, acc5))
+                        logger.info("Pass:%d batch:%d lr:%f loss:%f qps:%.2f "
+                            "acc1:%.4f acc5:%.4f" % (pass_id, batch_id, avg_lr,
+                            avg_loss, nsamples / local_time, acc1, acc5))
                     else:
-                        print("Pass:%d batch:%d lr:%f loss:%f qps:%.2f" % (
-                            pass_id, batch_id, avg_lr, avg_loss, nsamples / local_time))
+                        logger.info("Pass:%d batch:%d lr:%f loss:%f qps:%.2f" %(
+                            pass_id, batch_id, avg_lr, avg_loss,
+                            nsamples / local_time))
                     local_time = 0
                     nsamples = 0
                     local_train_info = [[], [], [], []]
