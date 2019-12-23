@@ -23,7 +23,7 @@ from plsc.version import plsc_version
 
 
 REQUIRED_PACKAGES = [
-    'sklearn', 'easydict', 'Pillow', 'numpy', 'scipy'
+    'sklearn', 'easydict', 'Pillow', 'numpy', 'scipy', 'six'
 ]
 
 

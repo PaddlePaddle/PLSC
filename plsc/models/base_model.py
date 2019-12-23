@@ -19,7 +19,7 @@ import numpy as np
 import paddle
 import paddle.fluid as fluid
 from paddle.fluid import unique_name
-import dist_algo
+from . import dist_algo
 
 
 __all__ = ["BaseModel"]
@@ -73,7 +73,7 @@ class BaseModel(object):
                                           param_attr,
                                           bias_attr)
         elif loss_type == "arcface":
-            loss, prob = self.fc_arcface(emb,
+            loss, prob = self.arcface(emb,
                                          label,
                                          num_classes,
                                          param_attr,

@@ -5,6 +5,7 @@ import pickle
 import functools
 import numpy as np
 import paddle
+import six
 from PIL import Image, ImageEnhance
 try:
     from StringIO import StringIO
@@ -238,9 +239,9 @@ def load_bin(path, image_size):
     for flip in [0, 1]:
         data = np.empty((len(issame_list)*2, 3, image_size[0], image_size[1]))
         data_list.append(data)
-    for i in xrange(len(issame_list)*2):
+    for i in range(len(issame_list)*2):
         _bin = bins[i]
-        if not isinstance(_bin, basestring):
+        if not isinstance(_bin, six.string_types):
             _bin = _bin.tostring()
         img_ori = Image.open(StringIO(_bin))
         for flip in [0, 1]:
