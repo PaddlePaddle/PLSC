@@ -57,6 +57,10 @@ softmax的计算公示如下图所示：
 
   飞桨是由百度研发的一款源于产业实践的开源深度学习平台，致力于让深度学习技术的创新与应用更简单。PLSC基于飞桨平台研发，实现与飞桨平台的无缝链接，可以更好地服务产业实践。
 
+- 支持大规模分类
+
+  单机8张V100 GPU配置下，支持的分类类别数增大了2.52倍;
+
 - 包含多种预训练模型
 
   除了PLSC库源码，我们还发布了基于ResNet50模型、ResNet101模型、ResNet152模型的大规模分类模型在多种数据集上的预训练模型，方便用户基于这些预训练模型进行下游任务的fine-tuning。
@@ -73,7 +77,7 @@ softmax的计算公示如下图所示：
 
 | 模型             | 描述           |
 | :--------------- | :------------- |
-| [resnet50_distarcface_ms1m_v2](http://icm.baidu-int.com/user-center/account) | 该模型使用ResNet50网络训练，数据集为MS1M_v2，训练阶段使用的loss_type为'dist_arcface'，预训练模型在lfw验证集上的验证精度为0.99817。 | 
+| [resnet50_distarcface_ms1m_arcface](https://plsc.bj.bcebos.com/pretrained_model/resnet50_distarcface_ms1mv2.tar.gz) | 该模型使用ResNet50网络训练，数据集为MS1M-ArcFace，训练阶段使用的loss_type为'dist_arcface'，预训练模型在lfw验证集上的验证精度为0.99817。 | 
 
 ### 训练性能
 
@@ -109,3 +113,10 @@ softmax的计算公示如下图所示：
 
 * [分布式参数转换](docs/distributed_params.md)
 * [Base64格式图像预处理](docs/base64_preprocessor.md)
+
+* 2019.12.23
+  **`0.1.0`**
+  *PaddlePaddle大规模分类库（PLSC）发布，内建ResNet50、ResNet101和ResNet152三种模型，并支持自定义模型;
+  * 单机8张V100 GPU配置下，ResNet50模型一百万类别训练速度2,122.56 images/s, 并支持多机分布式训练;
+  * 发布模型在线预测库;
+  * 发布基于ResNet50网络和MS1M-ArcFace数据集的预训练模型。
