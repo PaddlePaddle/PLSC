@@ -450,16 +450,10 @@ class Entry(object):
             checkpoint_dir = self.checkpoint_dir
 
         if self.fs_name is not None:
-            ans = 'y'
             if os.path.exists(checkpoint_dir):
-                ans = input("Downloading pretrained models, but the local "
-                            "checkpoint directory ({}) exists, overwrite it "
-                            "or not? [Y/N]".format(checkpoint_dir))
-
-            if ans.lower() == 'y':
-                if os.path.exists(checkpoint_dir):
-                    logger.info("Using the local checkpoint directory.")
-                    shutil.rmtree(checkpoint_dir)
+                logger.info("Local dir {} exists, we'll overwrite it.".format(
+                    checkpoint_dir))
+                shutil.rmtree(checkpoint_dir)
                 os.makedirs(checkpoint_dir)
 
                 # sync all trainers to avoid loading checkpoints before 
@@ -537,12 +531,8 @@ class Entry(object):
         assert self.model_save_dir, \
             "Does not set model_save_dir for inference model converting."
         if os.path.exists(self.model_save_dir):
-            ans = input("model_save_dir for inference model ({}) exists, "
-                        "overwrite it or not? [Y/N]".format(model_save_dir))
-            if ans.lower() == 'n':
-                logger.error("model_save_dir for inference model exists, "
-                            "and cannot overwrite it.")
-                exit()
+            logger.info("model_save_dir for inference model ({}) exists, "
+                        "we will overwrite it.".format(self.model_save_dir))
             shutil.rmtree(self.model_save_dir)
         fluid.io.save_inference_model(self.model_save_dir,
                                       feeded_var_names=[image.name],
@@ -550,7 +540,7 @@ class Entry(object):
                                       executor=exe,
                                       main_program=main_program)
         if self.fs_name:
-            self.put_files_to_hdfs(model_save_dir)
+            self.put_files_to_hdfs(self.model_save_dir)
 
     def predict(self):
         model_name = self.model_name
