@@ -12,37 +12,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import division
 from __future__ import print_function
+
 import math
 
-from six.moves import reduce
 import paddle.fluid as fluid
-from paddle.fluid.layer_helper import LayerHelper
-from paddle.fluid.framework import Variable, default_startup_program
-from paddle.fluid.param_attr import ParamAttr
-from paddle.fluid.initializer import Normal, Constant
+import paddle.fluid.layers.collective as collective
 import paddle.fluid.layers.nn as nn
 import paddle.fluid.layers.ops as ops
-import paddle.fluid.layers.collective as collective
+from paddle.fluid.framework import Variable, default_startup_program
+from paddle.fluid.initializer import Normal
+from paddle.fluid.layer_helper import LayerHelper
 from paddle.fluid.optimizer import Optimizer
+from paddle.fluid.param_attr import ParamAttr
+from six.moves import reduce
+
+__all__ = ['distributed_arcface_classify', 'distributed_softmax_classify']
 
 
 class DistributedClassificationOptimizer(Optimizer):
-    '''
-    A optimizer wrapper to generate backward network for distributed
+    """
+    An optimizer wrapper to generate backward network for distributed
     classification training of model parallelism.
-    '''
+    """
 
-    def __init__(self, optimizer, batch_size, use_fp16=False):
+    def __init__(self, optimizer, batch_size):
         self._optimizer = optimizer
         self._batch_size = batch_size
-        self._use_fp16 = use_fp16
 
     def minimize(self,
                  loss,
                  startup_program=None,
                  parameter_list=None,
-                 no_grad_set=None):
+                 no_grad_set=None,
+                 grad_clip=None):
         assert loss._get_info('shard_logit')
 
         shard_logit = loss._get_info('shard_logit')
@@ -52,7 +56,6 @@ class DistributedClassificationOptimizer(Optimizer):
 
         op_maker = fluid.core.op_proto_and_checker_maker
         op_role_key = op_maker.kOpRoleAttrName()
-        op_role_var_key = op_maker.kOpRoleVarAttrName()
         backward_role = int(op_maker.OpRole.Backward)
         loss_backward_role = int(op_maker.OpRole.Loss) | int(
             op_maker.OpRole.Backward)
@@ -79,42 +82,41 @@ class DistributedClassificationOptimizer(Optimizer):
         # insert the calculated gradient 
         dtype = shard_logit.dtype
         shard_one_hot = fluid.layers.create_tensor(dtype, name='shard_one_hot')
-        block._insert_op(
-            index - 1,
-            type='one_hot',
-            inputs={'X': shard_label},
-            outputs={'Out': shard_one_hot},
-            attrs={
-                'depth': shard_dim,
-                'allow_out_of_range': True,
-                op_role_key: backward_role
-            })
+        block._insert_op(index - 1,
+                         type='one_hot',
+                         inputs={'X': shard_label},
+                         outputs={'Out': shard_one_hot},
+                         attrs={
+                             'depth': shard_dim,
+                             'allow_out_of_range': True,
+                             op_role_key: backward_role
+                         })
         shard_logit_grad = fluid.layers.create_tensor(
             dtype, name=fluid.backward._append_grad_suffix_(shard_logit.name))
-        block._insert_op(
-            index,
-            type='elementwise_sub',
-            inputs={'X': shard_prob,
-                    'Y': shard_one_hot},
-            outputs={'Out': shard_logit_grad},
-            attrs={op_role_key: backward_role})
-        block._insert_op(
-            index + 1,
-            type='scale',
-            inputs={'X': shard_logit_grad},
-            outputs={'Out': shard_logit_grad},
-            attrs={
-                'scale': 1.0 / self._batch_size,
-                op_role_key: loss_backward_role
-            })
+        block._insert_op(index,
+                         type='elementwise_sub',
+                         inputs={
+                             'X': shard_prob,
+                             'Y': shard_one_hot},
+                         outputs={
+                             'Out': shard_logit_grad},
+                         attrs={op_role_key: backward_role})
+        block._insert_op(index + 1,
+                         type='scale',
+                         inputs={'X': shard_logit_grad},
+                         outputs={'Out': shard_logit_grad},
+                         attrs={
+                             'scale': 1.0 / self._batch_size,
+                             op_role_key: loss_backward_role
+                         })
         return ret
 
 
 class DistributedClassifier(object):
-    '''
+    """
     Tookit for distributed classification, in which the parameter of the last
     full-connected layer is distributed to all trainers
-    '''
+    """
 
     def __init__(self, nclasses, nranks, rank_id, layer_helper):
         self.nclasses = nclasses
@@ -136,29 +138,29 @@ class DistributedClassifier(object):
                          dtype,
                          in_dim,
                          param_attr=None,
+                         use_bias=True,
                          bias_attr=None,
-                         transpose_weight=False,
-                         use_bias=True):
+                         transpose_weight=False):
         if param_attr is None:
-            stdv = math.sqrt(2.0 / (in_dim + self.nclasses))
-            param_attr = ParamAttr(initializer=Normal(scale=stdv))
+            stddev = math.sqrt(2.0 / (in_dim + self.nclasses))
+            param_attr = ParamAttr(initializer=Normal(scale=stddev))
         weight_shape = [self.shard_dim, in_dim
                         ] if transpose_weight else [in_dim, self.shard_dim]
         weight = self._layer_helper.create_parameter(
             shape=weight_shape, dtype=dtype, attr=param_attr, is_bias=False)
-        # avoid distributed parameter allreduce gradients
+
+        # avoid allreducing gradients for distributed parameters
         weight.is_distributed = True
-        # avoid distributed parameter broadcasting in startup program
+        # avoid broadcasting distributed parameters in startup program
         default_startup_program().global_block().vars[
             weight.name].is_distributed = True
 
         bias = None
         if use_bias:
-            bias = self._layer_helper.create_parameter(
-                shape=[self.shard_dim],
-                attr=bias_attr,
-                dtype=dtype,
-                is_bias=True)
+            bias = self._layer_helper.create_parameter(shape=[self.shard_dim],
+                                                       attr=bias_attr,
+                                                       dtype=dtype,
+                                                       is_bias=True)
             bias.is_distributed = True
             default_startup_program().global_block().vars[
                 bias.name].is_distributed = True
@@ -195,12 +197,11 @@ class DistributedClassifier(object):
                          use_bias=True,
                          bias_attr=None):
         flatten_dim = reduce(lambda a, b: a * b, x.shape[1:], 1)
-        weight, bias = self.create_parameter(
-            dtype=x.dtype,
-            in_dim=flatten_dim,
-            param_attr=param_attr,
-            bias_attr=bias_attr,
-            use_bias=use_bias)
+        weight, bias = self.create_parameter(dtype=x.dtype,
+                                             in_dim=flatten_dim,
+                                             param_attr=param_attr,
+                                             bias_attr=bias_attr,
+                                             use_bias=use_bias)
 
         x_all = collective._c_allgather(
             x, nranks=self.nranks, use_calc_stream=True)
@@ -241,11 +242,10 @@ class DistributedClassifier(object):
         reference: ArcFace. https://arxiv.org/abs/1801.07698
         '''
         flatten_dim = reduce(lambda a, b: a * b, x.shape[1:], 1)
-        weight, bias = self.create_parameter(
-            dtype=x.dtype,
-            in_dim=flatten_dim,
-            param_attr=param_attr,
-            use_bias=False)
+        weight, bias = self.create_parameter(dtype=x.dtype,
+                                             in_dim=flatten_dim,
+                                             param_attr=param_attr,
+                                             use_bias=False)
 
         # normalize x
         x_l2 = ops.sqrt(nn.reduce_sum(ops.square(x), dim=1))
@@ -256,12 +256,11 @@ class DistributedClassifier(object):
         label_all = collective._c_allgather(
             label, nranks=self.nranks, use_calc_stream=True)
         label_all.stop_gradient = True
-        shard_label = nn.shard_index(
-            label_all,
-            index_num=self.nclasses,
-            nshards=self.nranks,
-            shard_id=self.rank_id,
-            ignore_value=-1)
+        shard_label = nn.shard_index(label_all,
+                                     index_num=self.nclasses,
+                                     nshards=self.nranks,
+                                     shard_id=self.rank_id,
+                                     ignore_value=-1)
         # TODO check necessary
         shard_label.stop_gradient = True
 
@@ -295,16 +294,16 @@ class DistributedClassifier(object):
         return avg_loss
 
 
-def _distributed_softmax_classify(x,
-                                  label,
-                                  class_num,
-                                  nranks,
-                                  rank_id,
-                                  param_attr=None,
-                                  use_bias=True,
-                                  bias_attr=None,
-                                  name=None):
-    '''
+def distributed_softmax_classify(x,
+                                 label,
+                                 class_num,
+                                 nranks,
+                                 rank_id,
+                                 param_attr=None,
+                                 use_bias=True,
+                                 bias_attr=None,
+                                 name=None):
+    """
     Classification layer with FC, softmax and cross entropy calculation of
     distibuted version in case of too large number of classes.
     
@@ -342,26 +341,29 @@ def _distributed_softmax_classify(x,
                                                             class_num=1000,
                                                             nranks=8,
                                                             rank_id=0)
-    '''
+    """
 
     if name is None:
         name = 'dist@softmax@rank@%05d' % rank_id
     helper = LayerHelper(name, **locals())
     classifier = DistributedClassifier(class_num, nranks, rank_id, helper)
-    return classifier.softmax_classify(x, label, param_attr, use_bias,
+    return classifier.softmax_classify(x,
+                                       label,
+                                       param_attr,
+                                       use_bias,
                                        bias_attr)
 
 
-def _distributed_arcface_classify(x,
-                                  label,
-                                  class_num,
-                                  nranks,
-                                  rank_id,
-                                  margin=0.5,
-                                  logit_scale=64.0,
-                                  param_attr=None,
-                                  name=None):
-    '''
+def distributed_arcface_classify(x,
+                                 label,
+                                 class_num,
+                                 nranks,
+                                 rank_id,
+                                 margin=0.5,
+                                 logit_scale=64.0,
+                                 param_attr=None,
+                                 name=None):
+    """
     Classification layer with ArcFace loss of distibuted version in case of
     too large number of classes. the equation is
 
@@ -409,15 +411,13 @@ def _distributed_arcface_classify(x,
                                                                  class_num=1000,
                                                                  nranks=8,
                                                                  rank_id=0)
-    '''
+    """
     if name is None:
         name = 'dist@arcface@rank@%05d' % rank_id
     helper = LayerHelper(name, **locals())
     classifier = DistributedClassifier(class_num, nranks, rank_id, helper)
-    return classifier.arcface_classify(
-        x=x,
-        label=label,
-        margin=margin,
-        logit_scale=logit_scale,
-        param_attr=param_attr)
-
+    return classifier.arcface_classify(x=x,
+                                       label=label,
+                                       margin=margin,
+                                       logit_scale=logit_scale,
+                                       param_attr=param_attr)
