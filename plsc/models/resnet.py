@@ -12,14 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
 import paddle.fluid as fluid
-import math
-import os
-import numpy as np
-from paddle.fluid import unique_name
-from .base_model import BaseModel
 
+from .base_model import BaseModel
 
 __all__ = ["ResNet", "ResNet50", "ResNet101", "ResNet152"]
 
@@ -33,7 +28,7 @@ class ResNet(BaseModel):
     def build_network(self,
                       input,
                       label,
-                      is_train):
+                      is_train=True):
         layers = self.layers
         supported_layers = [50, 101, 152]
         assert layers in supported_layers, \
