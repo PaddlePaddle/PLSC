@@ -37,66 +37,82 @@ class DistributedClassificationOptimizer(Optimizer):
     A optimizer wrapper to generate backward network for distributed
     classification training of model parallelism.
     '''
+    def init_fp16_params(self, loss_type, fp16_user_dict):
+        # set default value for fp16_params_dict
+        fp16_params_dict = dict()
+        fp16_params_dict['amp_lists']= None
+        fp16_params_dict['init_loss_scaling'] = 1.0
+        fp16_params_dict['incr_every_n_steps'] = 1000
+        fp16_params_dict['decr_every_n_nan_or_inf'] = 2
+        fp16_params_dict['incr_ratio'] = 2.0
+        fp16_params_dict['decr_ratio'] = 0.5
+        fp16_params_dict['use_dynamic_loss_scaling'] = True
+        if fp16_user_dict is not None:
+            # update fp16_params_dict
+            for key in fp16_user_dict:
+                if fp16_params_dict.has_key(key):
+                    fp16_params_dict[key] = fp16_user_dict[key]
+                else:
+                    print("Warning: can't find name %s in our fp16_params_dict. "
+                          "Please check your dict key. You can set fp16 params only "
+                          "in [amp_lists, init_loss_scaling, decr_every_n_nan_or_inf, "
+                          "incr_ratio, decr_ratio, use_dynamic_loss_scaling]" % (key))
+
+        self._amp_lists = fp16_params_dict['amp_lists']
+        if self._amp_lists is None:
+            self._amp_lists = AutoMixedPrecisionLists()
+
+        self._loss_type = loss_type
+        self._loss_scaling = layers.create_global_var(
+            name=unique_name.generate("loss_scaling"),
+            shape=[1],
+            value=fp16_params_dict['init_loss_scaling'],
+            dtype='float32',
+            persistable=True)
+        self._use_dynamic_loss_scaling = fp16_params_dict['use_dynamic_loss_scaling']
+        if self._use_dynamic_loss_scaling:
+            self._incr_every_n_steps = layers.fill_constant(
+                shape=[1], dtype='int32', value=fp16_params_dict['incr_every_n_steps'])
+            self._decr_every_n_nan_or_inf = layers.fill_constant(
+                shape=[1], dtype='int32', value=fp16_params_dict['decr_every_n_nan_or_inf'])
+            self._incr_ratio = fp16_params_dict['incr_ratio']
+            self._decr_ratio = fp16_params_dict['decr_ratio']
+            self._num_good_steps = layers.create_global_var(
+                name=unique_name.generate("num_good_steps"),
+                shape=[1],
+                value=0,
+                dtype='int32',
+                persistable=True)
+            self._num_bad_steps = layers.create_global_var(
+                name=unique_name.generate("num_bad_steps"),
+                shape=[1],
+                value=0,
+                dtype='int32',
+                persistable=True)
+
+        # Ensure the data type of learning rate vars is float32 (same as the
+        # master parameter dtype)
+        if isinstance(self._optimizer._learning_rate, float):
+            self._optimizer._learning_rate_map[fluid.default_main_program()] = \
+                        layers.create_global_var(
+                        name=unique_name.generate("learning_rate"),
+                        shape=[1],
+                        value=float(self._optimizer._learning_rate),
+                        dtype='float32',
+                        persistable=True)
 
     def __init__(self,
                  optimizer,
                  batch_size,
                  use_fp16=False,
                  loss_type='dist_arcface',
-                 amp_lists=None,
-                 init_loss_scaling=1.0,
-                 incr_every_n_steps=1000,
-                 decr_every_n_nan_or_inf=2,
-                 incr_ratio=2.0,
-                 decr_ratio=0.5,
-                 use_dynamic_loss_scaling=True):
+                 fp16_user_dict=None):
         self._optimizer = optimizer
         self._batch_size = batch_size
         self._use_fp16 = use_fp16
-        
+
         if self._use_fp16:
-            self._amp_lists = amp_lists
-            if amp_lists is None:
-                self._amp_lists = AutoMixedPrecisionLists()
-
-            self._loss_type = loss_type
-            self._loss_scaling = layers.create_global_var(
-                name=unique_name.generate("loss_scaling"),
-                shape=[1],
-                value=init_loss_scaling,
-                dtype='float32',
-                persistable=True)
-            self._use_dynamic_loss_scaling = use_dynamic_loss_scaling
-            if self._use_dynamic_loss_scaling:
-                self._incr_every_n_steps = layers.fill_constant(
-                    shape=[1], dtype='int32', value=incr_every_n_steps)
-                self._decr_every_n_nan_or_inf = layers.fill_constant(
-                    shape=[1], dtype='int32', value=decr_every_n_nan_or_inf)
-                self._incr_ratio = incr_ratio
-                self._decr_ratio = decr_ratio
-                self._num_good_steps = layers.create_global_var(
-                    name=unique_name.generate("num_good_steps"),
-                    shape=[1],
-                    value=0,
-                    dtype='int32',
-                    persistable=True)
-                self._num_bad_steps = layers.create_global_var(
-                    name=unique_name.generate("num_bad_steps"),
-                    shape=[1],
-                    value=0,
-                    dtype='int32',
-                    persistable=True)
-
-            # Ensure the data type of learning rate vars is float32 (same as the
-            # master parameter dtype)
-            if isinstance(optimizer._learning_rate, float):
-                optimizer._learning_rate_map[fluid.default_main_program()] = \
-                            layers.create_global_var(
-                            name=unique_name.generate("learning_rate"),
-                            shape=[1],
-                            value=float(optimizer._learning_rate),
-                            dtype='float32',
-                            persistable=True)
+            self.init_fp16_params(loss_type, fp16_user_dict)
 
     def fp16_backward(self,
                       block,
@@ -129,6 +145,10 @@ class DistributedClassificationOptimizer(Optimizer):
                                         op_role_key,
                                         backward_role,
                                         loss_backward_role):
+        '''
+        during mixed precision training(use_fp16=True), insert backward ops
+        when loss_type equals dist_arcface.
+        '''
         shard_one_hot = block.create_var(
                         name=fluid.unique_name.generate('shard_one_hot'),
                         dtype=shard_logit.dtype)
@@ -192,6 +212,10 @@ class DistributedClassificationOptimizer(Optimizer):
                                         op_role_key,
                                         backward_role,
                                         loss_backward_role):
+        '''
+        during mixed precision training(use_fp16=True), insert backward ops
+        when loss_type equals dist_softmax.
+        '''
         shard_one_hot = block.create_var(
                         name=fluid.unique_name.generate('shard_one_hot'),
                         dtype=fluid.core.VarDesc.VarType.FP32)
@@ -234,6 +258,55 @@ class DistributedClassificationOptimizer(Optimizer):
                 op_role_key: loss_backward_role
             })
 
+    def insert_commom_backward_op(self,
+                                block,
+                                index,
+                                shard_logit,
+                                shard_prob,
+                                shard_label,
+                                shard_dim,
+                                op_role_key,
+                                backward_role,
+                                loss_backward_role):
+        '''
+        insert backward ops when not using mixed precision training.
+        common use in all lose type.
+        '''
+
+        # insert the calculated gradient
+        dtype = shard_logit.dtype
+        shard_one_hot = fluid.layers.create_tensor(
+            dtype, name='shard_one_hot')
+        block._insert_op(
+            index - 1,
+            type='one_hot',
+            inputs={'X': shard_label},
+            outputs={'Out': shard_one_hot},
+            attrs={
+                'depth': shard_dim,
+                'allow_out_of_range': True,
+                op_role_key: backward_role
+            })
+        shard_logit_grad = fluid.layers.create_tensor(dtype,
+            name=fluid.backward._append_grad_suffix_(shard_logit.name))
+        block._insert_op(
+            index,
+            type='elementwise_sub',
+            inputs={'X': shard_prob,
+                    'Y': shard_one_hot},
+            outputs={'Out': shard_logit_grad},
+            attrs={op_role_key: backward_role})
+        block._insert_op(
+            index + 1,
+            type='scale',
+            inputs={'X': shard_logit_grad},
+            outputs={'Out': shard_logit_grad},
+            attrs={
+                'scale': 1.0 / self._batch_size,
+                op_role_key: loss_backward_role
+            })
+
+
     def minimize(self,
                  loss,
                  startup_program=None,
@@ -275,38 +348,9 @@ class DistributedClassificationOptimizer(Optimizer):
             block._remove_op(index)
             block._remove_op(index - 1)
 
-            # insert the calculated gradient
-            dtype = shard_logit.dtype
-            shard_one_hot = fluid.layers.create_tensor(
-                dtype, name='shard_one_hot')
-            block._insert_op(
-                index - 1,
-                type='one_hot',
-                inputs={'X': shard_label},
-                outputs={'Out': shard_one_hot},
-                attrs={
-                    'depth': shard_dim,
-                    'allow_out_of_range': True,
-                    op_role_key: backward_role
-                })
-            shard_logit_grad = fluid.layers.create_tensor(dtype,
-                name=fluid.backward._append_grad_suffix_(shard_logit.name))
-            block._insert_op(
-                index,
-                type='elementwise_sub',
-                inputs={'X': shard_prob,
-                        'Y': shard_one_hot},
-                outputs={'Out': shard_logit_grad},
-                attrs={op_role_key: backward_role})
-            block._insert_op(
-                index + 1,
-                type='scale',
-                inputs={'X': shard_logit_grad},
-                outputs={'Out': shard_logit_grad},
-                attrs={
-                    'scale': 1.0 / self._batch_size,
-                    op_role_key: loss_backward_role
-                })
+            self.insert_commom_backward_op(block, index, shard_logit, shard_prob,
+                                            shard_label, shard_dim, op_role_key,
+                                            backward_role, loss_backward_role)
             return ret
         else:
             scaled_params_grads = self.fp16_backward(block, scalar, startup_program,
@@ -330,7 +374,7 @@ class DistributedClassificationOptimizer(Optimizer):
                 block._remove_op(index)
                 block._remove_op(index - 1)
 
-                self.insert_dist_arcface_backward_op(block, index, shard_logit, shard_prob, 
+                self.insert_dist_arcface_backward_op(block, index, shard_logit, shard_prob,
                                                     shard_label, shard_dim, op_role_key,
                                                     backward_role, loss_backward_role)
 
@@ -684,4 +728,3 @@ def _distributed_arcface_classify(x,
         margin=margin,
         logit_scale=logit_scale,
         param_attr=param_attr)
-

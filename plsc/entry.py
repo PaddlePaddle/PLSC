@@ -101,6 +101,7 @@ class Entry(object):
 
         self.use_fp16 = False
         self.init_loss_scaling = 1.0
+        self.fp16_user_dict = None
 
         self.val_targets = self.config.val_targets
         self.dataset_dir = self.config.dataset_dir
@@ -154,6 +155,8 @@ class Entry(object):
         """
         self.use_fp16 = use_fp16
         self.init_loss_scaling = loss_scaling
+        self.fp16_user_dict = dict()
+        self.fp16_user_dict['init_loss_scaling'] = self.init_loss_scaling
         logger.info("Use mixed precision training: {}.".format(use_fp16))
         logger.info("Set init loss scaling to {}.".format(loss_scaling))
 
@@ -307,7 +310,7 @@ class Entry(object):
             self.optimizer = DistributedClassificationOptimizer(
                 self.optimizer, global_batch_size, use_fp16=self.use_fp16,
                 loss_type=self.loss_type,
-                init_loss_scaling=self.init_loss_scaling)
+                fp16_user_dict=self.fp16_user_dict)
         elif self.use_fp16:
             self.optimizer = fluid.contrib.mixed_precision.decorate(
                 optimizer=optimizer, init_loss_scaling=self.init_loss_scaling)
