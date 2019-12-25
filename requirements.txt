@@ -6,3 +6,4 @@ Pillow
 sklearn
 easydict
 six
+paddlepaddle-gpu>=1.6.2
