@@ -12,29 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
 from __future__ import division
+from __future__ import print_function
 
-import os
 import argparse
-import random
-import time
-import math
 import logging
+import math
+import os
+import random
 import sqlite3
 import tempfile
+import time
+
 import six
 
-
 logging.basicConfig(level=logging.INFO,
-    format='[%(levelname)s %(asctime)s line:%(lineno)d] %(message)s',
-    datefmt='%d %b %Y %H:%M:%S')
+                    format='[%(asctime)s - %(levelname)s - %(message)s',
+                    datefmt='%d %b %Y %H:%M:%S')
 logger = logging.getLogger()
-
 
 parser = argparse.ArgumentParser(description="""
     Tool to preprocess dataset in base64 format.""")
-    
+
 """
 We assume that the directory of dataset contains a file-list file, and one 
 or more data files. Each line of the file-list file represents a data file.
@@ -111,9 +110,9 @@ class Base64Preprocessor(object):
                     line = line.strip()
                     file_path = os.path.join(self.data_dir, line)
                     with open(file_path, 'r') as df:
-                        for line in df.xreadlines():
-                            line = line.strip().split('\t')
-                            self.insert_to_db(cnt, line)
+                        for line_local in df.xreadlines():
+                            line_local = line_local.strip().split('\t')
+                            self.insert_to_db(cnt, line_local)
                             cnt += 1
                     os.remove(file_path)
             else:
@@ -121,9 +120,9 @@ class Base64Preprocessor(object):
                     line = line.strip()
                     file_path = os.path.join(self.data_dir, line)
                     with open(file_path, 'r') as df:
-                        for line in df:
-                            line = line.strip().split('\t')
-                            self.insert_to_db(cnt, line)
+                        for line_local in df:
+                            line_local = line_local.strip().split('\t')
+                            self.insert_to_db(cnt, line_local)
                             cnt += 1
                     os.remove(file_path)
 
@@ -143,19 +142,20 @@ class Base64Preprocessor(object):
 
         start_time = time.time()
 
-        lines_per_rank = int(math.ceil(num/nranks))
+        lines_per_rank = int(math.ceil(num / nranks))
         total_num = lines_per_rank * nranks
         index = index + index[0:total_num - num]
         assert len(index) == total_num
 
         for rank in range(nranks):
             start = rank * lines_per_rank
-            end = (rank + 1) * lines_per_rank # exclusive
+            end = (rank + 1) * lines_per_rank  # exclusive
             f_handler = open(os.path.join(self.data_dir,
-                ".tmp_" + str(rank)), 'w')
+                                          ".tmp_" + str(rank)), 'w')
             for i in range(start, end):
                 idx = index[i]
-                sql_cmd = "SELECT DATA, LABEL FROM DATASET WHERE ID={};".format(idx)
+                sql_cmd = "SELECT DATA, LABEL FROM DATASET WHERE ID={};".format(
+                    idx)
                 cursor = self.cursor.execute(sql_cmd)
                 for result in cursor:
                     data = result[0]
@@ -174,7 +174,7 @@ class Base64Preprocessor(object):
                 line += '\n'
                 f_t.writelines(line)
                 os.rename(os.path.join(data_dir, ".tmp_" + str(rank)),
-                    os.path.join(data_dir, "base64_rank_{}".format(rank)))
+                          os.path.join(data_dir, "base64_rank_{}".format(rank)))
 
         os.remove(file_list)
         os.rename(temp_file_list, file_list)
@@ -183,21 +183,15 @@ class Base64Preprocessor(object):
     def close_db(self):
         self.conn.close()
         self.tempfile.close()
-        
+
 
 def main():
     global args
-    
+
     obj = Base64Preprocessor(args.data_dir, args.file_list, args.nranks)
     obj.shuffle_files()
     obj.close_db()
 
-    #data_dir = args.data_dir
-    #file_list = args.file_list
-    #nranks = args.nranks
 
-    #names, file_num_map, num = get_image_info(data_dir, file_list)
-    #
-    
 if __name__ == "__main__":
     main()
