@@ -1,23 +1,40 @@
-import os
-import math
-import random
-import pickle
+# Copyright (c) 2019 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import base64
 import functools
+import math
+import os
+import pickle
+import random
+
 import numpy as np
 import paddle
+import six
 from PIL import Image, ImageEnhance
+
 try:
     from StringIO import StringIO
 except ImportError:
     from io import StringIO
+from io import BytesIO
 
 random.seed(0)
 
 DATA_DIM = 112
 THREAD = 8
 BUF_SIZE = 10240
-
 
 img_mean = np.array([127.5, 127.5, 127.5]).reshape((3, 1, 1))
 img_std = np.array([128.0, 128.0, 128.0]).reshape((3, 1, 1))
@@ -218,16 +235,22 @@ def arc_iterator(file_list,
 
 
 def load_bin(path, image_size):
-    bins, issame_list = pickle.load(open(path, 'rb'))
+    if six.PY2:
+        bins, issame_list = pickle.load(open(path, 'rb'))
+    else:
+        bins, issame_list = pickle.load(open(path, 'rb'), encoding='bytes')
     data_list = []
     for flip in [0, 1]:
-        data = np.empty((len(issame_list)*2, 3, image_size[0], image_size[1]))
+        data = np.empty((len(issame_list) * 2, 3, image_size[0], image_size[1]))
         data_list.append(data)
-    for i in xrange(len(issame_list)*2):
+    for i in range(len(issame_list) * 2):
         _bin = bins[i]
-        if not isinstance(_bin, basestring):
-            _bin = _bin.tostring()
-        img_ori = Image.open(StringIO(_bin))
+        if six.PY2:
+            if not isinstance(_bin, six.string_types):
+                _bin = _bin.tostring()
+            img_ori = Image.open(StringIO(_bin))
+        else:
+            img_ori = Image.open(BytesIO(_bin))
         for flip in [0, 1]:
             img = img_ori.copy()
             if flip == 1:
