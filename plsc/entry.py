@@ -12,36 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
 from __future__ import division
-import os
-import sys
-import time
-import argparse
-import numpy as np
-import math
-import pickle
-import subprocess
-import shutil
-import logging
-import tempfile
+from __future__ import print_function
 
+import errno
+import logging
+import math
+import os
+import pickle
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+import numpy as np
 import paddle
 import paddle.fluid as fluid
+import paddle.fluid.incubate.fleet.base.role_maker as role_maker
+import paddle.fluid.transpiler.distribute_transpiler as dist_transpiler
 import sklearn
+from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
+from paddle.fluid.optimizer import Optimizer
+from paddle.fluid.transpiler.details.program_utils import program_to_code
+
 from . import config
-from .models import resnet
 from .models import base_model
+from .models import resnet
 from .models.dist_algo import DistributedClassificationOptimizer
+from .utils import jpeg_reader as reader
 from .utils.learning_rate import lr_warmup
 from .utils.verification import evaluate
-from .utils import jpeg_reader as reader
-from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
-import paddle.fluid.incubate.fleet.base.role_maker as role_maker
-from paddle.fluid.transpiler.details.program_utils import program_to_code
-import paddle.fluid.transpiler.distribute_transpiler as dist_transpiler
-from paddle.fluid.optimizer import Optimizer
-
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,9 +60,6 @@ class Entry(object):
         """
         Check the validation of parameters.
         """
-        assert os.getenv("PADDLE_TRAINERS_NUM") is not None, \
-            "Please start script using paddle.distributed.launch module."
-
         supported_types = ["softmax", "arcface",
                            "dist_softmax", "dist_arcface"]
         assert self.loss_type in supported_types, \
@@ -209,7 +207,7 @@ class Entry(object):
         """
         Set the size of the last hidding layer before the distributed fc-layer.
         """
-        self.emb_size = size
+        self.emb_dim = size
         logger.info("Set emb_size to {}.".format(size))
 
     def set_model(self, model):
@@ -244,7 +242,7 @@ class Entry(object):
 
     def set_loss_type(self, type):
         supported_types = ["dist_softmax", "dist_arcface", "softmax", "arcface"]
-        if not type in supported_types:
+        if type not in supported_types:
             raise ValueError("All supported loss types: {}".format(
                 supported_types))
         self.loss_type = type
@@ -322,13 +320,15 @@ class Entry(object):
                     shape=[1], dtype='int64')
 
                 emb, loss, prob = model.get_output(
-                        input=image,
-                        label=label,
-                        is_train=is_train,
-                        num_classes=self.num_classes,
-                        loss_type=self.loss_type,
-                        margin=self.margin,
-                        scale=self.scale)
+                    input=image,
+                    label=label,
+                    num_ranks=self.num_trainers,
+                    rank_id=self.trainer_id,
+                    is_train=is_train,
+                    num_classes=self.num_classes,
+                    loss_type=self.loss_type,
+                    margin=self.margin,
+                    scale=self.scale)
 
                 acc1 = None
                 acc5 = None
@@ -337,15 +337,22 @@ class Entry(object):
                     if self.calc_train_acc:
                         shard_prob = loss._get_info("shard_prob")
 
-                        prob_all = fluid.layers.collective._c_allgather(shard_prob,
-                            nranks=num_trainers, use_calc_stream=True)
-                        prob_list = fluid.layers.split(prob_all, dim=0,
+                        prob_all = fluid.layers.collective._c_allgather(
+                            shard_prob,
+                            nranks=num_trainers,
+                            use_calc_stream=True)
+                        prob_list = fluid.layers.split(
+                            prob_all,
+                            dim=0,
                             num_or_sections=num_trainers)
                         prob = fluid.layers.concat(prob_list, axis=1)
                         label_all = fluid.layers.collective._c_allgather(label,
-                            nranks=num_trainers, use_calc_stream=True)
-                        acc1 = fluid.layers.accuracy(input=prob, label=label_all, k=1)
-                        acc5 = fluid.layers.accuracy(input=prob, label=label_all, k=5)
+                                                                         nranks=num_trainers,
+                                                                         use_calc_stream=True)
+                        acc1 = fluid.layers.accuracy(input=prob,
+                                                     label=label_all, k=1)
+                        acc5 = fluid.layers.accuracy(input=prob,
+                                                     label=label_all, k=5)
                 else:
                     if self.calc_train_acc:
                         acc1 = fluid.layers.accuracy(input=prob, label=label, k=1)
@@ -436,7 +443,6 @@ class Entry(object):
                 inputs={'X': var},
                 outputs={'Out': var},
                 attrs={'use_calc_stream': True})
-
 
     def load_checkpoint(self,
                         executor,
@@ -633,7 +639,7 @@ class Entry(object):
         for i in range(len(test_list)):
             data_list, issame_list = test_list[i]
             embeddings_list = []
-            for j in xrange(len(data_list)):
+            for j in range(len(data_list)):
                 data = data_list[j]
                 embeddings = None
                 parallel_test_steps = data.shape[0] // real_test_batch_size
@@ -645,7 +651,7 @@ class Entry(object):
                     begin = start + offset
                     end = begin + self.test_batch_size
                     _data = []
-                    for k in xrange(begin, end):
+                    for k in range(begin, end):
                         _data.append((data[k], 0))
                     assert len(_data) == self.test_batch_size
                     [_embeddings] = exe.run(test_program,
@@ -660,7 +666,7 @@ class Entry(object):
                     end = min(beg + self.test_batch_size, data.shape[0])
                     count = end - beg
                     _data = []
-                    for k in xrange(end - self.test_batch_size, end):
+                    for k in range(end - self.test_batch_size, end):
                         _data.append((data[k], 0))
                     [_embeddings] = exe.run(test_program, 
                         fetch_list = fetch_list, feed=feeder.feed(_data),
@@ -806,22 +812,21 @@ class Entry(object):
 
             if self.with_test:
                 test_start = time.time()
-                for i in xrange(len(test_list)):
+                for i in range(len(test_list)):
                     data_list, issame_list = test_list[i]
                     embeddings_list = []
-                    for j in xrange(len(data_list)):
+                    for j in range(len(data_list)):
                         data = data_list[j]
                         embeddings = None
-                        parallel_test_steps = data.shape[0] // real_test_batch_size
-                        beg = 0
-                        end = 0
+                        parallel_test_steps = data.shape[
+                                                  0] // real_test_batch_size
                         for idx in range(parallel_test_steps):
                             start = idx * real_test_batch_size
                             offset = trainer_id * self.test_batch_size
                             begin = start + offset
                             end = begin + self.test_batch_size
                             _data = []
-                            for k in xrange(begin, end):
+                            for k in range(begin, end):
                                 _data.append((data[k], 0))
                             assert len(_data) == self.test_batch_size
                             [_embeddings] = exe.run(test_program,
@@ -836,7 +841,7 @@ class Entry(object):
                             end = min(beg + self.test_batch_size, data.shape[0])
                             count = end - beg
                             _data = []
-                            for k in xrange(end - self.test_batch_size, end):
+                            for k in range(end - self.test_batch_size, end):
                                 _data.append((data[k], 0))
                             [_embeddings] = exe.run(test_program, 
                                 fetch_list = fetch_list_test, feed=test_feeder.feed(_data),
@@ -879,8 +884,8 @@ class Entry(object):
                         pass
                 if trainer_id == 0:
                     fluid.io.save_persistables(exe,
-                        model_save_dir,
-                        origin_prog)
+                                               model_save_dir,
+                                               origin_prog)
                 else:
                     def save_var(var):
                         to_save = "dist@" in var.name and '@rank@' in var.name
