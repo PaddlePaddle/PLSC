@@ -48,7 +48,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%d %b %Y %H:%M:%S')
 logger = logging.getLogger(__name__)
-        
+ 
 
 class Entry(object):
     """
@@ -119,6 +119,7 @@ class Entry(object):
         self.with_test = self.config.with_test
         self.model_save_dir = self.config.model_save_dir
         self.warmup_epochs = self.config.warmup_epochs
+        self.calc_train_acc = False
 
         if self.checkpoint_dir:
             self.checkpoint_dir = os.path.abspath(self.checkpoint_dir)
@@ -184,6 +185,14 @@ class Entry(object):
             directory = os.path.abspath(directory)
         self.model_save_dir = directory
         logger.info("Set model_save_dir to {}.".format(directory))
+
+    def set_calc_acc(self, calc):
+        """
+        Whether to calcuate acc1 and acc5 during training.
+        """
+        self.calc_train_acc = calc
+        logger.info("Calcuating acc1 and acc5 during training: {}.".format(
+            calc))
 
     def set_dataset_dir(self, directory):
         """
@@ -337,21 +346,27 @@ class Entry(object):
                         margin=self.margin,
                         scale=self.scale)
 
-                if self.loss_type in ["dist_softmax", "dist_arcface"]:
-                    shard_prob = loss._get_info("shard_prob")
+                acc1 = None
+                acc5 = None
 
-                    prob_all = fluid.layers.collective._c_allgather(shard_prob,
-                        nranks=num_trainers, use_calc_stream=True)
-                    prob_list = fluid.layers.split(prob_all, dim=0,
-                        num_or_sections=num_trainers)
-                    prob = fluid.layers.concat(prob_list, axis=1)
-                    label_all = fluid.layers.collective._c_allgather(label,
-                        nranks=num_trainers, use_calc_stream=True)
-                    acc1 = fluid.layers.accuracy(input=prob, label=label_all, k=1)
-                    acc5 = fluid.layers.accuracy(input=prob, label=label_all, k=5)
+                if self.loss_type in ["dist_softmax", "dist_arcface"]:
+                    if self.calc_train_acc:
+                        shard_prob = loss._get_info("shard_prob")
+
+                        prob_all = fluid.layers.collective._c_allgather(shard_prob,
+                            nranks=num_trainers, use_calc_stream=True)
+                        prob_list = fluid.layers.split(prob_all, dim=0,
+                            num_or_sections=num_trainers)
+                        prob = fluid.layers.concat(prob_list, axis=1)
+                        label_all = fluid.layers.collective._c_allgather(label,
+                            nranks=num_trainers, use_calc_stream=True)
+                        acc1 = fluid.layers.accuracy(input=prob, label=label_all, k=1)
+                        acc5 = fluid.layers.accuracy(input=prob, label=label_all, k=5)
                 else:
-                    acc1 = fluid.layers.accuracy(input=prob, label=label, k=1)
-                    acc5 = fluid.layers.accuracy(input=prob, label=label, k=5)
+                    if self.calc_train_acc:
+                        acc1 = fluid.layers.accuracy(input=prob, label=label, k=1)
+                        acc5 = fluid.layers.accuracy(input=prob, label=label, k=5)
+
                 optimizer = None
                 if is_train:
                     # initialize optimizer
@@ -451,16 +466,10 @@ class Entry(object):
             checkpoint_dir = self.checkpoint_dir
 
         if self.fs_name is not None:
-            ans = 'y'
             if os.path.exists(checkpoint_dir):
-                ans = input("Downloading pretrained models, but the local "
-                            "checkpoint directory ({}) exists, overwrite it "
-                            "or not? [Y/N]".format(checkpoint_dir))
-
-            if ans.lower() == 'y':
-                if os.path.exists(checkpoint_dir):
-                    logger.info("Using the local checkpoint directory.")
-                    shutil.rmtree(checkpoint_dir)
+                logger.info("Local dir {} exists, we'll overwrite it.".format(
+                    checkpoint_dir))
+                shutil.rmtree(checkpoint_dir)
                 os.makedirs(checkpoint_dir)
 
                 # sync all trainers to avoid loading checkpoints before 
@@ -538,12 +547,8 @@ class Entry(object):
         assert self.model_save_dir, \
             "Does not set model_save_dir for inference model converting."
         if os.path.exists(self.model_save_dir):
-            ans = input("model_save_dir for inference model ({}) exists, "
-                        "overwrite it or not? [Y/N]".format(model_save_dir))
-            if ans.lower() == 'n':
-                logger.error("model_save_dir for inference model exists, "
-                            "and cannot overwrite it.")
-                exit()
+            logger.info("model_save_dir for inference model ({}) exists, "
+                        "we will overwrite it.".format(self.model_save_dir))
             shutil.rmtree(self.model_save_dir)
         fluid.io.save_inference_model(self.model_save_dir,
                                       feeded_var_names=[image.name],
@@ -551,7 +556,7 @@ class Entry(object):
                                       executor=exe,
                                       main_program=main_program)
         if self.fs_name:
-            self.put_files_to_hdfs(model_save_dir)
+            self.put_files_to_hdfs(self.model_save_dir)
 
     def predict(self):
         model_name = self.model_name
@@ -637,11 +642,11 @@ class Entry(object):
 
         feeder = fluid.DataFeeder(place=place,
             feed_list=['image', 'label'], program=test_program)
-        fetch_list = [emb.name, acc1.name, acc5.name]
+        fetch_list = [emb.name]
         real_test_batch_size = self.global_test_batch_size
 
         test_start = time.time()
-        for i in xrange(len(test_list)):
+        for i in range(len(test_list)):
             data_list, issame_list = test_list[i]
             embeddings_list = []
             for j in xrange(len(data_list)):
@@ -659,7 +664,7 @@ class Entry(object):
                     for k in xrange(begin, end):
                         _data.append((data[k], 0))
                     assert len(_data) == self.test_batch_size
-                    [_embeddings, acc1, acc5] = exe.run(test_program,
+                    [_embeddings] = exe.run(test_program,
                         fetch_list = fetch_list, feed=feeder.feed(_data),
                         use_program_cache=True)
                     if embeddings is None:
@@ -673,7 +678,7 @@ class Entry(object):
                     _data = []
                     for k in xrange(end - self.test_batch_size, end):
                         _data.append((data[k], 0))
-                    [_embeddings, acc1, acc5] = exe.run(test_program, 
+                    [_embeddings] = exe.run(test_program, 
                         fetch_list = fetch_list, feed=feeder.feed(_data),
                         use_program_cache=True)
                     _embeddings = _embeddings[0:self.test_batch_size,:]
@@ -746,7 +751,7 @@ class Entry(object):
         if self.with_test:
             test_feeder = fluid.DataFeeder(place=place,
                 feed_list=['image', 'label'], program=test_program)
-            fetch_list_test = [test_emb.name, test_acc1.name, test_acc5.name]
+            fetch_list_test = [test_emb.name] 
             real_test_batch_size = self.global_test_batch_size
     
         if self.checkpoint_dir:
@@ -766,8 +771,11 @@ class Entry(object):
         feeder = fluid.DataFeeder(place=place,
             feed_list=['image', 'label'], program=origin_prog)
     
-        fetch_list = [train_loss.name, global_lr.name,
-                      train_acc1.name, train_acc5.name]
+        if self.calc_train_acc:
+            fetch_list = [train_loss.name, global_lr.name,
+                          train_acc1.name, train_acc5.name]
+        else:
+            fetch_list = [train_loss.name, global_lr.name]
     
         local_time = 0.0
         nsamples = 0
@@ -779,9 +787,13 @@ class Entry(object):
             for batch_id, data in enumerate(train_reader()):
                 nsamples += global_batch_size
                 t1 = time.time()
-                loss, lr, acc1, acc5 = exe.run(train_prog,
-                    feed=feeder.feed(data), fetch_list=fetch_list,
-                    use_program_cache=True)
+                if self.calc_train_acc:
+                    loss, lr, acc1, acc5 = exe.run(train_prog,
+                        feed=feeder.feed(data), fetch_list=fetch_list,
+                        use_program_cache=True)
+                else:
+                    loss, lr = exe.run(train_prog, feed=feeder.feed(data),
+                        fetch_list=fetch_list, use_program_cache=True)
                 t2 = time.time()
                 period = t2 - t1
                 local_time += period
@@ -792,9 +804,14 @@ class Entry(object):
                 if batch_id % inspect_steps == 0:
                     avg_loss = np.mean(local_train_info[0])
                     avg_lr = np.mean(local_train_info[1])
-                    print("Pass:%d batch:%d lr:%f loss:%f qps:%.2f acc1:%.4f acc5:%.4f" % (
-                        pass_id, batch_id, avg_lr, avg_loss, nsamples / local_time,
-                        acc1, acc5))
+                    if self.calc_train_acc:
+                        logger.info("Pass:%d batch:%d lr:%f loss:%f qps:%.2f "
+                            "acc1:%.4f acc5:%.4f" % (pass_id, batch_id, avg_lr,
+                            avg_loss, nsamples / local_time, acc1, acc5))
+                    else:
+                        logger.info("Pass:%d batch:%d lr:%f loss:%f qps:%.2f" %(
+                            pass_id, batch_id, avg_lr, avg_loss,
+                            nsamples / local_time))
                     local_time = 0
                     nsamples = 0
                     local_train_info = [[], [], [], []]
@@ -823,7 +840,7 @@ class Entry(object):
                             for k in xrange(begin, end):
                                 _data.append((data[k], 0))
                             assert len(_data) == self.test_batch_size
-                            [_embeddings, acc1, acc5] = exe.run(test_program,
+                            [_embeddings] = exe.run(test_program,
                                 fetch_list = fetch_list_test, feed=test_feeder.feed(_data),
                                 use_program_cache=True)
                             if embeddings is None:
@@ -837,7 +854,7 @@ class Entry(object):
                             _data = []
                             for k in xrange(end - self.test_batch_size, end):
                                 _data.append((data[k], 0))
-                            [_embeddings, acc1, acc5] = exe.run(test_program, 
+                            [_embeddings] = exe.run(test_program, 
                                 fetch_list = fetch_list_test, feed=test_feeder.feed(_data),
                                 use_program_cache=True)
                             _embeddings = _embeddings[0:self.test_batch_size,:]

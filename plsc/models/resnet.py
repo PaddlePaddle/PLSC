@@ -41,13 +41,11 @@ class ResNet(BaseModel):
 
         if layers == 50:
             depth = [3, 4, 14, 3]
-            num_filters = [64, 128, 256, 512]
         elif layers == 101:
             depth = [3, 4, 23, 3]
-            num_filters = [256, 512, 1024, 2048]
         elif layers == 152:
             depth = [3, 8, 36, 3]
-            num_filters = [256, 512, 1024, 2048]
+        num_filters = [64, 128, 256, 512]
 
         conv = self.conv_bn_layer(
             input=input, num_filters=64, filter_size=3, stride=1,

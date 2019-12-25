@@ -2,8 +2,7 @@
 
 ## 默认配置参数
 
-PLSC大规模分类库提供了默认配置参数，用于设置训练、评估和模型相关的信息，如训练数
-据集目录、训练轮数等。
+PLSC大规模分类库提供了默认配置参数，用于设置训练、评估和模型相关的信息，如训练数据集目录、训练轮数等。
 
 这些参数信息位于plsc.config模块中，下面给出这些参数的含义和默认值。
 
@@ -58,6 +57,7 @@ PLSC大规模分类库提供了默认配置参数，用于设置训练、评估�
 | set_model_save_dir(dir) | 设置模型保存路径model_save_dir | 类型为字符串 |
 | set_dataset_dir(dir) | 设置数据集根目录dataset_dir | 类型为字符串 |
 | set_train_image_num(num) | 设置训练图像的总数量 | 类型为int |
+| set_calc_acc(calc) | 设置是否在训练时计算acc1和acc5值 | 类型为bool |
 | set_class_num(num) | 设置分类类别的总数量 | 类型为int |
 | set_emb_size(size) | 设置最后一层隐层的输出维度 | 类型为int |
 | set_model(model) | 设置用户使用的自定义模型类实例 | BaseModel的子类 |
@@ -71,7 +71,11 @@ PLSC大规模分类库提供了默认配置参数，用于设置训练、评估�
 | test() | 模型评估 | None |
 | train() | 模型训练 | None |
 
-备注：上述API均为PaddlePaddle大规模分类库PLSC的Entry类的方法，需要通过该类的实例
+备注：
+
+当设置set_calc_acc的参数值为True，会在训练是计算acc1和acc5的值，但这会占用额外的显存空间。
+
+上述API均为PaddlePaddle大规模分类库PLSC的Entry类的方法，需要通过该类的实例
 调用，例如：
 
 ```python

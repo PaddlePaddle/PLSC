@@ -23,7 +23,7 @@ from plsc.version import plsc_version
 
 
 REQUIRED_PACKAGES = [
-    'sklearn', 'easydict', 'Pillow', 'numpy', 'scipy'
+    'sklearn', 'easydict', 'Pillow', 'numpy', 'scipy', 'six'
 ]
 
 
@@ -46,10 +46,6 @@ setup(
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Mathematics',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
