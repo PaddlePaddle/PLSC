@@ -1,16 +1,19 @@
-import os
-import math
-import random
-import pickle
 import functools
+import math
+import os
+import pickle
+import random
+
 import numpy as np
 import paddle
 import six
 from PIL import Image, ImageEnhance
+
 try:
     from StringIO import StringIO
 except ImportError:
     from io import StringIO
+from io import BytesIO
 
 random.seed(0)
 
@@ -234,16 +237,22 @@ def arc_iterator(data,
 
 
 def load_bin(path, image_size):
-    bins, issame_list = pickle.load(open(path, 'rb'))
+    if six.PY2:
+        bins, issame_list = pickle.load(open(path, 'rb'))
+    else:
+        bins, issame_list = pickle.load(open(path, 'rb'), encoding='bytes')
     data_list = []
     for flip in [0, 1]:
-        data = np.empty((len(issame_list)*2, 3, image_size[0], image_size[1]))
+        data = np.empty((len(issame_list) * 2, 3, image_size[0], image_size[1]))
         data_list.append(data)
-    for i in range(len(issame_list)*2):
+    for i in range(len(issame_list) * 2):
         _bin = bins[i]
-        if not isinstance(_bin, six.string_types):
-            _bin = _bin.tostring()
-        img_ori = Image.open(StringIO(_bin))
+        if six.PY2:
+            if not isinstance(_bin, six.string_types):
+                _bin = _bin.tostring()
+            img_ori = Image.open(StringIO(_bin))
+        else:
+            img_ori = Image.open(BytesIO(_bin))
         for flip in [0, 1]:
             img = img_ori.copy()
             if flip == 1:
