@@ -291,7 +291,7 @@ class Entry(object):
     
         if self.loss_type in ["dist_softmax", "dist_arcface"]:
             self.optimizer = DistributedClassificationOptimizer(
-                self.optimizer, global_batch_size)
+                self.optimizer, self.train_batch_size)
 
         return self.optimizer
 
