@@ -264,11 +264,15 @@ class Entry(object):
         self.optimizer = optimizer
         logger.info("User manually set optimizer.")
 
+    def set_with_test(self, with_test):
+        self.with_test = with_test
+        logger.info("Set with_test to {}.".format(with_test))
+
     def _get_optimizer(self):
         if not self.optimizer:
             bd = [step for step in self.lr_steps]
             start_lr = self.lr
-    
+
             global_batch_size = self.global_train_batch_size
             train_image_num = self.train_image_num
             images_per_trainer = int(math.ceil(
