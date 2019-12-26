@@ -15,6 +15,7 @@
 from __future__ import print_function
 import math
 
+import logging
 from six.moves import reduce
 import paddle.fluid as fluid
 from paddle.fluid.layer_helper import LayerHelper
@@ -53,10 +54,10 @@ class DistributedClassificationOptimizer(Optimizer):
                 if fp16_params_dict.has_key(key):
                     fp16_params_dict[key] = fp16_user_dict[key]
                 else:
-                    print("Warning: can't find name %s in our fp16_params_dict. "
+                    logging.warning("Can't find name '%s' in our fp16_params_dict. "
                           "Please check your dict key. You can set fp16 params only "
                           "in [amp_lists, init_loss_scaling, decr_every_n_nan_or_inf, "
-                          "incr_ratio, decr_ratio, use_dynamic_loss_scaling]" % (key))
+                          "incr_ratio, decr_ratio, use_dynamic_loss_scaling]." % (key))
 
         self._amp_lists = fp16_params_dict['amp_lists']
         if self._amp_lists is None:
