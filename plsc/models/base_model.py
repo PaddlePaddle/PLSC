@@ -29,13 +29,14 @@ class BaseModel(object):
     which constructs the custom model. And we will add the
     distributed fc layer for you automatically.
     """
+
     def __init__(self):
         super(BaseModel, self).__init__()
 
     def build_network(self, input, label, is_train=True):
         """
-        Construct the custom model, and we will add the
-        distributed fc layer for you automatically.
+        Construct the custom model, and we will add the distributed fc layer
+        at the end of your model automatically.
         """
         raise NotImplementedError(
             "You must implement this method in your subclass.")
@@ -44,8 +45,8 @@ class BaseModel(object):
                    input,
                    label,
                    num_classes,
-                   num_ranks,
-                   rank_id,
+                   num_ranks=1,
+                   rank_id=0,
                    is_train=True,
                    param_attr=None,
                    bias_attr=None,
@@ -166,4 +167,3 @@ class BaseModel(object):
         one_hot.stop_gradient = True
 
         return avg_loss, prob
-
