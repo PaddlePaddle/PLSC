@@ -741,7 +741,7 @@ class Entry(object):
         test_end = time.time()
         print("test time: {}".format(test_end - test_start))
 
-    def train(self):
+    def train(self, param_attr=None, bias_attr=None):
         self._check()
 
         trainer_id = self.trainer_id
@@ -757,7 +757,10 @@ class Entry(object):
             self.strategy = strategy
 
         train_emb, train_loss, train_acc1, train_acc5, optimizer = \
-            self.build_program(True, False)
+            self.build_program(True,
+                               False,
+                               param_attr=param_attr,
+                               bias_attr=bias_attr)
     
         global_lr = optimizer._global_learning_rate(
             program=self.train_program)
