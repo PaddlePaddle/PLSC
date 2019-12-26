@@ -732,10 +732,11 @@ class Entry(object):
             acc, std = np.mean(accuracy), np.std(accuracy)
 
             print('[%s][%d]XNorm: %f' % (test_name_list[i], pass_id, xnorm))
-            print('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' % (test_name_list[i],
-                                                           pass_id,
-                                                           acc,
-                                                           std))
+            print('[{}][{}]Accuracy-Flip: {:.5f}+-{:.5f}'.format(
+                test_name_list[i],
+                pass_id,
+                acc,
+                std))
             sys.stdout.flush()
         test_end = time.time()
         print("test time: {}".format(test_end - test_start))
