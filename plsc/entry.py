@@ -695,8 +695,8 @@ class Entry(object):
                                             feed=feeder.feed(_data),
                                             use_program_cache=True)
                     if embeddings is None:
-                        embeddings = np.zeros(
-                            (data.shape[0], _embeddings.shape[1]))
+                        embeddings = np.zeros((data.shape[0],
+                                               _embeddings.shape[1]))
                     end = start + real_test_batch_size
                     embeddings[start:end, :] = _embeddings[:, :]
                 beg = parallel_test_steps * real_test_batch_size
