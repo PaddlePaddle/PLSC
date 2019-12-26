@@ -242,13 +242,13 @@ class Entry(object):
         self.warmup_epochs = num
         logger.info("Set warmup_epochs to {}.".format(num))
 
-    def set_loss_type(self, type):
+    def set_loss_type(self, loss_type):
         supported_types = ["dist_softmax", "dist_arcface", "softmax", "arcface"]
-        if type not in supported_types:
+        if loss_type not in supported_types:
             raise ValueError("All supported loss types: {}".format(
                 supported_types))
-        self.loss_type = type
-        logger.info("Set loss_type to {}.".format(type))
+        self.loss_type = loss_type
+        logger.info("Set loss_type to {}.".format(loss_type))
 
     def set_image_shape(self, shape):
         if not isinstance(shape, (list, tuple)):
@@ -258,9 +258,9 @@ class Entry(object):
 
     def set_optimizer(self, optimizer):
         if not isinstance(optimizer, Optimizer):
-            raise ValueError("Optimizer must be type of Optimizer")
+            raise ValueError("Optimizer must be of type Optimizer")
         self.optimizer = optimizer
-        logger.info("User manually set optimizer")
+        logger.info("User manually set optimizer.")
 
     def _get_optimizer(self):
         if not self.optimizer:
@@ -272,7 +272,7 @@ class Entry(object):
             images_per_trainer = int(math.ceil(
                 train_image_num * 1.0 / self.num_trainers))
             steps_per_pass = int(math.ceil(
-                images_per_trainer * 1.0 / self.train_batch_size)) 
+                images_per_trainer * 1.0 / self.train_batch_size))
             logger.info("Steps per epoch: %d" % steps_per_pass)
             warmup_steps = steps_per_pass * self.warmup_epochs
             batch_denom = 1024
@@ -282,7 +282,10 @@ class Entry(object):
             logger.info("lr_step: {}".format(lr))
             if self.warmup_epochs:
                 lr_val = lr_warmup(fluid.layers.piecewise_decay(boundaries=bd,
-                    values=lr), warmup_steps, start_lr, base_lr)
+                                                                values=lr),
+                                   warmup_steps,
+                                   start_lr,
+                                   base_lr)
             else:
                 lr_val = fluid.layers.piecewise_decay(boundaries=bd, values=lr)
     
@@ -299,7 +302,9 @@ class Entry(object):
 
     def build_program(self,
                       is_train=True,
-                      use_parallel_test=False):
+                      use_parallel_test=False,
+                      param_attr=None,
+                      bias_attr=None):
         model_name = self.model_name
         assert not (is_train and use_parallel_test), \
             "is_train and use_parallel_test cannot be set simultaneously."
@@ -317,18 +322,22 @@ class Entry(object):
         with fluid.program_guard(main_program, startup_program):
             with fluid.unique_name.guard():
                 image = fluid.layers.data(name='image',
-                    shape=image_shape, dtype='float32')
+                                          shape=image_shape,
+                                          dtype='float32')
                 label = fluid.layers.data(name='label',
-                    shape=[1], dtype='int64')
+                                          shape=[1],
+                                          dtype='int64')
 
                 emb, loss, prob = model.get_output(
                     input=image,
                     label=label,
-                    num_ranks=self.num_trainers,
-                    rank_id=self.trainer_id,
+                    num_ranks=num_trainers,
+                    rank_id=trainer_id,
                     is_train=is_train,
                     num_classes=self.num_classes,
                     loss_type=self.loss_type,
+                    param_attr=param_attr,
+                    bias_attr=bias_attr,
                     margin=self.margin,
                     scale=self.scale)
 
@@ -348,17 +357,24 @@ class Entry(object):
                             dim=0,
                             num_or_sections=num_trainers)
                         prob = fluid.layers.concat(prob_list, axis=1)
-                        label_all = fluid.layers.collective._c_allgather(label,
-                                                                         nranks=num_trainers,
-                                                                         use_calc_stream=True)
+                        label_all = fluid.layers.collective._c_allgather(
+                            label,
+                            nranks=num_trainers,
+                            use_calc_stream=True)
                         acc1 = fluid.layers.accuracy(input=prob,
-                                                     label=label_all, k=1)
+                                                     label=label_all,
+                                                     k=1)
                         acc5 = fluid.layers.accuracy(input=prob,
-                                                     label=label_all, k=5)
+                                                     label=label_all,
+                                                     k=5)
                 else:
                     if self.calc_train_acc:
-                        acc1 = fluid.layers.accuracy(input=prob, label=label, k=1)
-                        acc5 = fluid.layers.accuracy(input=prob, label=label, k=5)
+                        acc1 = fluid.layers.accuracy(input=prob,
+                                                     label=label,
+                                                     k=1)
+                        acc5 = fluid.layers.accuracy(input=prob,
+                                                     label=label,
+                                                     k=5)
 
                 optimizer = None
                 if is_train:
@@ -368,15 +384,16 @@ class Entry(object):
                         dist_optimizer = self.fleet.distributed_optimizer(
                             optimizer, strategy=self.strategy)
                         dist_optimizer.minimize(loss)
-                    else:
+                    else:  # single card training
                         optimizer.minimize(loss)
                     if "dist" in self.loss_type:
                         optimizer = optimizer._optimizer
                 elif use_parallel_test:
-                    emb = fluid.layers.collective._c_allgather(emb,
-                        nranks=num_trainers, use_calc_stream=True)
+                    emb = fluid.layers.collective._c_allgather(
+                        emb,
+                        nranks=num_trainers,
+                        use_calc_stream=True)
         return emb, loss, acc1, acc5, optimizer
-
 
     def get_files_from_hdfs(self, local_dir):
         cmd = "hadoop fs -D fs.default.name="
