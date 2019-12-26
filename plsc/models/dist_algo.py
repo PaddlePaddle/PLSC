@@ -28,7 +28,8 @@ from paddle.fluid.optimizer import Optimizer
 from paddle.fluid.param_attr import ParamAttr
 from six.moves import reduce
 
-__all__ = ['distributed_arcface_classify', 'distributed_softmax_classify']
+__all__ = ['distributed_arcface_classify', 'distributed_softmax_classify',
+           'DistributedClassificationOptimizer']
 
 
 class DistributedClassificationOptimizer(Optimizer):
