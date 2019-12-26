@@ -38,6 +38,9 @@ class DistributedClassificationOptimizer(Optimizer):
     """
 
     def __init__(self, optimizer, batch_size):
+        fake_learning_rate = 0.1  # a fake learning rate to call super __init__
+        super(DistributedClassificationOptimizer, self).__init__(
+            learning_rate=fake_learning_rate)
         self._optimizer = optimizer
         self._batch_size = batch_size
 
@@ -110,6 +113,10 @@ class DistributedClassificationOptimizer(Optimizer):
                              op_role_key: loss_backward_role
                          })
         return ret
+
+    # implement the abstract method in super class
+    def _append_optimize_op(self, block, param_and_grad):
+        pass
 
 
 class DistributedClassifier(object):
