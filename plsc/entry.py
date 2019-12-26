@@ -88,6 +88,7 @@ class Entry(object):
         self.model = None
         self.train_reader = None
         self.test_reader = None
+        self.predict_reader = None
 
         self.train_program = fluid.Program()
         self.startup_program = fluid.Program()
@@ -117,6 +118,7 @@ class Entry(object):
         self.warmup_epochs = self.config.warmup_epochs
         self.calc_train_acc = False
         self.fleet = None
+        self.strategy = None
 
         if self.checkpoint_dir:
             self.checkpoint_dir = os.path.abspath(self.checkpoint_dir)
@@ -405,8 +407,8 @@ class Entry(object):
         logger.info("hdfs download cmd: {}".format(cmd))
         cmd = cmd.split(' ')
         process = subprocess.Popen(cmd,
-                         stdout=sys.stdout,
-                         stderr=subprocess.STDOUT)
+                                   stdout=sys.stdout,
+                                   stderr=subprocess.STDOUT)
         process.wait()
 
     def put_files_to_hdfs(self, local_dir):
@@ -419,8 +421,8 @@ class Entry(object):
         logger.info("hdfs upload cmd: {}".format(cmd))
         cmd = cmd.split(' ')
         process = subprocess.Popen(cmd,
-                         stdout=sys.stdout,
-                         stderr=subprocess.STDOUT)
+                                   stdout=sys.stdout,
+                                   stderr=subprocess.STDOUT)
         process.wait()
 
     def preprocess_distributed_params(self,
@@ -523,8 +525,10 @@ class Entry(object):
                 print('var: %s found' % (var.name))
             return has_var
 
-        fluid.io.load_vars(executor, checkpoint_dir, predicate=if_exist,
-            main_program=main_program)
+        fluid.io.load_vars(executor,
+                           checkpoint_dir,
+                           predicate=if_exist,
+                           main_program=main_program)
 
     def convert_for_prediction(self):
         model_name = self.model_name
@@ -533,19 +537,20 @@ class Entry(object):
         model = self.model
         if model is None:
             model = resnet.__dict__[model_name](emb_dim=self.emb_dim)
-        main_program = self.train_program
+        main_program = self.predict_program
         startup_program = self.startup_program
         with fluid.program_guard(main_program, startup_program):
             with fluid.unique_name.guard():
                 image = fluid.layers.data(name='image',
-                    shape=image_shape, dtype='float32')
+                                          shape=image_shape,
+                                          dtype='float32')
                 label = fluid.layers.data(name='label',
-                    shape=[1], dtype='int64')
+                                          shape=[1],
+                                          dtype='int64')
 
-                emb = model.build_network(
-                        input=image,
-                        label=label,
-                        is_train=False)
+                emb = model.build_network(input=image,
+                                          label=label,
+                                          is_train=False)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
@@ -553,8 +558,9 @@ class Entry(object):
         exe.run(startup_program)
 
         assert self.checkpoint_dir, "No checkpoint found for converting."
-        self.load_checkpoint(executor=exe, main_program=main_program,
-            load_for_train=False)
+        self.load_checkpoint(executor=exe,
+                             main_program=main_program,
+                             load_for_train=False)
 
         assert self.model_save_dir, \
             "Does not set model_save_dir for inference model converting."
@@ -582,14 +588,15 @@ class Entry(object):
         with fluid.program_guard(main_program, startup_program):
             with fluid.unique_name.guard():
                 image = fluid.layers.data(name='image',
-                    shape=image_shape, dtype='float32')
+                                          shape=image_shape,
+                                          dtype='float32')
                 label = fluid.layers.data(name='label',
-                    shape=[1], dtype='int64')
+                                          shape=[1],
+                                          dtype='int64')
 
-                emb = model.build_network(
-                        input=image,
-                        label=label,
-                        is_train=False)
+                emb = model.build_network(input=image,
+                                          label=label,
+                                          is_train=False)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
@@ -597,63 +604,73 @@ class Entry(object):
         exe.run(startup_program)
 
         assert self.checkpoint_dir, "No checkpoint found for predicting."
-        self.load_checkpoint(executor=exe, main_program=main_program,
-            load_for_train=False)
+        self.load_checkpoint(executor=exe,
+                             main_program=main_program,
+                             load_for_train=False)
 
-        if self.train_reader is None:
-            predict_reader = paddle.batch(reader.arc_train(
-                self.dataset_dir, self.num_classes),
-                batch_size=self.train_batch_size)
+        if self.predict_reader is None:
+            predict_reader = paddle.batch(reader.arc_train(self.dataset_dir,
+                                                           self.num_classes),
+                                          batch_size=self.train_batch_size)
         else:
-            predict_reader = self.train_reader
+            predict_reader = self.predict_reader
 
         feeder = fluid.DataFeeder(place=place,
-            feed_list=['image', 'label'], program=main_program)
-    
+                                  feed_list=['image', 'label'],
+                                  program=main_program)
+
         fetch_list = [emb.name]
         for data in predict_reader():
-            emb = exe.run(main_program, feed=feeder.feed(data),
-                fetch_list=fetch_list, use_program_cache=True)
+            emb = exe.run(main_program,
+                          feed=feeder.feed(data),
+                          fetch_list=fetch_list,
+                          use_program_cache=True)
             print("emb: ", emb)
 
-    def test(self, pass_id=0):
+    def test(self, pass_id=0, run_with_train=False):
         self._check()
 
         trainer_id = self.trainer_id
         num_trainers = self.num_trainers
-        worker_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS")
-        current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
+        emb, loss, acc1, acc5, _ = self.build_program(False,
+                                                      self.num_trainers > 1)
+        if num_trainers > 1:
+            worker_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS")
+            current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
 
-        emb, loss, acc1, acc5, _ = self.build_program(
-            False, self.num_trainers > 1)
-
-        config = dist_transpiler.DistributeTranspilerConfig()
-        config.mode = "collective"
-        config.collective_mode = "grad_allreduce"
-        t = dist_transpiler.DistributeTranspiler(config=config)
-        t.transpile(
-                trainer_id=trainer_id,
-                trainers=worker_endpoints,
-                startup_program=self.startup_program,
-                program=self.test_program,
-                current_endpoint=current_endpoint)
+            config = dist_transpiler.DistributeTranspilerConfig()
+            config.mode = "collective"
+            config.collective_mode = "grad_allreduce"
+            t = dist_transpiler.DistributeTranspiler(config=config)
+            t.transpile(trainer_id=trainer_id,
+                        trainers=worker_endpoints,
+                        startup_program=self.startup_program,
+                        program=self.test_program,
+                        current_endpoint=current_endpoint)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
         exe = fluid.Executor(place)
-        exe.run(self.startup_program)
+        if not run_with_train:
+            exe.run(self.startup_program)
 
-        test_list, test_name_list = reader.test(
-            self.dataset_dir, self.val_targets)
+        if not self.test_reader:
+            test_reader = reader.test
+        else:
+            test_reader = self.test_reader
+        test_list, test_name_list = test_reader(self.dataset_dir,
+                                                self.val_targets)
         test_program = self.test_program
-        #test_program = test_program._prune(emb)
 
-        assert self.checkpoint_dir, "No checkpoint found for test."
-        self.load_checkpoint(executor=exe, main_program=test_program,
-            load_for_train=False)
+        if not run_with_train:
+            assert self.checkpoint_dir, "No checkpoint found for test."
+            self.load_checkpoint(executor=exe,
+                                 main_program=test_program,
+                                 load_for_train=False)
 
         feeder = fluid.DataFeeder(place=place,
-            feed_list=['image', 'label'], program=test_program)
+                                  feed_list=['image', 'label'],
+                                  program=test_program)
         fetch_list = [emb.name]
         real_test_batch_size = self.global_test_batch_size
 
@@ -665,8 +682,6 @@ class Entry(object):
                 data = data_list[j]
                 embeddings = None
                 parallel_test_steps = data.shape[0] // real_test_batch_size
-                beg = 0
-                end = 0
                 for idx in range(parallel_test_steps):
                     start = idx * real_test_batch_size
                     offset = trainer_id * self.test_batch_size
@@ -677,11 +692,14 @@ class Entry(object):
                         _data.append((data[k], 0))
                     assert len(_data) == self.test_batch_size
                     [_embeddings] = exe.run(test_program,
-                        fetch_list = fetch_list, feed=feeder.feed(_data),
-                        use_program_cache=True)
+                                            fetch_list=fetch_list,
+                                            feed=feeder.feed(_data),
+                                            use_program_cache=True)
                     if embeddings is None:
-                        embeddings = np.zeros((data.shape[0], _embeddings.shape[1]))
-                    embeddings[start:start+real_test_batch_size, :] = _embeddings[:, :]
+                        embeddings = np.zeros(
+                            (data.shape[0], _embeddings.shape[1]))
+                    end = start + real_test_batch_size
+                    embeddings[start:end, :] = _embeddings[:, :]
                 beg = parallel_test_steps * real_test_batch_size
     
                 while beg < data.shape[0]:
@@ -690,28 +708,35 @@ class Entry(object):
                     _data = []
                     for k in range(end - self.test_batch_size, end):
                         _data.append((data[k], 0))
-                    [_embeddings] = exe.run(test_program, 
-                        fetch_list = fetch_list, feed=feeder.feed(_data),
-                        use_program_cache=True)
-                    _embeddings = _embeddings[0:self.test_batch_size,:]
-                    embeddings[beg:end, :] = _embeddings[(self.test_batch_size-count):, :]
+                    [_embeddings] = exe.run(test_program,
+                                            fetch_list=fetch_list,
+                                            feed=feeder.feed(_data),
+                                            use_program_cache=True)
+                    _embeddings = _embeddings[0:self.test_batch_size, :]
+                    embeddings[beg:end, :] = _embeddings[
+                                             (self.test_batch_size - count):, :]
                     beg = end
                 embeddings_list.append(embeddings)
-    
+
             xnorm = 0.0
             xnorm_cnt = 0
             for embed in embeddings_list:
                 xnorm += np.sqrt((embed * embed).sum(axis=1)).sum(axis=0)
                 xnorm_cnt += embed.shape[0]
             xnorm /= xnorm_cnt
-    
+
             embeddings = embeddings_list[0] + embeddings_list[1]
             embeddings = sklearn.preprocessing.normalize(embeddings)
-            _, _, accuracy, val, val_std, far = evaluate(embeddings, issame_list, nrof_folds=10)
+            _, _, accuracy, val, val_std, far = evaluate(embeddings,
+                                                         issame_list,
+                                                         nrof_folds=10)
             acc, std = np.mean(accuracy), np.std(accuracy)
-    
+
             print('[%s][%d]XNorm: %f' % (test_name_list[i], pass_id, xnorm))
-            print('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' % (test_name_list[i], pass_id, acc, std))
+            print('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' % (test_name_list[i],
+                                                           pass_id,
+                                                           acc,
+                                                           std))
             sys.stdout.flush()
         test_end = time.time()
         print("test time: {}".format(test_end - test_start))
@@ -733,13 +758,6 @@ class Entry(object):
 
         train_emb, train_loss, train_acc1, train_acc5, optimizer = \
             self.build_program(True, False)
-        if self.with_test:
-            test_emb, test_loss, test_acc1, test_acc5, _ = \
-                self.build_program(False, self.num_trainers > 1)
-            test_list, test_name_list = reader.test(
-                self.dataset_dir, self.val_targets)
-            test_program = self.test_program
-            self._append_broadcast_ops(test_program)
     
         global_lr = optimizer._global_learning_rate(
             program=self.train_program)
@@ -753,19 +771,11 @@ class Entry(object):
                 program_to_code(train_prog, fout, True)
             with open('origin.program', 'w') as fout:
                 program_to_code(origin_prog, fout, True)
-            with open('test.program', 'w') as fout:
-                program_to_code(test_program, fout, True)
     
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
         exe = fluid.Executor(place)
         exe.run(self.startup_program)
-        
-        if self.with_test:
-            test_feeder = fluid.DataFeeder(place=place,
-                feed_list=['image', 'label'], program=test_program)
-            fetch_list_test = [test_emb.name] 
-            real_test_batch_size = self.global_test_batch_size
     
         if self.checkpoint_dir:
             load_checkpoint = True
@@ -782,7 +792,8 @@ class Entry(object):
             train_reader = self.train_reader
 
         feeder = fluid.DataFeeder(place=place,
-            feed_list=['image', 'label'], program=origin_prog)
+                                  feed_list=['image', 'label'],
+                                  program=origin_prog)
     
         if self.calc_train_acc:
             fetch_list = [train_loss.name, global_lr.name,
@@ -800,13 +811,18 @@ class Entry(object):
             for batch_id, data in enumerate(train_reader()):
                 nsamples += global_batch_size
                 t1 = time.time()
+                acc1 = None
+                acc5 = None
                 if self.calc_train_acc:
                     loss, lr, acc1, acc5 = exe.run(train_prog,
-                        feed=feeder.feed(data), fetch_list=fetch_list,
-                        use_program_cache=True)
+                                                   feed=feeder.feed(data),
+                                                   fetch_list=fetch_list,
+                                                   use_program_cache=True)
                 else:
-                    loss, lr = exe.run(train_prog, feed=feeder.feed(data),
-                        fetch_list=fetch_list, use_program_cache=True)
+                    loss, lr = exe.run(train_prog,
+                                       feed=feeder.feed(data),
+                                       fetch_list=fetch_list,
+                                       use_program_cache=True)
                 t2 = time.time()
                 period = t2 - t1
                 local_time += period
@@ -817,14 +833,23 @@ class Entry(object):
                 if batch_id % inspect_steps == 0:
                     avg_loss = np.mean(local_train_info[0])
                     avg_lr = np.mean(local_train_info[1])
+                    speed = nsamples / local_time
                     if self.calc_train_acc:
-                        logger.info("Pass:%d batch:%d lr:%f loss:%f qps:%.2f "
-                            "acc1:%.4f acc5:%.4f" % (pass_id, batch_id, avg_lr,
-                            avg_loss, nsamples / local_time, acc1, acc5))
+                        logger.info("Pass:{} batch:%d lr:{} loss:{} qps:{} "
+                                    "acc1:{} acc5:{}f".format(pass_id,
+                                                              batch_id,
+                                                              avg_lr,
+                                                              avg_loss,
+                                                              speed,
+                                                              acc1,
+                                                              acc5))
                     else:
-                        logger.info("Pass:%d batch:%d lr:%f loss:%f qps:%.2f" %(
-                            pass_id, batch_id, avg_lr, avg_loss,
-                            nsamples / local_time))
+                        logger.info("Pass:{} batch:{} lr:{} loss:{} "
+                                    "qps:{}".format(pass_id,
+                                                    batch_id,
+                                                    avg_lr,
+                                                    avg_loss,
+                                                    speed))
                     local_time = 0
                     nsamples = 0
                     local_train_info = [[], [], [], []]
@@ -835,64 +860,11 @@ class Entry(object):
 
             if self.with_test:
                 test_start = time.time()
-                for i in range(len(test_list)):
-                    data_list, issame_list = test_list[i]
-                    embeddings_list = []
-                    for j in range(len(data_list)):
-                        data = data_list[j]
-                        embeddings = None
-                        parallel_test_steps = data.shape[
-                                                  0] // real_test_batch_size
-                        for idx in range(parallel_test_steps):
-                            start = idx * real_test_batch_size
-                            offset = trainer_id * self.test_batch_size
-                            begin = start + offset
-                            end = begin + self.test_batch_size
-                            _data = []
-                            for k in range(begin, end):
-                                _data.append((data[k], 0))
-                            assert len(_data) == self.test_batch_size
-                            [_embeddings] = exe.run(test_program,
-                                fetch_list = fetch_list_test, feed=test_feeder.feed(_data),
-                                use_program_cache=True)
-                            if embeddings is None:
-                                embeddings = np.zeros((data.shape[0], _embeddings.shape[1]))
-                            embeddings[start:start+real_test_batch_size, :] = _embeddings[:, :]
-                        beg = parallel_test_steps * real_test_batch_size
-    
-                        while beg < data.shape[0]:
-                            end = min(beg + self.test_batch_size, data.shape[0])
-                            count = end - beg
-                            _data = []
-                            for k in range(end - self.test_batch_size, end):
-                                _data.append((data[k], 0))
-                            [_embeddings] = exe.run(test_program, 
-                                fetch_list = fetch_list_test, feed=test_feeder.feed(_data),
-                                use_program_cache=True)
-                            _embeddings = _embeddings[0:self.test_batch_size,:]
-                            embeddings[beg:end, :] = _embeddings[(self.test_batch_size-count):, :]
-                            beg = end
-                        embeddings_list.append(embeddings)
-    
-                    xnorm = 0.0
-                    xnorm_cnt = 0
-                    for embed in embeddings_list:
-                        xnorm += np.sqrt((embed * embed).sum(axis=1)).sum(axis=0)
-                        xnorm_cnt += embed.shape[0]
-                    xnorm /= xnorm_cnt
-    
-                    embeddings = embeddings_list[0] + embeddings_list[1]
-                    embeddings = sklearn.preprocessing.normalize(embeddings)
-                    _, _, accuracy, val, val_std, far = evaluate(embeddings, issame_list, nrof_folds=10)
-                    acc, std = np.mean(accuracy), np.std(accuracy)
-    
-                    print('[%s][%d]XNorm: %f' % (test_name_list[i], pass_id, xnorm))
-                    print('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' % (test_name_list[i], pass_id, acc, std))
-                    sys.stdout.flush()
+                self.test(pass_id, run_with_train=True)
                 test_end = time.time()
                 print("test time: {}".format(test_end - test_start))
-    
-            #save model
+
+            # save model
             if self.model_save_dir:
                 model_save_dir = os.path.join(
                     self.model_save_dir, str(pass_id))
@@ -913,10 +885,13 @@ class Entry(object):
                     def save_var(var):
                         to_save = "dist@" in var.name and '@rank@' in var.name
                         return to_save and var.persistable
-                    fluid.io.save_vars(exe, model_save_dir,
-                        origin_prog, predicate=save_var)
 
-            #save training info
+                    fluid.io.save_vars(exe,
+                                       model_save_dir,
+                                       origin_prog,
+                                       predicate=save_var)
+
+            # save training info
             if self.model_save_dir and trainer_id == 0:
                 config_file = os.path.join(
                     self.model_save_dir, str(pass_id), 'meta.pickle')
@@ -927,7 +902,7 @@ class Entry(object):
                 with open(config_file, 'wb') as f:
                     pickle.dump(train_info, f)
 
-        #upload model
+        # upload model
         if self.model_save_dir and self.fs_name and trainer_id == 0:
             self.put_files_to_hdfs(self.model_save_dir)
             
