@@ -838,21 +838,21 @@ class Entry(object):
                     avg_lr = np.mean(local_train_info[1])
                     speed = nsamples / local_time
                     if self.calc_train_acc:
-                        logger.info("Pass:{} batch:%d lr:{} loss:{} qps:{} "
-                                    "acc1:{} acc5:{}f".format(pass_id,
-                                                              batch_id,
-                                                              avg_lr,
-                                                              avg_loss,
-                                                              speed,
-                                                              acc1,
-                                                              acc5))
+                        logger.info("Pass:{} batch:%d lr:{} loss:{} qps:{:.2f} "
+                                    "acc1:{} acc5:{}".format(pass_id,
+                                                             batch_id,
+                                                             avg_lr,
+                                                             avg_loss,
+                                                             speed,
+                                                             acc1,
+                                                             acc5))
                     else:
                         logger.info("Pass:{} batch:{} lr:{} loss:{} "
-                                    "qps:{}".format(pass_id,
-                                                    batch_id,
-                                                    avg_lr,
-                                                    avg_loss,
-                                                    speed))
+                                    "qps:{:.2f}".format(pass_id,
+                                                        batch_id,
+                                                        avg_lr,
+                                                        avg_loss,
+                                                        speed))
                     local_time = 0
                     nsamples = 0
                     local_train_info = [[], [], [], []]
