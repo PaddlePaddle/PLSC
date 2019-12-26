@@ -13,5 +13,6 @@
 # limitations under the License.
 
 from .entry import Entry
+from .version import plsc_version as __version__
 
 __all__ = ['Entry']
