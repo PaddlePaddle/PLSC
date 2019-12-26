@@ -218,10 +218,16 @@ def arc_iterator(data_dir,
             assert len(flist) == num_trainers, \
                 "Please use process_base64_files.py to pre-process the dataset."
             file = flist[trainer_id]
-            file = os.path.join(data_dir, file)
+        file = os.path.join(data_dir, file)
 
-            with open(file, 'r') as f:
+        with open(file, 'r') as f:
+            if six.PY2:
                 for line in f.xreadlines():
+                    line = line.strip().split('\t')
+                    image, label = line[0], line[1]
+                    yield image, label
+            else:
+                for line in f:
                     line = line.strip().split('\t')
                     image, label = line[0], line[1]
                     yield image, label
