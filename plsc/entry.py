@@ -68,7 +68,7 @@ class Entry(object):
 
         if self.loss_type in ["dist_softmax", "dist_arcface"]:
             assert self.num_trainers > 1, \
-                "At least 2 trainers are required for  distributed fc-layer. " \
+                "At least 2 trainers are required for distributed fc-layer. " \
                 "You can start your job using paddle.distributed.launch module."
 
     def __init__(self):
