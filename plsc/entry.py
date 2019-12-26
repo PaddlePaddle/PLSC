@@ -330,18 +330,17 @@ class Entry(object):
                                           shape=[1],
                                           dtype='int64')
 
-                emb, loss, prob = model.get_output(
-                    input=image,
-                    label=label,
-                    num_ranks=num_trainers,
-                    rank_id=trainer_id,
-                    is_train=is_train,
-                    num_classes=self.num_classes,
-                    loss_type=self.loss_type,
-                    param_attr=param_attr,
-                    bias_attr=bias_attr,
-                    margin=self.margin,
-                    scale=self.scale)
+                emb, loss, prob = model.get_output(input=image,
+                                                   label=label,
+                                                   num_ranks=num_trainers,
+                                                   rank_id=trainer_id,
+                                                   is_train=is_train,
+                                                   num_classes=self.num_classes,
+                                                   loss_type=self.loss_type,
+                                                   param_attr=param_attr,
+                                                   bias_attr=bias_attr,
+                                                   margin=self.margin,
+                                                   scale=self.scale)
 
                 acc1 = None
                 acc5 = None
