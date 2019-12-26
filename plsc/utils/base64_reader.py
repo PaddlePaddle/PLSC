@@ -167,12 +167,12 @@ def distort_color(img):
     return img
 
 
-def process_image_imagepath(sample,
-                            class_dim,
-                            color_jitter,
-                            rotate,
-                            rand_mirror,
-                            normalize):
+def process_image(sample,
+                  class_dim,
+                  color_jitter,
+                  rotate,
+                  rand_mirror,
+                  normalize):
     img_data = base64.b64decode(sample[0])
     img = Image.open(StringIO(img_data))
 
@@ -202,35 +202,36 @@ def process_image_imagepath(sample,
     return img, sample[1]
 
 
-def arc_iterator(file_list,
+def arc_iterator(data_dir,
+                 file_list,
                  class_dim,
                  color_jitter=False,
                  rotate=False,
                  rand_mirror=False,
                  normalize=False):
     trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))
-    trainer_count = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
+    num_trainers = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
+
     def reader():
         with open(file_list, 'r') as f:
             flist = f.readlines()
-            assert len(flist) % trainer_count == 0, \
-                "Number of files should be divisible by trainer count, " \
-                "run base64 file preprocessing tool first."
-            num_files_per_trainer = len(flist) // trainer_count
-            start = num_files_per_trainer * trainer_id
-            end = start + num_files_per_trainer
-            flist = flist[start:end]
+            assert len(flist) == num_trainers, \
+                "Please use process_base64_files.py to pre-process the dataset."
+            file = flist[trainer_id]
+            file = os.path.join(data_dir, file)
 
-            for file in flist:
-                with open(file, 'r') as f:
-                    for line in f.xreadlines():
-                        line = line.strip().split('\t')
-                        image, label = line[0], line[1]
-                        yield image, label
+            with open(file, 'r') as f:
+                for line in f.xreadlines():
+                    line = line.strip().split('\t')
+                    image, label = line[0], line[1]
+                    yield image, label
 
-    mapper = functools.partial(process_image_imagepath,
-        class_dim=class_dim, color_jitter=color_jitter, rotate=rotate,
-        rand_mirror=rand_mirror, normalize=normalize)
+    mapper = functools.partial(process_image,
+                               class_dim=class_dim,
+                               color_jitter=color_jitter,
+                               rotate=rotate,
+                               rand_mirror=rand_mirror,
+                               normalize=normalize)
     return paddle.reader.xmap_readers(mapper, reader, THREAD, BUF_SIZE)
 
 
@@ -267,10 +268,15 @@ def load_bin(path, image_size):
     return (data_list, issame_list)
 
 
-def train(data_dir, file_list, num_classes):
-    file_path = os.path.join(data_dir, file_list)
-    return arc_iterator(file_path, class_dim=num_classes, color_jitter=False,
-        rotate=False, rand_mirror=True, normalize=True)
+def train(data_dir, num_classes):
+    file_path = os.path.join(data_dir, 'file_list.txt')
+    return arc_iterator(data_dir,
+                        file_path,
+                        class_dim=num_classes,
+                        color_jitter=False,
+                        rotate=False,
+                        rand_mirror=True,
+                        normalize=True)
 
 
 def test(data_dir, datasets):
