@@ -37,9 +37,9 @@ from paddle.fluid.optimizer import Optimizer
 from paddle.fluid.transpiler.details.program_utils import program_to_code
 
 from . import config
+from .models import DistributedClassificationOptimizer
 from .models import base_model
 from .models import resnet
-from .models.dist_algo import DistributedClassificationOptimizer
 from .utils import jpeg_reader as reader
 from .utils.learning_rate import lr_warmup
 from .utils.verification import evaluate
@@ -68,7 +68,8 @@ class Entry(object):
 
         if self.loss_type in ["dist_softmax", "dist_arcface"]:
             assert self.num_trainers > 1, \
-                "At least 2 trainers are required to use distributed fc-layer."
+                "At least 2 trainers are required for  distributed fc-layer. " \
+                "You can start your job using paddle.distributed.launch module."
 
     def __init__(self):
         self.config = config.config
@@ -115,6 +116,7 @@ class Entry(object):
         self.model_save_dir = self.config.model_save_dir
         self.warmup_epochs = self.config.warmup_epochs
         self.calc_train_acc = False
+        self.fleet = None
 
         if self.checkpoint_dir:
             self.checkpoint_dir = os.path.abspath(self.checkpoint_dir)
@@ -177,7 +179,7 @@ class Entry(object):
         Whether to calcuate acc1 and acc5 during training.
         """
         self.calc_train_acc = calc
-        logger.info("Calcuating acc1 and acc5 during training: {}.".format(
+        logger.info("Calculating acc1 and acc5 during training: {}.".format(
             calc))
 
     def set_dataset_dir(self, directory):
@@ -208,7 +210,7 @@ class Entry(object):
         Set the size of the last hidding layer before the distributed fc-layer.
         """
         self.emb_dim = size
-        logger.info("Set emb_size to {}.".format(size))
+        logger.info("Set emb_dim to {}.".format(size))
 
     def set_model(self, model):
         """
@@ -362,9 +364,12 @@ class Entry(object):
                 if is_train:
                     # initialize optimizer
                     optimizer = self._get_optimizer()
-                    dist_optimizer = self.fleet.distributed_optimizer(
-                        optimizer, strategy=self.strategy)
-                    dist_optimizer.minimize(loss)
+                    if self.fleet:
+                        dist_optimizer = self.fleet.distributed_optimizer(
+                            optimizer, strategy=self.strategy)
+                        dist_optimizer.minimize(loss)
+                    else:
+                        optimizer.minimize(loss)
                     if "dist" in self.loss_type:
                         optimizer = optimizer._optimizer
                 elif use_parallel_test:
@@ -699,15 +704,16 @@ class Entry(object):
 
         trainer_id = self.trainer_id
         num_trainers = self.num_trainers
-    
-        role = role_maker.PaddleCloudRoleMaker(is_collective=True)
-        fleet.init(role)
-        strategy = DistributedStrategy()
-        strategy.mode = "collective"
-        strategy.collective_mode = "grad_allreduce"
-        self.fleet = fleet
-        self.strategy = strategy
-    
+
+        if num_trainers > 1:
+            role = role_maker.PaddleCloudRoleMaker(is_collective=True)
+            fleet.init(role)
+            strategy = DistributedStrategy()
+            strategy.mode = "collective"
+            strategy.collective_mode = "grad_allreduce"
+            self.fleet = fleet
+            self.strategy = strategy
+
         train_emb, train_loss, train_acc1, train_acc5, optimizer = \
             self.build_program(True, False)
         if self.with_test:
