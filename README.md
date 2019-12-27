@@ -113,6 +113,7 @@ softmax的计算公示如下图所示：
 
 * [分布式参数转换](docs/distributed_params.md)
 * [Base64格式图像预处理](docs/base64_preprocessor.md)
+* [混合精度训练](docs/mixed_precision.md)
 
 * 2019.12.23
   **`0.1.0`**
