@@ -579,6 +579,16 @@ class Entry(object):
         if self.fs_name:
             self.put_files_to_hdfs(self.model_save_dir)
 
+    def _set_info(self, key, value):
+        if not hasattr(self, '_info'):
+            self._info = {}
+        self._info[key] = value
+
+    def _get_info(self, key):
+        if hasattr(self, '_info') and key in self._info:
+            return self._info[key]
+        return None
+
     def predict(self):
         model_name = self.model_name
         image_shape = [int(m) for m in self.image_shape]
@@ -638,8 +648,9 @@ class Entry(object):
         if not initialized:
             emb, loss, _, _, _ = self.build_program(False,
                                                     self.num_trainers > 1)
-            assert 'emb' not in dir(self.test)
-            self.test['emb'] = emb
+            emb_name = emb.name
+            assert self._get_info(emb_name) is None
+            self._set_info('emb_name', emb.name)
             if num_trainers > 1:
                 worker_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS")
                 current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
@@ -654,8 +665,7 @@ class Entry(object):
                             program=self.test_program,
                             current_endpoint=current_endpoint)
         else:
-            assert 'emb' in dir(self.test)
-            emb = self.test['emb']
+            emb_name = self._get_info('emb_name')
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
@@ -670,15 +680,13 @@ class Entry(object):
         if not initialized:
             test_list, test_name_list = test_reader(self.dataset_dir,
                                                     self.val_targets)
-            assert 'test_list' not in dir(self.test)
-            assert 'test_name_list' not in dir(self.test)
-            self.test['test_list'] = test_list
-            self.test['test_name_list'] = test_name_list
+            assert self._get_info('test_list') is None
+            assert self._get_info('test_name_list') is None
+            self._set_info('test_list', test_list)
+            self._set_info('test_name_list', test_name_list)
         else:
-            assert 'test_list' in dir(self.test)
-            assert 'test_name_list' in dir(self.test)
-            test_list = self.test['test_list']
-            test_name_list = self.test['test_name_list']
+            test_list = self._get_info('test_list')
+            test_name_list = self._get_info('test_name_list')
 
         test_program = self.test_program
 
@@ -691,7 +699,7 @@ class Entry(object):
         feeder = fluid.DataFeeder(place=place,
                                   feed_list=['image', 'label'],
                                   program=test_program)
-        fetch_list = [emb.name]
+        fetch_list = [emb_name]
         real_test_batch_size = self.global_test_batch_size
 
         test_start = time.time()
