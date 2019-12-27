@@ -7,10 +7,9 @@ PLSC支持混合精度训练。使用混合精度训练可以提升训练的速�
 可以通过下面的代码设置开启混合精度训练：
 
 ```python
-from __future__ import print_function
-import plsc.entry as entry
+from plsc import Entry
 def main():
-    ins = entry.Entry()
+    ins = Entry()
     ins.set_mixed_precision(True, 1.0)
     ins.train()
 if __name__ == "__main__":
@@ -29,7 +28,7 @@ if __name__ == "__main__":
 
 ## 训练性能
 
-| 模型\速度(单机8卡) | 正常训练 | 混合精度训练 | 加速比 |
+| 模型\速度(单机8卡) | FP32训练 | 混合精度训练 | 加速比 |
 | --- | --- | --- | --- |
 | ResNet50 | 2567.96 images/s | 3643.11 images/s | 1.42 |
 备注：上述模型训练使用的loss_type均为'dist_arcface'。
