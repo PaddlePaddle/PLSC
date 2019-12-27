@@ -113,10 +113,3 @@ softmax的计算公示如下图所示：
 
 * [分布式参数转换](docs/distributed_params.md)
 * [Base64格式图像预处理](docs/base64_preprocessor.md)
-
-* 2019.12.23
-  **`0.1.0`**
-  *PaddlePaddle大规模分类库（PLSC）发布，内建ResNet50、ResNet101和ResNet152三种模型，并支持自定义模型;
-  * 单机8张V100 GPU配置下，ResNet50模型一百万类别训练速度2,122.56 images/s, 并支持多机分布式训练;
-  * 发布模型在线预测库;
-  * 发布基于ResNet50网络和MS1M-ArcFace数据集的预训练模型。
