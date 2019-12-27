@@ -48,7 +48,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%d %b %Y %H:%M:%S')
 logger = logging.getLogger(__name__)
- 
+
 
 class Entry(object):
     """
@@ -100,7 +100,6 @@ class Entry(object):
         self.fs_dir = None
 
         self.use_fp16 = False
-        self.init_loss_scaling = 1.0
         self.fp16_user_dict = None
 
         self.val_targets = self.config.val_targets
@@ -149,16 +148,30 @@ class Entry(object):
         self.global_train_batch_size = batch_size * self.num_trainers
         logger.info("Set train batch size to {}.".format(batch_size))
 
-    def set_mixed_precision(self, use_fp16, loss_scaling):
+    def set_mixed_precision(self,
+                            use_fp16,
+                            init_loss_scaling = 1.0,
+                            incr_every_n_steps = 2000,
+                            decr_every_n_nan_or_inf = 2,
+                            incr_ratio = 2.0,
+                            decr_ratio = 0.5,
+                            use_dynamic_loss_scaling = True,
+                            amp_lists = None):
         """
         Whether to use mixed precision training.
         """
         self.use_fp16 = use_fp16
-        self.init_loss_scaling = loss_scaling
         self.fp16_user_dict = dict()
-        self.fp16_user_dict['init_loss_scaling'] = self.init_loss_scaling
+        self.fp16_user_dict['init_loss_scaling'] = init_loss_scaling
+        self.fp16_user_dict['incr_every_n_steps'] = incr_every_n_steps
+        self.fp16_user_dict['decr_every_n_nan_or_inf'] = decr_every_n_nan_or_inf
+        self.fp16_user_dict['incr_ratio'] = incr_ratio
+        self.fp16_user_dict['decr_ratio'] = decr_ratio
+        self.fp16_user_dict['use_dynamic_loss_scaling'] = use_dynamic_loss_scaling
+        self.fp16_user_dict['amp_lists'] = amp_lists
         logger.info("Use mixed precision training: {}.".format(use_fp16))
-        logger.info("Set init loss scaling to {}.".format(loss_scaling))
+        for key in self.fp16_user_dict:
+            logger.info("Set init {} to {}.".format(key, self.fp16_user_dict[key]))
 
     def set_test_batch_size(self, batch_size):
         self.test_batch_size = batch_size
@@ -168,7 +181,7 @@ class Entry(object):
     def set_hdfs_info(self, fs_name, fs_ugi, directory):
         """
         Set the info to download from or upload to hdfs filesystems.
-        If the information is provided, we will download pretrained 
+        If the information is provided, we will download pretrained
         model from hdfs at the begining and upload pretrained models
         to hdfs at the end automatically.
         """
@@ -281,13 +294,13 @@ class Entry(object):
         if not self.optimizer:
             bd = [step for step in self.lr_steps]
             start_lr = self.lr
-    
+
             global_batch_size = self.global_train_batch_size
             train_image_num = self.train_image_num
             images_per_trainer = int(math.ceil(
                 train_image_num * 1.0 / self.num_trainers))
             steps_per_pass = int(math.ceil(
-                images_per_trainer * 1.0 / self.train_batch_size)) 
+                images_per_trainer * 1.0 / self.train_batch_size))
             logger.info("Steps per epoch: %d" % steps_per_pass)
             warmup_steps = steps_per_pass * self.warmup_epochs
             batch_denom = 1024
@@ -300,12 +313,12 @@ class Entry(object):
                     values=lr), warmup_steps, start_lr, base_lr)
             else:
                 lr_val = fluid.layers.piecewise_decay(boundaries=bd, values=lr)
-    
+
             optimizer = fluid.optimizer.Momentum(
                 learning_rate=lr_val, momentum=0.9,
                 regularization=fluid.regularizer.L2Decay(5e-4))
             self.optimizer = optimizer
-    
+
         if self.loss_type in ["dist_softmax", "dist_arcface"]:
             self.optimizer = DistributedClassificationOptimizer(
                 self.optimizer, global_batch_size, use_fp16=self.use_fp16,
@@ -313,7 +326,7 @@ class Entry(object):
                 fp16_user_dict=self.fp16_user_dict)
         elif self.use_fp16:
             self.optimizer = fluid.contrib.mixed_precision.decorate(
-                optimizer=optimizer, init_loss_scaling=self.init_loss_scaling)
+                optimizer=optimizer, init_loss_scaling=self.fp16_user_dict['init_loss_scaling'])
         return self.optimizer
 
     def build_program(self,
@@ -428,7 +441,7 @@ class Entry(object):
                                    stdout=sys.stdout,
                                    stderr=subprocess.STDOUT)
         process.wait()
-        
+
         for file in os.listdir(local_dir):
             if "dist@" in file and "@rank@" in file:
                 file = os.path.join(local_dir, file)
@@ -442,10 +455,10 @@ class Entry(object):
 
     def _append_broadcast_ops(self, program):
         """
-        Before test, we broadcast bathnorm-related parameters to all 
+        Before test, we broadcast bathnorm-related parameters to all
         other trainers from trainer-0.
         """
-        bn_vars = [var for var in program.list_vars() 
+        bn_vars = [var for var in program.list_vars()
                    if 'batch_norm' in var.name and var.persistable]
         block = program.current_block()
         for var in bn_vars:
@@ -475,7 +488,7 @@ class Entry(object):
                 shutil.rmtree(checkpoint_dir)
                 os.makedirs(checkpoint_dir)
 
-                # sync all trainers to avoid loading checkpoints before 
+                # sync all trainers to avoid loading checkpoints before
                 # parameters are downloaded
                 file_name = os.path.join(checkpoint_dir, '.lock')
                 if self.trainer_id == 0:
@@ -483,14 +496,14 @@ class Entry(object):
                     with open(file_name, 'w') as f:
                         pass
                     time.sleep(10)
-                    os.remove(file_name)     
+                    os.remove(file_name)
                 else:
                     while True:
                         if not os.path.exists(file_name):
                             time.sleep(1)
                         else:
                             break
-        
+
         # Preporcess distributed parameters.
         file_name = os.path.join(checkpoint_dir, '.lock')
         distributed = self.loss_type in ["dist_softmax", "dist_arcface"]
@@ -499,7 +512,7 @@ class Entry(object):
             with open(file_name, 'w') as f:
                 pass
             time.sleep(10)
-            os.remove(file_name)     
+            os.remove(file_name)
         elif load_for_train and distributed:
             # wait trainer_id (0) to complete
             while True:
@@ -600,7 +613,7 @@ class Entry(object):
 
         feeder = fluid.DataFeeder(place=place,
             feed_list=['image', 'label'], program=main_program)
-    
+
         fetch_list = [emb.name]
         for data in predict_reader():
             emb = exe.run(main_program, feed=feeder.feed(data),
@@ -674,33 +687,33 @@ class Entry(object):
                         embeddings = np.zeros((data.shape[0], _embeddings.shape[1]))
                     embeddings[start:start+real_test_batch_size, :] = _embeddings[:, :]
                 beg = parallel_test_steps * real_test_batch_size
-    
+
                 while beg < data.shape[0]:
                     end = min(beg + self.test_batch_size, data.shape[0])
                     count = end - beg
                     _data = []
                     for k in xrange(end - self.test_batch_size, end):
                         _data.append((data[k], 0))
-                    [_embeddings] = exe.run(test_program, 
+                    [_embeddings] = exe.run(test_program,
                         fetch_list = fetch_list, feed=feeder.feed(_data),
                         use_program_cache=True)
                     _embeddings = _embeddings[0:self.test_batch_size,:]
                     embeddings[beg:end, :] = _embeddings[(self.test_batch_size-count):, :]
                     beg = end
                 embeddings_list.append(embeddings)
-    
+
             xnorm = 0.0
             xnorm_cnt = 0
             for embed in embeddings_list:
                 xnorm += np.sqrt((embed * embed).sum(axis=1)).sum(axis=0)
                 xnorm_cnt += embed.shape[0]
             xnorm /= xnorm_cnt
-    
+
             embeddings = embeddings_list[0] + embeddings_list[1]
             embeddings = sklearn.preprocessing.normalize(embeddings)
             _, _, accuracy, val, val_std, far = evaluate(embeddings, issame_list, nrof_folds=10)
             acc, std = np.mean(accuracy), np.std(accuracy)
-    
+
             print('[%s][%d]XNorm: %f' % (test_name_list[i], pass_id, xnorm))
             print('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' % (test_name_list[i], pass_id, acc, std))
             sys.stdout.flush()
@@ -712,7 +725,7 @@ class Entry(object):
 
         trainer_id = self.trainer_id
         num_trainers = self.num_trainers
-    
+
         role = role_maker.PaddleCloudRoleMaker(is_collective=True)
         fleet.init(role)
         strategy = DistributedStrategy()
@@ -720,7 +733,7 @@ class Entry(object):
         strategy.collective_mode = "grad_allreduce"
         self.fleet = fleet
         self.strategy = strategy
-    
+
         train_emb, train_loss, train_acc1, train_acc5, optimizer = \
             self.build_program(True, False)
         if self.with_test:
@@ -730,10 +743,10 @@ class Entry(object):
                 self.dataset_dir, self.val_targets)
             test_program = self.test_program
             self._append_broadcast_ops(test_program)
-    
+
         global_lr = optimizer._global_learning_rate(
             program=self.train_program)
-    
+
         origin_prog = fleet._origin_program
         train_prog = fleet.main_program
         if trainer_id == 0:
@@ -745,25 +758,25 @@ class Entry(object):
                 program_to_code(origin_prog, fout, True)
             with open('test.program', 'w') as fout:
                 program_to_code(test_program, fout, True)
-    
+
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
         exe = fluid.Executor(place)
         exe.run(self.startup_program)
-        
+
         if self.with_test:
             test_feeder = fluid.DataFeeder(place=place,
                 feed_list=['image', 'label'], program=test_program)
-            fetch_list_test = [test_emb.name] 
+            fetch_list_test = [test_emb.name]
             real_test_batch_size = self.global_test_batch_size
-    
+
         if self.checkpoint_dir:
             load_checkpoint = True
         else:
             load_checkpoint = False
         if load_checkpoint:
             self.load_checkpoint(executor=exe, main_program=origin_prog)
-    
+
         if self.train_reader is None:
             train_reader = paddle.batch(reader.arc_train(
                 self.dataset_dir, self.num_classes),
@@ -773,13 +786,13 @@ class Entry(object):
 
         feeder = fluid.DataFeeder(place=place,
             feed_list=['image', 'label'], program=origin_prog)
-    
+
         if self.calc_train_acc:
             fetch_list = [train_loss.name, global_lr.name,
                           train_acc1.name, train_acc5.name]
         else:
             fetch_list = [train_loss.name, global_lr.name]
-    
+
         local_time = 0.0
         nsamples = 0
         inspect_steps = 200
@@ -818,7 +831,7 @@ class Entry(object):
                     local_time = 0
                     nsamples = 0
                     local_train_info = [[], [], [], []]
-    
+
             train_loss = np.array(train_info[0]).mean()
             print("End pass {0}, train_loss {1}".format(pass_id, train_loss))
             sys.stdout.flush()
@@ -850,45 +863,45 @@ class Entry(object):
                                 embeddings = np.zeros((data.shape[0], _embeddings.shape[1]))
                             embeddings[start:start+real_test_batch_size, :] = _embeddings[:, :]
                         beg = parallel_test_steps * real_test_batch_size
-    
+
                         while beg < data.shape[0]:
                             end = min(beg + self.test_batch_size, data.shape[0])
                             count = end - beg
                             _data = []
                             for k in xrange(end - self.test_batch_size, end):
                                 _data.append((data[k], 0))
-                            [_embeddings] = exe.run(test_program, 
+                            [_embeddings] = exe.run(test_program,
                                 fetch_list = fetch_list_test, feed=test_feeder.feed(_data),
                                 use_program_cache=True)
                             _embeddings = _embeddings[0:self.test_batch_size,:]
                             embeddings[beg:end, :] = _embeddings[(self.test_batch_size-count):, :]
                             beg = end
                         embeddings_list.append(embeddings)
-    
+
                     xnorm = 0.0
                     xnorm_cnt = 0
                     for embed in embeddings_list:
                         xnorm += np.sqrt((embed * embed).sum(axis=1)).sum(axis=0)
                         xnorm_cnt += embed.shape[0]
                     xnorm /= xnorm_cnt
-    
+
                     embeddings = embeddings_list[0] + embeddings_list[1]
                     embeddings = sklearn.preprocessing.normalize(embeddings)
                     _, _, accuracy, val, val_std, far = evaluate(embeddings, issame_list, nrof_folds=10)
                     acc, std = np.mean(accuracy), np.std(accuracy)
-    
+
                     print('[%s][%d]XNorm: %f' % (test_name_list[i], pass_id, xnorm))
                     print('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' % (test_name_list[i], pass_id, acc, std))
                     sys.stdout.flush()
                 test_end = time.time()
                 print("test time: {}".format(test_end - test_start))
-    
+
             #save model
             if self.model_save_dir:
                 model_save_dir = os.path.join(
                     self.model_save_dir, str(pass_id))
                 if not os.path.exists(model_save_dir):
-                    # may be more than one processes trying 
+                    # may be more than one processes trying
                     # to create the directory
                     try:
                         os.makedirs(model_save_dir)
@@ -921,7 +934,7 @@ class Entry(object):
         #upload model
         if self.model_save_dir and self.fs_name and trainer_id == 0:
             self.put_files_to_hdfs(self.model_save_dir)
-            
+
 
 if __name__ == '__main__':
     ins = Entry()
