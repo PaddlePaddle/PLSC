@@ -643,6 +643,9 @@ class Entry(object):
     def test(self, pass_id=0, run_with_train=False, initialized=False):
         self._check()
 
+        if initialized:
+            assert run_with_train, "Only when run_with_train set to True, " \
+                "can set initialized to True."
         trainer_id = self.trainer_id
         num_trainers = self.num_trainers
         if not initialized:
@@ -651,7 +654,7 @@ class Entry(object):
             emb_name = emb.name
             assert self._get_info(emb_name) is None
             self._set_info('emb_name', emb.name)
-            if num_trainers > 1:
+            if num_trainers > 1 and not run_with_train:
                 worker_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS")
                 current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
 
