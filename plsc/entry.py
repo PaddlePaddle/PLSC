@@ -155,8 +155,7 @@ class Entry(object):
                             decr_every_n_nan_or_inf = 2,
                             incr_ratio = 2.0,
                             decr_ratio = 0.5,
-                            use_dynamic_loss_scaling = True,
-                            amp_lists = None):
+                            use_dynamic_loss_scaling = True):
         """
         Whether to use mixed precision training.
         """
@@ -168,7 +167,6 @@ class Entry(object):
         self.fp16_user_dict['incr_ratio'] = incr_ratio
         self.fp16_user_dict['decr_ratio'] = decr_ratio
         self.fp16_user_dict['use_dynamic_loss_scaling'] = use_dynamic_loss_scaling
-        self.fp16_user_dict['amp_lists'] = amp_lists
         logger.info("Use mixed precision training: {}.".format(use_fp16))
         for key in self.fp16_user_dict:
             logger.info("Set init {} to {}.".format(key, self.fp16_user_dict[key]))
