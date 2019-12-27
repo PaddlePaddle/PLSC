@@ -114,13 +114,13 @@ def RandomResizedCrop(img, size):
     return img
 
 
-def random_crop(img, size, scale=[0.08, 1.0], ratio=[3. / 4., 4. / 3.]):
+def random_crop(img, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.)):
     aspect_ratio = math.sqrt(random.uniform(*ratio))
     w = 1. * aspect_ratio
     h = 1. / aspect_ratio
 
-    bound = min((float(img.size[0]) / img.size[1]) / (w**2),
-                (float(img.size[1]) / img.size[0]) / (h**2))
+    bound = min((float(img.size[0]) / img.size[1]) / (w ** 2),
+                (float(img.size[1]) / img.size[0]) / (h ** 2))
     scale_max = min(scale[1], bound)
     scale_min = min(scale[0], bound)
 
@@ -271,7 +271,7 @@ def load_bin(path, image_size):
         if i % 1000 == 0:
             print('loading bin', i)
     print(data_list[0].shape)
-    return (data_list, issame_list)
+    return data_list, issame_list
 
 
 def train(data_dir, num_classes):
