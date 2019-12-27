@@ -633,9 +633,9 @@ class Entry(object):
     def test(self, pass_id=0, run_with_train=False, initialized=False):
         self._check()
 
+        trainer_id = self.trainer_id
+        num_trainers = self.num_trainers
         if not initialized:
-            trainer_id = self.trainer_id
-            num_trainers = self.num_trainers
             emb, loss, _, _, _ = self.build_program(False,
                                                     self.num_trainers > 1)
             assert 'emb' not in dir(self.test)
