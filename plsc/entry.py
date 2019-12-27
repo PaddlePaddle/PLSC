@@ -16,10 +16,10 @@ from __future__ import division
 from __future__ import print_function
 
 import errno
+import json
 import logging
 import math
 import os
-import json
 import shutil
 import subprocess
 import sys
@@ -630,26 +630,32 @@ class Entry(object):
                           use_program_cache=True)
             print("emb: ", emb)
 
-    def test(self, pass_id=0, run_with_train=False):
+    def test(self, pass_id=0, run_with_train=False, initialized=False):
         self._check()
 
-        trainer_id = self.trainer_id
-        num_trainers = self.num_trainers
-        emb, loss, acc1, acc5, _ = self.build_program(False,
-                                                      self.num_trainers > 1)
-        if num_trainers > 1:
-            worker_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS")
-            current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
+        if not initialized:
+            trainer_id = self.trainer_id
+            num_trainers = self.num_trainers
+            emb, loss, _, _, _ = self.build_program(False,
+                                                    self.num_trainers > 1)
+            assert 'emb' not in dir(self.test)
+            self.test.emb = emb
+            if num_trainers > 1:
+                worker_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS")
+                current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
 
-            config = dist_transpiler.DistributeTranspilerConfig()
-            config.mode = "collective"
-            config.collective_mode = "grad_allreduce"
-            t = dist_transpiler.DistributeTranspiler(config=config)
-            t.transpile(trainer_id=trainer_id,
-                        trainers=worker_endpoints,
-                        startup_program=self.startup_program,
-                        program=self.test_program,
-                        current_endpoint=current_endpoint)
+                config = dist_transpiler.DistributeTranspilerConfig()
+                config.mode = "collective"
+                config.collective_mode = "grad_allreduce"
+                t = dist_transpiler.DistributeTranspiler(config=config)
+                t.transpile(trainer_id=trainer_id,
+                            trainers=worker_endpoints,
+                            startup_program=self.startup_program,
+                            program=self.test_program,
+                            current_endpoint=current_endpoint)
+        else:
+            assert 'emb' in dir(self.test)
+            emb = self.test.emb
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
@@ -661,8 +667,19 @@ class Entry(object):
             test_reader = reader.test
         else:
             test_reader = self.test_reader
-        test_list, test_name_list = test_reader(self.dataset_dir,
-                                                self.val_targets)
+        if not initialized:
+            test_list, test_name_list = test_reader(self.dataset_dir,
+                                                    self.val_targets)
+            assert 'test_list' not in dir(self.test)
+            assert 'test_name_list' not in dir(self.test)
+            self.test.test_list = test_list
+            self.test.test_name_list = test_name_list
+        else:
+            assert 'test_list' in dir(self.test)
+            assert 'test_name_list' in dir(self.test)
+            test_list = self.test.test_list
+            test_name_list = self.test.test_name_list
+
         test_program = self.test_program
 
         if not run_with_train:
@@ -873,10 +890,9 @@ class Entry(object):
             sys.stdout.flush()
 
             if self.with_test:
-                test_start = time.time()
-                self.test(pass_id, run_with_train=True)
-                test_end = time.time()
-                logger.info("test time: {}".format(test_end - test_start))
+                self.test(pass_id,
+                          run_with_train=True,
+                          initialized=False if pass_id == 0 else True)
 
             # save model
             if self.model_save_dir:
