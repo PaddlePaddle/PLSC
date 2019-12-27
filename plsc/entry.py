@@ -770,7 +770,7 @@ class Entry(object):
                 std))
             sys.stdout.flush()
         test_end = time.time()
-        logger.info("test time: {}".format(test_end - test_start))
+        logger.info("test time: {:.4f}".format(test_end - test_start))
 
     def train(self, param_attr=None, bias_attr=None):
         self._check()
@@ -873,16 +873,17 @@ class Entry(object):
                     avg_lr = np.mean(local_train_info[1])
                     speed = nsamples / local_time
                     if self.calc_train_acc:
-                        logger.info("Pass:{} batch:%d lr:{} loss:{} qps:{:.2f} "
-                                    "acc1:{} acc5:{}".format(pass_id,
-                                                             batch_id,
-                                                             avg_lr,
-                                                             avg_loss,
-                                                             speed,
-                                                             acc1,
-                                                             acc5))
+                        logger.info("Pass:{} batch:%d lr:{:.8f} loss:{:.6f} "
+                                    "qps:{:.2f} acc1:{:.6f} acc5:{:.6f}".format(
+                            pass_id,
+                            batch_id,
+                            avg_lr,
+                            avg_loss,
+                            speed,
+                            acc1,
+                            acc5))
                     else:
-                        logger.info("Pass:{} batch:{} lr:{} loss:{} "
+                        logger.info("Pass:{} batch:{} lr:{:.8f} loss:{:.6f} "
                                     "qps:{:.2f}".format(pass_id,
                                                         batch_id,
                                                         avg_lr,
@@ -891,10 +892,10 @@ class Entry(object):
                     local_time = 0
                     nsamples = 0
                     local_train_info = [[], [], [], []]
-    
+
             train_loss = np.array(train_info[0]).mean()
-            logger.info("End pass {0}, train_loss {1}".format(pass_id,
-                                                              train_loss))
+            logger.info("End pass {}, train_loss {:.6f}".format(pass_id,
+                                                                train_loss))
             sys.stdout.flush()
 
             if self.with_test:
