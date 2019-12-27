@@ -760,17 +760,21 @@ class Entry(object):
             self.fleet = fleet
             self.strategy = strategy
 
-        train_emb, train_loss, train_acc1, train_acc5, optimizer = \
-            self.build_program(True,
-                               False,
-                               param_attr=param_attr,
-                               bias_attr=bias_attr)
+        emb, loss, acc1, acc5, optimizer = self.build_program(
+            True,
+            False,
+            param_attr=param_attr,
+            bias_attr=bias_attr)
     
         global_lr = optimizer._global_learning_rate(
             program=self.train_program)
     
-        origin_prog = fleet._origin_program
-        train_prog = fleet.main_program
+        if num_trainers > 1:
+            origin_prog = fleet._origin_program
+            train_prog = fleet.main_program
+        else:
+            origin_prog = self.train_program
+            train_prog = self.train_program
         if trainer_id == 0:
             with open('start.program', 'w') as fout:
                 program_to_code(self.startup_program, fout, True)
@@ -803,10 +807,10 @@ class Entry(object):
                                   program=origin_prog)
     
         if self.calc_train_acc:
-            fetch_list = [train_loss.name, global_lr.name,
-                          train_acc1.name, train_acc5.name]
+            fetch_list = [loss.name, global_lr.name,
+                          acc1.name, acc5.name]
         else:
-            fetch_list = [train_loss.name, global_lr.name]
+            fetch_list = [loss.name, global_lr.name]
     
         local_time = 0.0
         nsamples = 0
