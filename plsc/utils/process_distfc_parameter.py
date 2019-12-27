@@ -20,7 +20,7 @@ import six
 import logging
 import argparse
 import shutil
-import pickle
+import json
 
 import numpy as np
 
@@ -87,7 +87,7 @@ def load_config(args):
         2. emb_dim (int): embedding dim for pretraining;
         3. num_classes (int): number of classes for classification.
     """
-    meta_file = os.path.join(args.pretrained_model_dir, 'meta.pickle')
+    meta_file = os.path.join(args.pretrained_model_dir, 'meta.json')
     if not os.path.exists(meta_file):
         if args.pretrain_nranks < 0 or args.emb_dim < 0 or args.num_classes < 0:
             logger.error("Meta file does not exist, you have to set "
@@ -99,8 +99,8 @@ def load_config(args):
                      "--num_classes ({}) parameters manually.".format(
                          args.pretrain_nranks, args.emb_dim, args.num_classes))
     else:
-        with open(meta_file, 'rb') as handle:
-            config = pickle.load(handle)
+        with open(meta_file, 'r') as handle:
+            config = json.load(handle)
         if args.pretrain_nranks < 0:
             args.pretrain_nranks = config['pretrain_nranks']
         elif args.pretrain_nranks != config['pretrain_nranks']:

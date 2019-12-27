@@ -639,7 +639,7 @@ class Entry(object):
             emb, loss, _, _, _ = self.build_program(False,
                                                     self.num_trainers > 1)
             assert 'emb' not in dir(self.test)
-            self.test.emb = emb
+            self.test['emb'] = emb
             if num_trainers > 1:
                 worker_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS")
                 current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
@@ -655,7 +655,7 @@ class Entry(object):
                             current_endpoint=current_endpoint)
         else:
             assert 'emb' in dir(self.test)
-            emb = self.test.emb
+            emb = self.test['emb']
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
@@ -672,13 +672,13 @@ class Entry(object):
                                                     self.val_targets)
             assert 'test_list' not in dir(self.test)
             assert 'test_name_list' not in dir(self.test)
-            self.test.test_list = test_list
-            self.test.test_name_list = test_name_list
+            self.test['test_list'] = test_list
+            self.test['test_name_list'] = test_name_list
         else:
             assert 'test_list' in dir(self.test)
             assert 'test_name_list' in dir(self.test)
-            test_list = self.test.test_list
-            test_name_list = self.test.test_name_list
+            test_list = self.test['test_list']
+            test_name_list = self.test['test_name_list']
 
         test_program = self.test_program
 
