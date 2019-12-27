@@ -19,7 +19,7 @@ import errno
 import logging
 import math
 import os
-import pickle
+import json
 import shutil
 import subprocess
 import sys
@@ -905,13 +905,13 @@ class Entry(object):
             # save training info
             if self.model_save_dir and trainer_id == 0:
                 config_file = os.path.join(
-                    self.model_save_dir, str(pass_id), 'meta.pickle')
+                    self.model_save_dir, str(pass_id), 'meta.json')
                 train_info = dict()
                 train_info["pretrain_nranks"] = self.num_trainers
                 train_info["emb_dim"] = self.emb_dim
                 train_info['num_classes'] = self.num_classes
                 with open(config_file, 'wb') as f:
-                    pickle.dump(train_info, f)
+                    json.dump(train_info, f)
 
         # upload model
         if self.model_save_dir and self.fs_name and trainer_id == 0:
