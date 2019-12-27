@@ -525,7 +525,7 @@ class Entry(object):
         def if_exist(var):
             has_var = os.path.exists(os.path.join(checkpoint_dir, var.name))
             if has_var:
-                print('var: %s found' % (var.name))
+                logger.info('var: %s found' % (var.name))
             return has_var
 
         fluid.io.load_vars(executor,
@@ -735,15 +735,17 @@ class Entry(object):
                                                          nrof_folds=10)
             acc, std = np.mean(accuracy), np.std(accuracy)
 
-            print('[%s][%d]XNorm: %f' % (test_name_list[i], pass_id, xnorm))
-            print('[{}][{}]Accuracy-Flip: {:.5f}+-{:.5f}'.format(
+            logger.info('[{}][{}]XNorm: %f'.format(test_name_list[i],
+                                                   pass_id,
+                                                   xnorm))
+            logger.info('[{}][{}]Accuracy-Flip: {:.5f}+-{:.5f}'.format(
                 test_name_list[i],
                 pass_id,
                 acc,
                 std))
             sys.stdout.flush()
         test_end = time.time()
-        print("test time: {}".format(test_end - test_start))
+        logger.info("test time: {}".format(test_end - test_start))
 
     def train(self, param_attr=None, bias_attr=None):
         self._check()
@@ -866,14 +868,15 @@ class Entry(object):
                     local_train_info = [[], [], [], []]
     
             train_loss = np.array(train_info[0]).mean()
-            print("End pass {0}, train_loss {1}".format(pass_id, train_loss))
+            logger.info("End pass {0}, train_loss {1}".format(pass_id,
+                                                              train_loss))
             sys.stdout.flush()
 
             if self.with_test:
                 test_start = time.time()
                 self.test(pass_id, run_with_train=True)
                 test_end = time.time()
-                print("test time: {}".format(test_end - test_start))
+                logger.info("test time: {}".format(test_end - test_start))
 
             # save model
             if self.model_save_dir:
@@ -910,7 +913,7 @@ class Entry(object):
                 train_info["pretrain_nranks"] = self.num_trainers
                 train_info["emb_dim"] = self.emb_dim
                 train_info['num_classes'] = self.num_classes
-                with open(config_file, 'wb') as f:
+                with open(config_file, 'w') as f:
                     json.dump(train_info, f)
 
         # upload model
