@@ -760,9 +760,9 @@ class Entry(object):
                                                          nrof_folds=10)
             acc, std = np.mean(accuracy), np.std(accuracy)
 
-            logger.info('[{}][{}]XNorm: %f'.format(test_name_list[i],
-                                                   pass_id,
-                                                   xnorm))
+            logger.info('[{}][{}]XNorm: {:.5f}'.format(test_name_list[i],
+                                                       pass_id,
+                                                       xnorm))
             logger.info('[{}][{}]Accuracy-Flip: {:.5f}+-{:.5f}'.format(
                 test_name_list[i],
                 pass_id,
