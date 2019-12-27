@@ -15,6 +15,7 @@
 from __future__ import print_function
 import math
 
+import logging
 from six.moves import reduce
 import paddle.fluid as fluid
 from paddle.fluid.layer_helper import LayerHelper
@@ -23,8 +24,13 @@ from paddle.fluid.param_attr import ParamAttr
 from paddle.fluid.initializer import Normal, Constant
 import paddle.fluid.layers.nn as nn
 import paddle.fluid.layers.ops as ops
+import paddle.fluid.layers as layers
 import paddle.fluid.layers.collective as collective
 from paddle.fluid.optimizer import Optimizer
+import paddle.fluid.unique_name as unique_name
+from ..utils.fp16_utils import rewrite_program, update_role_var_grad
+from ..utils.fp16_utils import update_loss_scaling, move_optimize_ops_back
+from ..utils.fp16_lists import AutoMixedPrecisionLists
 
 
 class DistributedClassificationOptimizer(Optimizer):
@@ -32,53 +38,127 @@ class DistributedClassificationOptimizer(Optimizer):
     A optimizer wrapper to generate backward network for distributed
     classification training of model parallelism.
     '''
+    def init_fp16_params(self, loss_type, fp16_user_dict):
+        # set default value for fp16_params_dict
+        fp16_params_dict = dict()
+        fp16_params_dict['amp_lists']= None
+        fp16_params_dict['init_loss_scaling'] = 1.0
+        fp16_params_dict['incr_every_n_steps'] = 1000
+        fp16_params_dict['decr_every_n_nan_or_inf'] = 2
+        fp16_params_dict['incr_ratio'] = 2.0
+        fp16_params_dict['decr_ratio'] = 0.5
+        fp16_params_dict['use_dynamic_loss_scaling'] = True
+        if fp16_user_dict is not None:
+            # update fp16_params_dict
+            for key in fp16_user_dict:
+                if fp16_params_dict.has_key(key):
+                    fp16_params_dict[key] = fp16_user_dict[key]
+                else:
+                    logging.warning("Can't find name '%s' in our fp16_params_dict. "
+                          "Please check your dict key. You can set fp16 params only "
+                          "in [amp_lists, init_loss_scaling, decr_every_n_nan_or_inf, "
+                          "incr_ratio, decr_ratio, use_dynamic_loss_scaling]." % (key))
 
-    def __init__(self, optimizer, batch_size, use_fp16=False):
+        self._amp_lists = fp16_params_dict['amp_lists']
+        if self._amp_lists is None:
+            self._amp_lists = AutoMixedPrecisionLists()
+
+        self._loss_type = loss_type
+        self._loss_scaling = layers.create_global_var(
+            name=unique_name.generate("loss_scaling"),
+            shape=[1],
+            value=fp16_params_dict['init_loss_scaling'],
+            dtype='float32',
+            persistable=True)
+        self._use_dynamic_loss_scaling = fp16_params_dict['use_dynamic_loss_scaling']
+        if self._use_dynamic_loss_scaling:
+            self._incr_every_n_steps = layers.fill_constant(
+                shape=[1], dtype='int32', value=fp16_params_dict['incr_every_n_steps'])
+            self._decr_every_n_nan_or_inf = layers.fill_constant(
+                shape=[1], dtype='int32', value=fp16_params_dict['decr_every_n_nan_or_inf'])
+            self._incr_ratio = fp16_params_dict['incr_ratio']
+            self._decr_ratio = fp16_params_dict['decr_ratio']
+            self._num_good_steps = layers.create_global_var(
+                name=unique_name.generate("num_good_steps"),
+                shape=[1],
+                value=0,
+                dtype='int32',
+                persistable=True)
+            self._num_bad_steps = layers.create_global_var(
+                name=unique_name.generate("num_bad_steps"),
+                shape=[1],
+                value=0,
+                dtype='int32',
+                persistable=True)
+
+        # Ensure the data type of learning rate vars is float32 (same as the
+        # master parameter dtype)
+        if isinstance(self._optimizer._learning_rate, float):
+            self._optimizer._learning_rate_map[fluid.default_main_program()] = \
+                        layers.create_global_var(
+                        name=unique_name.generate("learning_rate"),
+                        shape=[1],
+                        value=float(self._optimizer._learning_rate),
+                        dtype='float32',
+                        persistable=True)
+
+    def __init__(self,
+                 optimizer,
+                 batch_size,
+                 use_fp16=False,
+                 loss_type='dist_arcface',
+                 fp16_user_dict=None):
         self._optimizer = optimizer
         self._batch_size = batch_size
         self._use_fp16 = use_fp16
 
-    def minimize(self,
-                 loss,
-                 startup_program=None,
-                 parameter_list=None,
-                 no_grad_set=None):
-        assert loss._get_info('shard_logit')
+        if self._use_fp16:
+            self.init_fp16_params(loss_type, fp16_user_dict)
 
-        shard_logit = loss._get_info('shard_logit')
-        shard_prob = loss._get_info('shard_prob')
-        shard_label = loss._get_info('shard_label')
-        shard_dim = loss._get_info('shard_dim')
+    def fp16_backward(self,
+                      block,
+                      scalar,
+                      startup_program=None,
+                      parameter_list=None,
+                      no_grad_set=None,
+                      callbacks=None):
+        rewrite_program(block.program, self._amp_lists)
 
-        op_maker = fluid.core.op_proto_and_checker_maker
-        op_role_key = op_maker.kOpRoleAttrName()
-        op_role_var_key = op_maker.kOpRoleVarAttrName()
-        backward_role = int(op_maker.OpRole.Backward)
-        loss_backward_role = int(op_maker.OpRole.Loss) | int(
-            op_maker.OpRole.Backward)
+        self._params_grads = self._optimizer.backward(
+            scalar, startup_program, parameter_list,
+            no_grad_set, callbacks)
+        update_role_var_grad(block.program, self._params_grads)
+        move_optimize_ops_back(block.program.global_block())
+        scaled_params_grads = []
+        for p, g in self._params_grads:
+            with fluid.default_main_program()._optimized_guard([p, g]):
+                scaled_g = g / self._loss_scaling
+                scaled_params_grads.append([p, scaled_g])
+        return scaled_params_grads
 
-        # minimize a scalar of reduce_sum to generate the backward network
-        scalar = fluid.layers.reduce_sum(shard_logit)
-        ret = self._optimizer.minimize(scalar)
+    def insert_dist_arcface_backward_op(self,
+                                        block,
+                                        index,
+                                        shard_logit,
+                                        shard_prob,
+                                        shard_label,
+                                        shard_dim,
+                                        op_role_key,
+                                        backward_role,
+                                        loss_backward_role):
+        '''
+        during mixed precision training(use_fp16=True), insert backward ops
+        when loss_type equals dist_arcface.
+        '''
+        shard_one_hot = block.create_var(
+                        name=fluid.unique_name.generate('shard_one_hot'),
+                        dtype=shard_logit.dtype)
+        shard_one_hot_fp32 = block.create_var(
+                        name=fluid.unique_name.generate(shard_one_hot.name+'.cast_fp32'),
+                        dtype=shard_logit.dtype)
+        # input var of elementwise_add_grad op after scale
+        shard_logit_grad_fp32 = block.var('tmp_3@GRAD')
 
-        block = loss.block
-        # remove the unnecessary ops
-        index = 0
-        for i, op in enumerate(block.ops):
-            if op.all_attrs()[op_role_key] == loss_backward_role:
-                index = i
-                break
-
-        assert block.ops[index - 1].type == 'reduce_sum'
-        assert block.ops[index].type == 'fill_constant'
-        assert block.ops[index + 1].type == 'reduce_sum_grad'
-        block._remove_op(index + 1)
-        block._remove_op(index)
-        block._remove_op(index - 1)
-
-        # insert the calculated gradient 
-        dtype = shard_logit.dtype
-        shard_one_hot = fluid.layers.create_tensor(dtype, name='shard_one_hot')
         block._insert_op(
             index - 1,
             type='one_hot',
@@ -89,8 +169,127 @@ class DistributedClassificationOptimizer(Optimizer):
                 'allow_out_of_range': True,
                 op_role_key: backward_role
             })
-        shard_logit_grad = fluid.layers.create_tensor(
-            dtype, name=fluid.backward._append_grad_suffix_(shard_logit.name))
+        block._insert_op(
+            index,
+            type="cast",
+            inputs={"X": shard_one_hot},
+            outputs={"Out": shard_one_hot_fp32},
+            attrs={
+                "in_dtype": fluid.core.VarDesc.VarType.FP16,
+                "out_dtype": fluid.core.VarDesc.VarType.FP32,
+                op_role_key: backward_role
+            })
+        block._insert_op(
+            index + 1,
+            type='elementwise_sub',
+            inputs={'X': shard_prob,
+                    'Y': shard_one_hot_fp32},
+            outputs={'Out': shard_logit_grad_fp32},
+            attrs={op_role_key: backward_role})
+        block._insert_op(
+            index + 2,
+            type='elementwise_mul',
+            inputs={'X': shard_logit_grad_fp32,
+                    'Y': self._loss_scaling},
+            outputs={'Out': shard_logit_grad_fp32},
+            attrs={op_role_key: backward_role})
+        block._insert_op(
+            index + 3,
+            type='scale',
+            inputs={'X': shard_logit_grad_fp32},
+            outputs={'Out': shard_logit_grad_fp32},
+            attrs={
+                'scale': 1.0 / self._batch_size,
+                op_role_key: loss_backward_role
+            })
+
+    def insert_dist_softmax_backward_op(self,
+                                        block,
+                                        index,
+                                        shard_logit,
+                                        shard_prob,
+                                        shard_label,
+                                        shard_dim,
+                                        op_role_key,
+                                        backward_role,
+                                        loss_backward_role):
+        '''
+        during mixed precision training(use_fp16=True), insert backward ops
+        when loss_type equals dist_softmax.
+        '''
+        shard_one_hot = block.create_var(
+                        name=fluid.unique_name.generate('shard_one_hot'),
+                        dtype=fluid.core.VarDesc.VarType.FP32)
+        shard_one_hot_fp32 = block.create_var(
+                        name=fluid.unique_name.generate(shard_one_hot.name+'.cast_fp32'),
+                        dtype=fluid.core.VarDesc.VarType.FP32)
+        shard_logit_grad_fp32 = block.var(shard_logit.name + ".cast_fp32@GRAD")
+
+        block._insert_op(
+            index - 1,
+            type='one_hot',
+            inputs={'X': shard_label},
+            outputs={'Out': shard_one_hot_fp32},
+            attrs={
+                'depth': shard_dim,
+                'allow_out_of_range': True,
+                op_role_key: backward_role
+            })
+        block._insert_op(
+            index,
+            type='elementwise_sub',
+            inputs={'X': shard_prob,
+                    'Y': shard_one_hot_fp32},
+            outputs={'Out': shard_logit_grad_fp32},
+            attrs={op_role_key: backward_role})
+        block._insert_op(
+            index + 1,
+            type='elementwise_mul',
+            inputs={'X': shard_logit_grad_fp32,
+                    'Y': self._loss_scaling},
+            outputs={'Out': shard_logit_grad_fp32},
+            attrs={op_role_key: backward_role})
+        block._insert_op(
+            index + 2,
+            type='scale',
+            inputs={'X': shard_logit_grad_fp32},
+            outputs={'Out': shard_logit_grad_fp32},
+            attrs={
+                'scale': 1.0 / self._batch_size,
+                op_role_key: loss_backward_role
+            })
+
+    def insert_commom_backward_op(self,
+                                block,
+                                index,
+                                shard_logit,
+                                shard_prob,
+                                shard_label,
+                                shard_dim,
+                                op_role_key,
+                                backward_role,
+                                loss_backward_role):
+        '''
+        insert backward ops when not using mixed precision training.
+        common use in all lose type.
+        '''
+
+        # insert the calculated gradient
+        dtype = shard_logit.dtype
+        shard_one_hot = fluid.layers.create_tensor(
+            dtype, name='shard_one_hot')
+        block._insert_op(
+            index - 1,
+            type='one_hot',
+            inputs={'X': shard_label},
+            outputs={'Out': shard_one_hot},
+            attrs={
+                'depth': shard_dim,
+                'allow_out_of_range': True,
+                op_role_key: backward_role
+            })
+        shard_logit_grad = fluid.layers.create_tensor(dtype,
+            name=fluid.backward._append_grad_suffix_(shard_logit.name))
         block._insert_op(
             index,
             type='elementwise_sub',
@@ -107,7 +306,117 @@ class DistributedClassificationOptimizer(Optimizer):
                 'scale': 1.0 / self._batch_size,
                 op_role_key: loss_backward_role
             })
-        return ret
+
+
+    def minimize(self,
+                 loss,
+                 startup_program=None,
+                 parameter_list=None,
+                 no_grad_set=None,
+                 callbacks=None):
+        assert loss._get_info('shard_logit')
+
+        shard_logit = loss._get_info('shard_logit')
+        shard_prob = loss._get_info('shard_prob')
+        shard_label = loss._get_info('shard_label')
+        shard_dim = loss._get_info('shard_dim')
+
+        op_maker = fluid.core.op_proto_and_checker_maker
+        op_role_key = op_maker.kOpRoleAttrName()
+        op_role_var_key = op_maker.kOpRoleVarAttrName()
+        backward_role = int(op_maker.OpRole.Backward)
+        loss_backward_role = int(op_maker.OpRole.Loss) | int(
+            op_maker.OpRole.Backward)
+
+        # minimize a scalar of reduce_sum to generate the backward network
+        scalar = fluid.layers.reduce_sum(shard_logit)
+        block = loss.block
+
+        if not self._use_fp16:
+            ret = self._optimizer.minimize(scalar)
+
+            # remove the unnecessary ops
+            index = 0
+            for i, op in enumerate(block.ops):
+                if op.all_attrs()[op_role_key] == loss_backward_role:
+                    index = i
+                    break
+
+            assert block.ops[index - 1].type == 'reduce_sum'
+            assert block.ops[index].type == 'fill_constant'
+            assert block.ops[index + 1].type == 'reduce_sum_grad'
+            block._remove_op(index + 1)
+            block._remove_op(index)
+            block._remove_op(index - 1)
+
+            self.insert_commom_backward_op(block, index, shard_logit, shard_prob,
+                                            shard_label, shard_dim, op_role_key,
+                                            backward_role, loss_backward_role)
+            return ret
+        else:
+            scaled_params_grads = self.fp16_backward(block, scalar, startup_program,
+                                                parameter_list, no_grad_set, callbacks)
+            index = 0
+            for i, op in enumerate(block.ops):
+                if op.all_attrs()[op_role_key] == loss_backward_role:
+                    index = i
+                    break
+
+            if self._loss_type == 'dist_arcface':
+                assert block.ops[index - 2].type == 'fill_constant'
+                assert block.ops[index - 1].type == 'reduce_sum'
+                assert block.ops[index].type == 'fill_constant'
+                assert block.ops[index + 1].type == 'reduce_sum_grad'
+                assert block.ops[index + 2].type == 'scale'
+                assert block.ops[index + 3].type == 'elementwise_add_grad'
+
+                block._remove_op(index + 2)
+                block._remove_op(index + 1)
+                block._remove_op(index)
+                block._remove_op(index - 1)
+
+                self.insert_dist_arcface_backward_op(block, index, shard_logit, shard_prob,
+                                                    shard_label, shard_dim, op_role_key,
+                                                    backward_role, loss_backward_role)
+
+            elif self._loss_type == 'dist_softmax':
+                assert block.ops[index - 1].type == 'reduce_sum'
+                assert block.ops[index].type == 'fill_constant'
+                assert block.ops[index + 1].type == 'reduce_sum_grad'
+                assert block.ops[index + 2].type == 'cast'
+                assert block.ops[index + 3].type == 'elementwise_add_grad'
+
+                block._remove_op(index + 1)
+                block._remove_op(index)
+                block._remove_op(index - 1)
+
+                self.insert_dist_softmax_backward_op(block, index, shard_logit, shard_prob,
+                                                    shard_label, shard_dim, op_role_key,
+                                                    backward_role, loss_backward_role)
+
+            if self._use_dynamic_loss_scaling:
+                grads = [layers.reduce_sum(g) for [_, g] in scaled_params_grads]
+                all_grads = layers.concat(grads)
+                all_grads_sum = layers.reduce_sum(all_grads)
+                is_overall_finite = layers.isfinite(all_grads_sum)
+
+                update_loss_scaling(is_overall_finite, self._loss_scaling,
+                                    self._num_good_steps, self._num_bad_steps,
+                                    self._incr_every_n_steps,
+                                    self._decr_every_n_nan_or_inf,
+                                    self._incr_ratio,
+                                    self._decr_ratio)
+
+                with layers.Switch() as switch:
+                    with switch.case(is_overall_finite):
+                        pass
+                    with switch.default():
+                        for _, g in scaled_params_grads:
+                            layers.assign(layers.zeros_like(g), g)
+
+            optimize_ops = self._optimizer.apply_gradients(scaled_params_grads)
+            ret = optimize_ops, scaled_params_grads
+            return ret
 
 
 class DistributedClassifier(object):
@@ -307,7 +616,7 @@ def _distributed_softmax_classify(x,
     '''
     Classification layer with FC, softmax and cross entropy calculation of
     distibuted version in case of too large number of classes.
-    
+
     Args:
         x (Variable): The feature representation of the input samples. This
             feature will be flattened into 2-D tensor from dimension index
@@ -330,13 +639,13 @@ def _distributed_softmax_classify(x,
 
         import paddle.fluid as fluid
         input = fluid.layers.data(name="input",
-                                  shape=[32, 1024], 
-                                  dtype='float32', 
-                                  append_batch_size=False)                   
+                                  shape=[32, 1024],
+                                  dtype='float32',
+                                  append_batch_size=False)
         label = fluid.layers.data(name="label",
-                                  shape=[32, 1], 
-                                  dtype='int64', 
-                                  append_batch_size=False)                   
+                                  shape=[32, 1],
+                                  dtype='int64',
+                                  append_batch_size=False)
         y = fluid.layers.collective.distributed_softmax_classify(x=input,
                                                             label=label,
                                                             class_num=1000,
@@ -372,7 +681,7 @@ def _distributed_arcface_classify(x,
     where the :math: `\theta_{y_i}` is the angle between the feature :math: `x` and
     the representation of class :math: `i`. The details of ArcFace loss
     could be referred to https://arxiv.org/abs/1801.07698.
-    
+
     Args:
         x (Variable): The feature representation of the input samples. This
             feature will be flattened into 2-D tensor from dimension index
@@ -397,13 +706,13 @@ def _distributed_arcface_classify(x,
 
         import paddle.fluid as fluid
         input = fluid.layers.data(name="input",
-                                  shape=[32, 1024], 
-                                  dtype='float32', 
-                                  append_batch_size=False)                   
+                                  shape=[32, 1024],
+                                  dtype='float32',
+                                  append_batch_size=False)
         label = fluid.layers.data(name="label",
-                                  shape=[32, 1], 
-                                  dtype='int64', 
-                                  append_batch_size=False)                   
+                                  shape=[32, 1],
+                                  dtype='int64',
+                                  append_batch_size=False)
         y = fluid.layers.collective.distributed_arcface_classify(x=input,
                                                                  label=label,
                                                                  class_num=1000,
@@ -420,4 +729,3 @@ def _distributed_arcface_classify(x,
         margin=margin,
         logit_scale=logit_scale,
         param_attr=param_attr)
-
