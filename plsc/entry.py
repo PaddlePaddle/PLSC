@@ -42,6 +42,7 @@ from .models import base_model
 from .models import resnet
 from .utils import jpeg_reader as reader
 from .utils.learning_rate import lr_warmup
+from .utils.parameter_converter import ParameterConverter
 from .utils.verification import evaluate
 
 logging.basicConfig(
@@ -428,22 +429,12 @@ class Entry(object):
                                    stderr=subprocess.STDOUT)
         process.wait()
 
-    def preprocess_distributed_params(self,
-                                      local_dir):
+    def process_distributed_params(self, local_dir):
         local_dir = os.path.abspath(local_dir)
         output_dir = tempfile.mkdtemp()
-        cmd = sys.executable + ' -m plsc.utils.process_distfc_parameter '
-        cmd += "--nranks {} ".format(self.num_trainers)
-        cmd += "--num_classes {} ".format(self.num_classes)
-        cmd += "--pretrained_model_dir {} ".format(local_dir)
-        cmd += "--output_dir {}".format(output_dir)
-        cmd = cmd.split(' ')
-        logger.info("Distributed parameters processing cmd: {}".format(cmd))
-        process = subprocess.Popen(cmd,
-                                   stdout=sys.stdout,
-                                   stderr=subprocess.STDOUT)
-        process.wait()
-        
+        converter = ParameterConverter(local_dir, output_dir, self.num_trainers)
+        converter.process()
+
         for file in os.listdir(local_dir):
             if "dist@" in file and "@rank@" in file:
                 file = os.path.join(local_dir, file)
@@ -509,7 +500,7 @@ class Entry(object):
         file_name = os.path.join(checkpoint_dir, '.lock')
         distributed = self.loss_type in ["dist_softmax", "dist_arcface"]
         if load_for_train and self.trainer_id == 0 and distributed:
-            self.preprocess_distributed_params(checkpoint_dir)
+            self.process_distributed_params(checkpoint_dir)
             with open(file_name, 'w') as f:
                 pass
             time.sleep(10)
