@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
 | API  | 描述 |
 | --- | ---|
-| set_mixed_precision| 设置混合精度训练 
+| set_mixed_precision| 设置混合精度训练
 
 ## 参数说明
 set_mixed_precision 函数提供7个参数，其中use_fp16为必选项，决定是否开启混合精度训练，其他6个参数均有默认值，具体说明如下：
@@ -33,6 +33,7 @@ set_mixed_precision 函数提供7个参数，其中use_fp16为必选项，决定
 |incr_ratio |float|2.0|扩大loss_scaling的倍数，建议设为默认值
 |decr_ratio| float |0.5| 缩小loss_scaling的倍数，建议设为默认值
 |use_dynamic_loss_scaling | bool | True| 是否使用动态损失缩放机制。如果开启，才会用到`incr_every_n_steps`，`decr_every_n_nan_or_inf`，`incr_ratio`，`decr_ratio`四个参数，开启会提高混合精度训练的稳定性和精度，建议设为默认值
+|amp_lists|AutoMixedPrecisionLists类|None|自动混合精度列表类，可以指定具体使用fp16计算的operators列表，建议设为默认值
 
 
 更多关于混合精度训练的介绍可参考：

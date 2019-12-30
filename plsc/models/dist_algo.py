@@ -47,6 +47,7 @@ class DistributedClassificationOptimizer(Optimizer):
         fp16_params_dict['incr_ratio'] = 2.0
         fp16_params_dict['decr_ratio'] = 0.5
         fp16_params_dict['use_dynamic_loss_scaling'] = True
+        fp16_params_dict['amp_lists']= None
         if fp16_user_dict is not None:
             # update fp16_params_dict
             for key in fp16_user_dict:
@@ -57,9 +58,11 @@ class DistributedClassificationOptimizer(Optimizer):
                           "Please check your dict key. You can set fp16 params only "
                           "in [init_loss_scaling, incr_every_n_steps, "
                           "decr_every_n_nan_or_inf, incr_ratio, decr_ratio, "
-                          "use_dynamic_loss_scaling]" % (key))
+                          "use_dynamic_loss_scaling, amp_lists]" % (key))
 
-        self._amp_lists = AutoMixedPrecisionLists()
+        self._amp_lists = fp16_params_dict['amp_lists']
+        if self._amp_lists is None:
+            self._amp_lists = AutoMixedPrecisionLists()
 
         self._loss_type = loss_type
         self._loss_scaling = layers.create_global_var(

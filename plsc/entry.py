@@ -155,7 +155,8 @@ class Entry(object):
                             decr_every_n_nan_or_inf = 2,
                             incr_ratio = 2.0,
                             decr_ratio = 0.5,
-                            use_dynamic_loss_scaling = True):
+                            use_dynamic_loss_scaling = True,
+                            amp_lists = None):
         """
         Whether to use mixed precision training.
         """
@@ -167,6 +168,7 @@ class Entry(object):
         self.fp16_user_dict['incr_ratio'] = incr_ratio
         self.fp16_user_dict['decr_ratio'] = decr_ratio
         self.fp16_user_dict['use_dynamic_loss_scaling'] = use_dynamic_loss_scaling
+        self.fp16_user_dict['amp_lists'] = amp_lists
         logger.info("Use mixed precision training: {}.".format(use_fp16))
         for key in self.fp16_user_dict:
             logger.info("Set init {} to {}.".format(key, self.fp16_user_dict[key]))
@@ -324,7 +326,15 @@ class Entry(object):
                 fp16_user_dict=self.fp16_user_dict)
         elif self.use_fp16:
             self.optimizer = fluid.contrib.mixed_precision.decorate(
-                optimizer=optimizer, init_loss_scaling=self.fp16_user_dict['init_loss_scaling'])
+                optimizer=optimizer,
+                init_loss_scaling=self.fp16_user_dict['init_loss_scaling'],
+                incr_every_n_steps=self.fp16_user_dict['incr_every_n_steps'],
+                decr_every_n_nan_or_inf=self.fp16_user_dict['decr_every_n_nan_or_inf'],
+                incr_ratio=self.fp16_user_dict['incr_ratio'],
+                decr_ratio=self.fp16_user_dict['decr_ratio'],
+                use_dynamic_loss_scaling=self.fp16_user_dict['use_dynamic_loss_scaling'],
+                amp_lists=self.fp16_user_dict['amp_lists']
+                )
         return self.optimizer
 
     def build_program(self,
