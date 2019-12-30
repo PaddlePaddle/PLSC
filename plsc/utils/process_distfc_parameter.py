@@ -29,7 +29,8 @@ import paddle.fluid as fluid
 from paddle.fluid.transpiler.details import program_to_code
 
 
-logging.basicConfig(level=logging.INFO,
+logging.basicConfig(
+    level=logging.INFO,
     format='[%(levelname)s %(asctime)s line:%(lineno)d] %(message)s',
     datefmt='%d %b %Y %H:%M:%S')
 logger = logging.getLogger()
