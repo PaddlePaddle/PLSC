@@ -55,9 +55,12 @@ class ResNet(BaseModel):
                     stride=2 if i == 0 else 1,
                     is_train=is_train)
 
-        bn = fluid.layers.batch_norm(input=conv, act=None, epsilon=2e-05,
+        bn = fluid.layers.batch_norm(input=conv,
+                                     act=None,
+                                     epsilon=2e-05,
                                      is_test=False if is_train else True)
-        drop = fluid.layers.dropout(x=bn, dropout_prob=0.4,
+        drop = fluid.layers.dropout(x=bn,
+                                    dropout_prob=0.4,
                                     dropout_implementation='upscale_in_train',
                                     is_test=False if is_train else True)
         fc = fluid.layers.fc(
@@ -68,7 +71,9 @@ class ResNet(BaseModel):
                                                      fan_in=0.0)),
             bias_attr=fluid.param_attr.ParamAttr(
                 initializer=fluid.initializer.ConstantInitializer()))
-        emb = fluid.layers.batch_norm(input=fc, act=None, epsilon=2e-05,
+        emb = fluid.layers.batch_norm(input=fc,
+                                      act=None,
+                                      epsilon=2e-05,
                                       is_test=False if is_train else True)
         return emb
 
@@ -112,7 +117,10 @@ class ResNet(BaseModel):
     def shortcut(self, input, ch_out, stride, is_train):
         ch_in = input.shape[1]
         if ch_in != ch_out or stride != 1:
-            return self.conv_bn_layer(input, ch_out, 1, stride,
+            return self.conv_bn_layer(input,
+                                      ch_out,
+                                      1,
+                                      stride,
                                       is_train=is_train)
         else:
             return input
