@@ -41,13 +41,13 @@ class DistributedClassificationOptimizer(Optimizer):
     def init_fp16_params(self, loss_type, fp16_user_dict):
         # set default value for fp16_params_dict
         fp16_params_dict = dict()
-        fp16_params_dict['amp_lists']= None
         fp16_params_dict['init_loss_scaling'] = 1.0
         fp16_params_dict['incr_every_n_steps'] = 1000
         fp16_params_dict['decr_every_n_nan_or_inf'] = 2
         fp16_params_dict['incr_ratio'] = 2.0
         fp16_params_dict['decr_ratio'] = 0.5
         fp16_params_dict['use_dynamic_loss_scaling'] = True
+        fp16_params_dict['amp_lists']= None
         if fp16_user_dict is not None:
             # update fp16_params_dict
             for key in fp16_user_dict:
@@ -56,8 +56,9 @@ class DistributedClassificationOptimizer(Optimizer):
                 else:
                     logging.warning("Can't find name '%s' in our fp16_params_dict. "
                           "Please check your dict key. You can set fp16 params only "
-                          "in [amp_lists, init_loss_scaling, decr_every_n_nan_or_inf, "
-                          "incr_ratio, decr_ratio, use_dynamic_loss_scaling]." % (key))
+                          "in [init_loss_scaling, incr_every_n_steps, "
+                          "decr_every_n_nan_or_inf, incr_ratio, decr_ratio, "
+                          "use_dynamic_loss_scaling, amp_lists]" % (key))
 
         self._amp_lists = fp16_params_dict['amp_lists']
         if self._amp_lists is None:
