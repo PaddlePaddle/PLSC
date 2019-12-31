@@ -98,9 +98,15 @@ class Entry(object):
 
         self.fs_name = None
         self.fs_ugi = None
-        self.fs_remote_dir_for_save = None
-        self.fs_remote_dir_for_load = None
-        self.fs_local_dir_for_load = None
+        self.fs_dir_for_save = None
+        self.fs_checkpoint_dir = None
+
+        self.param_attr = None
+        self.bias_attr = None
+
+        self.has_run_train = False  # Whether has run training or not
+        self.test_initialized = False
+        self.train_pass_id = -1
 
         self.use_fp16 = False
         self.fp16_user_dict = None
@@ -123,8 +129,6 @@ class Entry(object):
         self.model_save_dir = self.config.model_save_dir
         self.warmup_epochs = self.config.warmup_epochs
         self.calc_train_acc = False
-        self.fleet = None
-        self.strategy = None
 
         if self.checkpoint_dir:
             self.checkpoint_dir = os.path.abspath(self.checkpoint_dir)
@@ -155,13 +159,13 @@ class Entry(object):
 
     def set_mixed_precision(self,
                             use_fp16,
-                            init_loss_scaling = 1.0,
-                            incr_every_n_steps = 2000,
-                            decr_every_n_nan_or_inf = 2,
-                            incr_ratio = 2.0,
-                            decr_ratio = 0.5,
-                            use_dynamic_loss_scaling = True,
-                            amp_lists = None):
+                            init_loss_scaling=1.0,
+                            incr_every_n_steps=2000,
+                            decr_every_n_nan_or_inf=2,
+                            incr_ratio=2.0,
+                            decr_ratio=0.5,
+                            use_dynamic_loss_scaling=True,
+                            amp_lists=None):
         """
         Whether to use mixed precision training.
         """
@@ -186,9 +190,8 @@ class Entry(object):
     def set_hdfs_info(self,
                       fs_name,
                       fs_ugi,
-                      remote_dir_for_save=None,
-                      remote_dir_for_load=None,
-                      local_dir_for_load=None):
+                      fs_dir_for_save=None,
+                      fs_checkpoint_dir=None):
         """
         Set the info to download from or upload to hdfs filesystems.
         If the information is provided, we will download pretrained
@@ -197,20 +200,13 @@ class Entry(object):
         """
         self.fs_name = fs_name
         self.fs_ugi = fs_ugi
-        self.fs_remote_dir_for_save = remote_dir_for_save
-        self.fs_remote_dir_for_load = remote_dir_for_load
-        if local_dir_for_load:
-            local_dir_for_load = os.path.abspath(local_dir_for_load)
-        self.fs_local_dir_for_load = local_dir_for_load
+        self.fs_dir_for_save = fs_dir_for_save
+        self.fs_checkpoint_dir = fs_checkpoint_dir
         logger.info("HDFS Info:")
         logger.info("\tfs_name: {}".format(fs_name))
         logger.info("\tfs_ugi: {}".format(fs_ugi))
-        logger.info("\tremote dir for save: {}".format(
-            self.fs_remote_dir_for_save))
-        logger.info("\tremote dir for load: {}".format(
-            self.fs_remote_dir_for_load))
-        logger.info("\tlocal dir for load: {}".format(
-            self.fs_local_dir_for_load))
+        logger.info("\tfs dir for save: {}".format(self.fs_dir_for_save))
+        logger.info("\tfs checkpoint dir: {}".format(self.fs_checkpoint_dir))
 
     def set_model_save_dir(self, directory):
         """
@@ -313,6 +309,14 @@ class Entry(object):
         self.with_test = with_test
         logger.info("Set with_test to {}.".format(with_test))
 
+    def set_distfc_attr(self, param_attr=None, bias_attr=None):
+        self.param_attr = param_attr
+        logger.info("Set param_attr for distfc to {}.".format(self.param_attr))
+        if self.bias_attr:
+            self.bias_attr = bias_attr
+            logger.info(
+                "Set bias_attr for distfc to {}.".format(self.bias_attr))
+
     def _get_optimizer(self):
         if not self.optimizer:
             bd = [step for step in self.lr_steps]
@@ -354,22 +358,23 @@ class Entry(object):
                 fp16_user_dict=self.fp16_user_dict)
         elif self.use_fp16:
             self.optimizer = fluid.contrib.mixed_precision.decorate(
-                optimizer=optimizer,
+                optimizer=self.optimizer,
                 init_loss_scaling=self.fp16_user_dict['init_loss_scaling'],
                 incr_every_n_steps=self.fp16_user_dict['incr_every_n_steps'],
-                decr_every_n_nan_or_inf=self.fp16_user_dict['decr_every_n_nan_or_inf'],
+                decr_every_n_nan_or_inf=self.fp16_user_dict[
+                    'decr_every_n_nan_or_inf'],
                 incr_ratio=self.fp16_user_dict['incr_ratio'],
                 decr_ratio=self.fp16_user_dict['decr_ratio'],
-                use_dynamic_loss_scaling=self.fp16_user_dict['use_dynamic_loss_scaling'],
+                use_dynamic_loss_scaling=self.fp16_user_dict[
+                    'use_dynamic_loss_scaling'],
                 amp_lists=self.fp16_user_dict['amp_lists']
-                )
+            )
         return self.optimizer
 
     def build_program(self,
                       is_train=True,
                       use_parallel_test=False,
-                      param_attr=None,
-                      bias_attr=None):
+                      dist_strategy=None):
         model_name = self.model_name
         assert not (is_train and use_parallel_test), \
             "is_train and use_parallel_test cannot be set simultaneously."
@@ -400,8 +405,8 @@ class Entry(object):
                                                    is_train=is_train,
                                                    num_classes=self.num_classes,
                                                    loss_type=self.loss_type,
-                                                   param_attr=param_attr,
-                                                   bias_attr=bias_attr,
+                                                   param_attr=self.param_attr,
+                                                   bias_attr=self.bias_attr,
                                                    margin=self.margin,
                                                    scale=self.scale)
 
@@ -444,9 +449,9 @@ class Entry(object):
                 if is_train:
                     # initialize optimizer
                     optimizer = self._get_optimizer()
-                    if self.fleet:
-                        dist_optimizer = self.fleet.distributed_optimizer(
-                            optimizer, strategy=self.strategy)
+                    if self.num_trainers > 1:
+                        dist_optimizer = fleet.distributed_optimizer(
+                            optimizer, strategy=dist_strategy)
                         dist_optimizer.minimize(loss)
                     else:  # single card training
                         optimizer.minimize(loss)
@@ -460,16 +465,16 @@ class Entry(object):
         return emb, loss, acc1, acc5, optimizer
 
     def get_files_from_hdfs(self):
-        assert self.fs_remote_dir_for_load and self.fs_local_dir_for_load, \
-            logger.error("Please set remote_dir_for_load and local_dir_for_load"
-                         "paramerters for set_hdfs_info to get models from "
-                         "hdfs.")
+        assert self.fs_checkpoint_dir, \
+            logger.error("Please set the fs_checkpoint_dir paramerters for "
+                         "set_hdfs_info to get models from hdfs.")
+        self.fs_checkpoint_dir = os.path.join(self.fs_checkpoint_dir, '*')
         cmd = "hadoop fs -D fs.default.name="
         cmd += self.fs_name + " "
         cmd += "-D hadoop.job.ugi="
         cmd += self.fs_ugi + " "
-        cmd += "-get " + self.fs_remote_dir_for_load
-        cmd += " " + self.fs_local_dir_for_load
+        cmd += "-get " + self.fs_checkpoint_dir
+        cmd += " " + self.checkpoint_dir
         logger.info("hdfs download cmd: {}".format(cmd))
         cmd = cmd.split(' ')
         process = subprocess.Popen(cmd,
@@ -478,15 +483,15 @@ class Entry(object):
         process.wait()
 
     def put_files_to_hdfs(self, local_dir):
-        assert self.fs_remote_dir_for_save, \
-            logger.error("Please set remote_dir_for_save paramerter "
+        assert self.fs_dir_for_save, \
+            logger.error("Please set fs_dir_for_save paramerter "
                          "for set_hdfs_info to save models to hdfs.")
         cmd = "hadoop fs -D fs.default.name="
         cmd += self.fs_name + " "
         cmd += "-D hadoop.job.ugi="
         cmd += self.fs_ugi + " "
         cmd += "-put " + local_dir
-        cmd += " " + self.fs_remote_dir_for_save
+        cmd += " " + self.fs_dir_for_save
         logger.info("hdfs upload cmd: {}".format(cmd))
         cmd = cmd.split(' ')
         process = subprocess.Popen(cmd,
@@ -539,31 +544,13 @@ class Entry(object):
             checkpoint_dir = self.checkpoint_dir
 
         if self.fs_name is not None:
-            assert self.fs_remote_dir_for_load, \
-                logger.error("To get pre-trained models from hdfs, you have to "
-                             "set the remote_dir_for_load parameter for "
-                             "set_hdfs_info.")
-            assert self.fs_local_dir_for_load, \
-                logger.error("To get pre-trained models from hdfs, you have to "
-                             "set the local_dir_for_load parameter for "
-                             "set_hdfs_info.")
-            assert os.path.commonprefix(
-                [self.fs_local_dir_for_load,
-                 checkpoint_dir]) == self.fs_local_dir_for_load, \
-                logger.error("Local checkpoint dir ({}) must be a sub-path of "
-                             "fs_local_dir_for_load ({}). ".format(
-                    checkpoint_dir,
-                    self.fs_local_dir_for_load))
-            suffix = os.path.basename(self.fs_remote_dir_for_load)
-            local_dir = os.path.join(self.fs_local_dir_for_load, suffix)
-            if self.trainer_id == 0 and os.path.exists(local_dir):
+            if os.path.exists(checkpoint_dir):
                 logger.info("Local dir {} exists, we'll overwrite it.".format(
-                    local_dir))
-                shutil.rmtree(local_dir)
+                    checkpoint_dir))
 
             # sync all trainers to avoid loading checkpoints before 
             # parameters are downloaded
-            file_name = os.path.join(self.fs_local_dir_for_load, '.lock')
+            file_name = os.path.join(checkpoint_dir, '.lock')
             if self.trainer_id == 0:
                 self.get_files_from_hdfs()
                 with open(file_name, 'w') as f:
@@ -712,76 +699,14 @@ class Entry(object):
                           use_program_cache=True)
             print("emb: ", emb)
 
-    def test(self, pass_id=0, run_with_train=False, initialized=False):
-        self._check()
-
-        if initialized:
-            assert run_with_train, "Only when run_with_train set to True, " \
-                "can set initialized to True."
+    def _run_test(self,
+                  exe,
+                  test_list,
+                  test_name_list,
+                  feeder,
+                  fetch_list):
         trainer_id = self.trainer_id
-        num_trainers = self.num_trainers
-        if not initialized:
-            emb, loss, _, _, _ = self.build_program(False,
-                                                    self.num_trainers > 1)
-            emb_name = emb.name
-            assert self._get_info(emb_name) is None
-            self._set_info('emb_name', emb.name)
-
-            if num_trainers > 1 and run_with_train:
-                self._append_broadcast_ops(self.test_program)
-
-            if num_trainers > 1 and not run_with_train:
-                worker_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS")
-                current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
-
-                config = dist_transpiler.DistributeTranspilerConfig()
-                config.mode = "collective"
-                config.collective_mode = "grad_allreduce"
-                t = dist_transpiler.DistributeTranspiler(config=config)
-                t.transpile(trainer_id=trainer_id,
-                            trainers=worker_endpoints,
-                            startup_program=self.startup_program,
-                            program=self.test_program,
-                            current_endpoint=current_endpoint)
-        else:
-            emb_name = self._get_info('emb_name')
-
-        gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
-        place = fluid.CUDAPlace(gpu_id)
-        exe = fluid.Executor(place)
-        if not run_with_train:
-            exe.run(self.startup_program)
-
-        if not self.test_reader:
-            test_reader = reader.test
-        else:
-            test_reader = self.test_reader
-        if not initialized:
-            test_list, test_name_list = test_reader(self.dataset_dir,
-                                                    self.val_targets)
-            assert self._get_info('test_list') is None
-            assert self._get_info('test_name_list') is None
-            self._set_info('test_list', test_list)
-            self._set_info('test_name_list', test_name_list)
-        else:
-            test_list = self._get_info('test_list')
-            test_name_list = self._get_info('test_name_list')
-
-        test_program = self.test_program
-
-        if not run_with_train:
-            assert self.checkpoint_dir, "No checkpoint found for test."
-            self.load_checkpoint(executor=exe,
-                                 main_program=test_program,
-                                 load_for_train=False)
-
-        feeder = fluid.DataFeeder(place=place,
-                                  feed_list=['image', 'label'],
-                                  program=test_program)
-        fetch_list = [emb_name]
         real_test_batch_size = self.global_test_batch_size
-
-        test_start = time.time()
         for i in range(len(test_list)):
             data_list, issame_list = test_list[i]
             embeddings_list = []
@@ -798,7 +723,7 @@ class Entry(object):
                     for k in range(begin, end):
                         _data.append((data[k], 0))
                     assert len(_data) == self.test_batch_size
-                    [_embeddings] = exe.run(test_program,
+                    [_embeddings] = exe.run(self.test_program,
                                             fetch_list=fetch_list,
                                             feed=feeder.feed(_data),
                                             use_program_cache=True)
@@ -815,7 +740,7 @@ class Entry(object):
                     _data = []
                     for k in range(end - self.test_batch_size, end):
                         _data.append((data[k], 0))
-                    [_embeddings] = exe.run(test_program,
+                    [_embeddings] = exe.run(self.test_program,
                                             fetch_list=fetch_list,
                                             feed=feeder.feed(_data),
                                             use_program_cache=True)
@@ -839,38 +764,124 @@ class Entry(object):
                                                          nrof_folds=10)
             acc, std = np.mean(accuracy), np.std(accuracy)
 
-            logger.info('[{}][{}]XNorm: {:.5f}'.format(test_name_list[i],
-                                                       pass_id,
+            if self.train_pass_id >= 0:
+                logger.info('[{}][{}]XNorm: {:.5f}'.format(test_name_list[i],
+                                                           self.train_pass_id,
+                                                           xnorm))
+                logger.info('[{}][{}]Accuracy-Flip: {:.5f}+-{:.5f}'.format(
+                    test_name_list[i],
+                    self.train_pass_id,
+                    acc,
+                    std))
+            else:
+                logger.info('[{}]XNorm: {:.5f}'.format(test_name_list[i],
                                                        xnorm))
-            logger.info('[{}][{}]Accuracy-Flip: {:.5f}+-{:.5f}'.format(
-                test_name_list[i],
-                pass_id,
-                acc,
-                std))
+                logger.info('[{}]Accuracy-Flip: {:.5f}+-{:.5f}'.format(
+                    test_name_list[i],
+                    acc,
+                    std))
             sys.stdout.flush()
-        test_end = time.time()
-        logger.info("test time: {:.4f}".format(test_end - test_start))
 
-    def train(self, param_attr=None, bias_attr=None):
+    def test(self):
         self._check()
 
         trainer_id = self.trainer_id
         num_trainers = self.num_trainers
 
+        # if the test program is not built, which means that is the first time
+        # to call the test method, we will first build the test program and
+        # add ops to broadcast bn-related parameters from trainer 0 to other
+        # trainers for distributed tests.
+        if not self.test_initialized:
+            emb, loss, _, _, _ = self.build_program(False,
+                                                    self.num_trainers > 1)
+            emb_name = emb.name
+            assert self._get_info(emb_name) is None
+            self._set_info('emb_name', emb.name)
+
+            if num_trainers > 1 and self.has_run_train:
+                self._append_broadcast_ops(self.test_program)
+
+            if num_trainers > 1 and not self.has_run_train:
+                worker_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS")
+                current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
+
+                config = dist_transpiler.DistributeTranspilerConfig()
+                config.mode = "collective"
+                config.collective_mode = "grad_allreduce"
+                t = dist_transpiler.DistributeTranspiler(config=config)
+                t.transpile(trainer_id=trainer_id,
+                            trainers=worker_endpoints,
+                            startup_program=self.startup_program,
+                            program=self.test_program,
+                            current_endpoint=current_endpoint)
+        else:
+            emb_name = self._get_info('emb_name')
+
+        gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
+        place = fluid.CUDAPlace(gpu_id)
+        exe = fluid.Executor(place)
+        if not self.has_run_train:
+            exe.run(self.startup_program)
+
+        if not self.test_reader:
+            test_reader = reader.test
+        else:
+            test_reader = self.test_reader
+        if not self.test_initialized:
+            test_list, test_name_list = test_reader(self.dataset_dir,
+                                                    self.val_targets)
+            assert self._get_info('test_list') is None
+            assert self._get_info('test_name_list') is None
+            self._set_info('test_list', test_list)
+            self._set_info('test_name_list', test_name_list)
+        else:
+            test_list = self._get_info('test_list')
+            test_name_list = self._get_info('test_name_list')
+
+        test_program = self.test_program
+
+        if not self.has_run_train:
+            assert self.checkpoint_dir, "No checkpoint found for test."
+            self.load_checkpoint(executor=exe,
+                                 main_program=test_program,
+                                 load_for_train=False)
+
+        feeder = fluid.DataFeeder(place=place,
+                                  feed_list=['image', 'label'],
+                                  program=test_program)
+        fetch_list = [emb_name]
+
+        self.test_initialized = True
+
+        test_start = time.time()
+        self._run_test(exe,
+                       test_list,
+                       test_name_list,
+                       feeder,
+                       fetch_list)
+        test_end = time.time()
+        logger.info("test time: {:.4f}".format(test_end - test_start))
+
+    def train(self):
+        self._check()
+        self.has_run_train = True
+
+        trainer_id = self.trainer_id
+        num_trainers = self.num_trainers
+
+        strategy = None
         if num_trainers > 1:
             role = role_maker.PaddleCloudRoleMaker(is_collective=True)
             fleet.init(role)
             strategy = DistributedStrategy()
             strategy.mode = "collective"
             strategy.collective_mode = "grad_allreduce"
-            self.fleet = fleet
-            self.strategy = strategy
 
         emb, loss, acc1, acc5, optimizer = self.build_program(
             True,
             False,
-            param_attr=param_attr,
-            bias_attr=bias_attr)
+            dist_strategy=strategy)
     
         global_lr = optimizer._global_learning_rate(
             program=self.train_program)
@@ -924,6 +935,7 @@ class Entry(object):
         inspect_steps = 200
         global_batch_size = self.global_train_batch_size
         for pass_id in range(self.train_epochs):
+            self.train_pass_id = pass_id
             train_info = [[], [], [], []]
             local_train_info = [[], [], [], []]
             for batch_id, data in enumerate(train_reader()):
@@ -979,9 +991,7 @@ class Entry(object):
             sys.stdout.flush()
 
             if self.with_test:
-                self.test(pass_id,
-                          run_with_train=True,
-                          initialized=False if pass_id == 0 else True)
+                self.test()
 
             # save model
             if self.model_save_dir:
