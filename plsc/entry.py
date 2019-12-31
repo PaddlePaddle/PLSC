@@ -98,8 +98,9 @@ class Entry(object):
 
         self.fs_name = None
         self.fs_ugi = None
-        self.fs_remote_dir = None
-        self.fs_local_dir = None
+        self.fs_remote_dir_for_save = None
+        self.fs_remote_dir_for_load = None
+        self.fs_local_dir_for_load = None
 
         self.val_targets = self.config.val_targets
         self.dataset_dir = self.config.dataset_dir
@@ -114,7 +115,7 @@ class Entry(object):
         self.model_name = self.config.model_name
         self.emb_dim = self.config.emb_dim
         self.train_epochs = self.config.train_epochs
-        self.checkpoint_dir = self.config.checkpoint_dir
+        self.checkpoint_dir = self.config.checkpont_dir
         self.with_test = self.config.with_test
         self.model_save_dir = self.config.model_save_dir
         self.warmup_epochs = self.config.warmup_epochs
@@ -154,7 +155,12 @@ class Entry(object):
         self.global_test_batch_size = batch_size * self.num_trainers
         logger.info("Set test batch size to {}.".format(batch_size))
 
-    def set_hdfs_info(self, fs_name, fs_ugi, remote_dir, local_dir=None):
+    def set_hdfs_info(self,
+                      fs_name,
+                      fs_ugi,
+                      remote_dir_for_save=None,
+                      remote_dir_for_load=None,
+                      local_dir_for_load=None):
         """
         Set the info to download from or upload to hdfs filesystems.
         If the information is provided, we will download pretrained 
@@ -163,15 +169,20 @@ class Entry(object):
         """
         self.fs_name = fs_name
         self.fs_ugi = fs_ugi
-        self.fs_remote_dir = remote_dir
-        if local_dir:
-            local_dir = os.path.abspath(local_dir)
-        self.fs_local_dir = local_dir
+        self.fs_remote_dir_for_save = remote_dir_for_save
+        self.fs_remote_dir_for_load = remote_dir_for_load
+        if local_dir_for_load:
+            local_dir_for_load = os.path.abspath(local_dir_for_load)
+        self.fs_local_dir_for_load = local_dir_for_load
         logger.info("HDFS Info:")
         logger.info("\tfs_name: {}".format(fs_name))
         logger.info("\tfs_ugi: {}".format(fs_ugi))
-        logger.info("\tremote directory: {}".format(self.fs_remote_dir))
-        logger.info("\tlocal directory: {}".format(self.fs_local_dir))
+        logger.info("\tremote dir for save: {}".format(
+            self.fs_remote_dir_for_save))
+        logger.info("\tremote dir for load: {}".format(
+            self.fs_remote_dir_for_load))
+        logger.info("\tlocal dir for load: {}".format(
+            self.fs_local_dir_for_load))
 
     def set_model_save_dir(self, directory):
         """
@@ -407,12 +418,16 @@ class Entry(object):
         return emb, loss, acc1, acc5, optimizer
 
     def get_files_from_hdfs(self):
+        assert self.fs_remote_dir_for_load and self.fs_local_dir_for_load, \
+            logger.error("Please set remote_dir_for_load and local_dir_for_load"
+                         "paramerters for set_hdfs_info to get models from "
+                         "hdfs.")
         cmd = "hadoop fs -D fs.default.name="
         cmd += self.fs_name + " "
         cmd += "-D hadoop.job.ugi="
         cmd += self.fs_ugi + " "
-        cmd += "-get " + self.fs_remote_dir
-        cmd += " " + self.fs_local_dir
+        cmd += "-get " + self.fs_remote_dir_for_load
+        cmd += " " + self.fs_local_dir_for_load
         logger.info("hdfs download cmd: {}".format(cmd))
         cmd = cmd.split(' ')
         process = subprocess.Popen(cmd,
@@ -421,12 +436,15 @@ class Entry(object):
         process.wait()
 
     def put_files_to_hdfs(self, local_dir):
+        assert self.fs_remote_dir_for_save, \
+            logger.error("Please set remote_dir_for_save paramerter "
+                         "for set_hdfs_info to save models to hdfs.")
         cmd = "hadoop fs -D fs.default.name="
         cmd += self.fs_name + " "
         cmd += "-D hadoop.job.ugi="
         cmd += self.fs_ugi + " "
         cmd += "-put " + local_dir
-        cmd += " " + self.fs_remote_dir
+        cmd += " " + self.fs_remote_dir_for_save
         logger.info("hdfs upload cmd: {}".format(cmd))
         cmd = cmd.split(' ')
         process = subprocess.Popen(cmd,
@@ -479,20 +497,30 @@ class Entry(object):
             checkpoint_dir = self.checkpoint_dir
 
         if self.fs_name is not None:
-            assert self.fs_local_dir, \
+            assert self.fs_remote_dir_for_load, \
                 logger.error("To get pre-trained models from hdfs, you have to "
-                             "set the local_dir parameter for set_hdfs_info.")
-            suffix = os.path.basename(checkpoint_dir)
-            local_dir = os.path.join(self.fs_local_dir, suffix)
+                             "set the remote_dir_for_load parameter for "
+                             "set_hdfs_info.")
+            assert self.fs_local_dir_for_load, \
+                logger.error("To get pre-trained models from hdfs, you have to "
+                             "set the local_dir_for_load parameter for "
+                             "set_hdfs_info.")
+            assert os.path.commonpath([self.fs_local_dir_for_load,
+                                       checkpoint_dir]) == self.fs_local_dir_for_load, \
+                logger.error("Local checkpoint dir ({}) must be a sub-path of "
+                             "fs_local_dir_for_load ({}). ".format(
+                    checkpoint_dir,
+                    self.fs_local_dir_for_load))
+            suffix = os.path.basename(self.fs_remote_dir_for_load)
+            local_dir = os.path.join(self.fs_local_dir_for_load, suffix)
             if os.path.exists(local_dir):
                 logger.info("Local dir {} exists, we'll overwrite it.".format(
                     local_dir))
                 shutil.rmtree(local_dir)
-                os.makedirs(local_dir)
 
             # sync all trainers to avoid loading checkpoints before 
             # parameters are downloaded
-            file_name = os.path.join(self.fs_local_dir, '.lock')
+            file_name = os.path.join(self.fs_local_dir_for_load, '.lock')
             if self.trainer_id == 0:
                 self.get_files_from_hdfs()
                 with open(file_name, 'w') as f:
