@@ -482,11 +482,13 @@ class Entry(object):
             assert self.fs_local_dir, \
                 logger.error("To get pre-trained models from hdfs, you have to "
                              "set the local_dir parameter for set_hdfs_info.")
-            if os.path.exists(self.fs_local_dir):
+            suffix = os.path.basename(checkpoint_dir)
+            local_dir = os.path.join(self.fs_local_dir, suffix)
+            if os.path.exists(local_dir):
                 logger.info("Local dir {} exists, we'll overwrite it.".format(
-                    self.fs_local_dir))
-                shutil.rmtree(self.fs_local_dir)
-                os.makedirs(self.fs_local_dir)
+                    local_dir))
+                shutil.rmtree(local_dir)
+                os.makedirs(local_dir)
 
             # sync all trainers to avoid loading checkpoints before 
             # parameters are downloaded
