@@ -115,7 +115,7 @@ class Entry(object):
         self.model_name = self.config.model_name
         self.emb_dim = self.config.emb_dim
         self.train_epochs = self.config.train_epochs
-        self.checkpoint_dir = self.config.checkpont_dir
+        self.checkpoint_dir = self.config.checkpoint_dir
         self.with_test = self.config.with_test
         self.model_save_dir = self.config.model_save_dir
         self.warmup_epochs = self.config.warmup_epochs
@@ -505,15 +505,16 @@ class Entry(object):
                 logger.error("To get pre-trained models from hdfs, you have to "
                              "set the local_dir_for_load parameter for "
                              "set_hdfs_info.")
-            assert os.path.commonpath([self.fs_local_dir_for_load,
-                                       checkpoint_dir]) == self.fs_local_dir_for_load, \
+            assert os.path.commonprefix(
+                [self.fs_local_dir_for_load,
+                 checkpoint_dir]) == self.fs_local_dir_for_load, \
                 logger.error("Local checkpoint dir ({}) must be a sub-path of "
                              "fs_local_dir_for_load ({}). ".format(
                     checkpoint_dir,
                     self.fs_local_dir_for_load))
             suffix = os.path.basename(self.fs_remote_dir_for_load)
             local_dir = os.path.join(self.fs_local_dir_for_load, suffix)
-            if os.path.exists(local_dir):
+            if self.trainer_id == 0 and os.path.exists(local_dir):
                 logger.info("Local dir {} exists, we'll overwrite it.".format(
                     local_dir))
                 shutil.rmtree(local_dir)
