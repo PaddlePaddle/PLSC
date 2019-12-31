@@ -98,7 +98,8 @@ class Entry(object):
 
         self.fs_name = None
         self.fs_ugi = None
-        self.fs_dir = None
+        self.fs_remote_dir = None
+        self.fs_local_dir = None
 
         self.val_targets = self.config.val_targets
         self.dataset_dir = self.config.dataset_dir
@@ -153,7 +154,7 @@ class Entry(object):
         self.global_test_batch_size = batch_size * self.num_trainers
         logger.info("Set test batch size to {}.".format(batch_size))
 
-    def set_hdfs_info(self, fs_name, fs_ugi, directory):
+    def set_hdfs_info(self, fs_name, fs_ugi, remote_dir, local_dir=None):
         """
         Set the info to download from or upload to hdfs filesystems.
         If the information is provided, we will download pretrained 
@@ -162,11 +163,15 @@ class Entry(object):
         """
         self.fs_name = fs_name
         self.fs_ugi = fs_ugi
-        self.fs_dir = directory
+        self.fs_remote_dir = remote_dir
+        if local_dir:
+            local_dir = os.path.abspath(local_dir)
+        self.fs_local_dir = local_dir
         logger.info("HDFS Info:")
         logger.info("\tfs_name: {}".format(fs_name))
         logger.info("\tfs_ugi: {}".format(fs_ugi))
-        logger.info("\tremote directory: {}".format(directory))
+        logger.info("\tremote directory: {}".format(self.fs_remote_dir))
+        logger.info("\tlocal directory: {}".format(self.fs_local_dir))
 
     def set_model_save_dir(self, directory):
         """
@@ -401,13 +406,13 @@ class Entry(object):
                         use_calc_stream=True)
         return emb, loss, acc1, acc5, optimizer
 
-    def get_files_from_hdfs(self, local_dir):
+    def get_files_from_hdfs(self):
         cmd = "hadoop fs -D fs.default.name="
         cmd += self.fs_name + " "
         cmd += "-D hadoop.job.ugi="
         cmd += self.fs_ugi + " "
-        cmd += "-get " + self.fs_dir
-        cmd += " " + local_dir
+        cmd += "-get " + self.fs_remote_dir
+        cmd += " " + self.fs_local_dir
         logger.info("hdfs download cmd: {}".format(cmd))
         cmd = cmd.split(' ')
         process = subprocess.Popen(cmd,
@@ -421,7 +426,7 @@ class Entry(object):
         cmd += "-D hadoop.job.ugi="
         cmd += self.fs_ugi + " "
         cmd += "-put " + local_dir
-        cmd += " " + self.fs_dir
+        cmd += " " + self.fs_remote_dir
         logger.info("hdfs upload cmd: {}".format(cmd))
         cmd = cmd.split(' ')
         process = subprocess.Popen(cmd,
@@ -474,17 +479,20 @@ class Entry(object):
             checkpoint_dir = self.checkpoint_dir
 
         if self.fs_name is not None:
-            if os.path.exists(checkpoint_dir):
+            assert self.fs_local_dir, \
+                logger.error("To get pre-trained models from hdfs, you have to "
+                             "set the local_dir parameter for set_hdfs_info.")
+            if os.path.exists(self.fs_local_dir):
                 logger.info("Local dir {} exists, we'll overwrite it.".format(
-                    checkpoint_dir))
-                shutil.rmtree(checkpoint_dir)
-                os.makedirs(checkpoint_dir)
+                    self.fs_local_dir))
+                shutil.rmtree(self.fs_local_dir)
+                os.makedirs(self.fs_local_dir)
 
             # sync all trainers to avoid loading checkpoints before 
             # parameters are downloaded
-            file_name = os.path.join(checkpoint_dir, '.lock')
+            file_name = os.path.join(self.fs_local_dir, '.lock')
             if self.trainer_id == 0:
-                self.get_files_from_hdfs(checkpoint_dir)
+                self.get_files_from_hdfs()
                 with open(file_name, 'w') as f:
                     pass
                 time.sleep(10)
