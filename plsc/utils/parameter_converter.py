@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import shutil
+from functools import cmp_to_key
 
 import paddle.fluid as fluid
 
@@ -507,6 +508,27 @@ class ParameterConverter(object):
         bias_velocity_param_names = [name for name in var_names
                                      if '.b' in name and 'velocity' in name]
 
+        def parameter_name_compare(x, y):
+            """
+            Compare two parameter names depend on their rank id.
+            A parameter name is like dist_softmax_rank_00000.w_0,
+            where 00000 is the rank id.
+            """
+            rank_id_x = int(x.split('.')[0].split('@')[-1])
+            rank_id_y = int(y.split('.')[0].split('@')[-1])
+            if rank_id_x < rank_id_y:
+                return -1
+            elif rank_id_x == rank_id_y:
+                return 0
+            else:
+                return 1
+
+        weight_param_names.sort(key=cmp_to_key(parameter_name_compare))
+        weight_velocity_param_names.sort(
+            key=cmp_to_key(parameter_name_compare))
+        bias_param_names.sort(key=cmp_to_key(parameter_name_compare))
+        bias_velocity_param_names.sort(key=cmp_to_key(parameter_name_compare))
+
         assert len(weight_param_names) == self.pretrain_nranks, \
             logger.error(
                 "Number of distributed fc-related weight parameters ({}) "
@@ -535,7 +557,7 @@ class ParameterConverter(object):
                                        self.pretrain_nranks))
 
         pretrain_nranks = self.pretrain_nranks
-        nranks = converter.nranks
+        nranks = self.nranks
         if pretrain_nranks == nranks:
             logger.info(
                 "Pre-training and inference (or fine-tuning) have the same "
