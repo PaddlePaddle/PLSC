@@ -480,21 +480,21 @@ class Entry(object):
                 shutil.rmtree(checkpoint_dir)
                 os.makedirs(checkpoint_dir)
 
-                # sync all trainers to avoid loading checkpoints before 
-                # parameters are downloaded
-                file_name = os.path.join(checkpoint_dir, '.lock')
-                if self.trainer_id == 0:
-                    self.get_files_from_hdfs(checkpoint_dir)
-                    with open(file_name, 'w') as f:
-                        pass
-                    time.sleep(10)
-                    os.remove(file_name)     
-                else:
-                    while True:
-                        if not os.path.exists(file_name):
-                            time.sleep(1)
-                        else:
-                            break
+            # sync all trainers to avoid loading checkpoints before 
+            # parameters are downloaded
+            file_name = os.path.join(checkpoint_dir, '.lock')
+            if self.trainer_id == 0:
+                self.get_files_from_hdfs(checkpoint_dir)
+                with open(file_name, 'w') as f:
+                    pass
+                time.sleep(10)
+                os.remove(file_name)     
+            else:
+                while True:
+                    if not os.path.exists(file_name):
+                        time.sleep(1)
+                    else:
+                        break
         
         # Preporcess distributed parameters.
         file_name = os.path.join(checkpoint_dir, '.lock')
