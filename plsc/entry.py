@@ -684,6 +684,10 @@ class Entry(object):
             emb_name = emb.name
             assert self._get_info(emb_name) is None
             self._set_info('emb_name', emb.name)
+
+            if num_trainers > 1 and run_with_train:
+                self._append_broadcast_ops(self.test_program)
+
             if num_trainers > 1 and not run_with_train:
                 worker_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS")
                 current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
