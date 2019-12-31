@@ -1,23 +1,40 @@
-import os
-import math
-import random
-import pickle
+# Copyright (c) 2019 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import base64
 import functools
+import math
+import os
+import pickle
+import random
+
 import numpy as np
 import paddle
+import six
 from PIL import Image, ImageEnhance
+
 try:
     from StringIO import StringIO
 except ImportError:
     from io import StringIO
+from io import BytesIO
 
 random.seed(0)
 
 DATA_DIM = 112
 THREAD = 8
 BUF_SIZE = 10240
-
 
 img_mean = np.array([127.5, 127.5, 127.5]).reshape((3, 1, 1))
 img_std = np.array([128.0, 128.0, 128.0]).reshape((3, 1, 1))
@@ -97,13 +114,13 @@ def RandomResizedCrop(img, size):
     return img
 
 
-def random_crop(img, size, scale=[0.08, 1.0], ratio=[3. / 4., 4. / 3.]):
+def random_crop(img, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.)):
     aspect_ratio = math.sqrt(random.uniform(*ratio))
     w = 1. * aspect_ratio
     h = 1. / aspect_ratio
 
-    bound = min((float(img.size[0]) / img.size[1]) / (w**2),
-                (float(img.size[1]) / img.size[0]) / (h**2))
+    bound = min((float(img.size[0]) / img.size[1]) / (w ** 2),
+                (float(img.size[1]) / img.size[0]) / (h ** 2))
     scale_max = min(scale[1], bound)
     scale_min = min(scale[0], bound)
 
@@ -150,12 +167,12 @@ def distort_color(img):
     return img
 
 
-def process_image_imagepath(sample,
-                            class_dim,
-                            color_jitter,
-                            rotate,
-                            rand_mirror,
-                            normalize):
+def process_image(sample,
+                  class_dim,
+                  color_jitter,
+                  rotate,
+                  rand_mirror,
+                  normalize):
     img_data = base64.b64decode(sample[0])
     img = Image.open(StringIO(img_data))
 
@@ -185,49 +202,62 @@ def process_image_imagepath(sample,
     return img, sample[1]
 
 
-def arc_iterator(file_list,
+def arc_iterator(data_dir,
+                 file_list,
                  class_dim,
                  color_jitter=False,
                  rotate=False,
                  rand_mirror=False,
                  normalize=False):
     trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))
-    trainer_count = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
+    num_trainers = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
+
     def reader():
         with open(file_list, 'r') as f:
             flist = f.readlines()
-            assert len(flist) % trainer_count == 0, \
-                "Number of files should be divisible by trainer count, " \
-                "run base64 file preprocessing tool first."
-            num_files_per_trainer = len(flist) // trainer_count
-            start = num_files_per_trainer * trainer_id
-            end = start + num_files_per_trainer
-            flist = flist[start:end]
+            assert len(flist) == num_trainers, \
+                "Please use process_base64_files.py to pre-process the dataset."
+            file = flist[trainer_id]
+        file = os.path.join(data_dir, file)
 
-            for file in flist:
-                with open(file, 'r') as f:
-                    for line in f.xreadlines():
-                        line = line.strip().split('\t')
-                        image, label = line[0], line[1]
-                        yield image, label
+        with open(file, 'r') as f:
+            if six.PY2:
+                for line in f.xreadlines():
+                    line = line.strip().split('\t')
+                    image, label = line[0], line[1]
+                    yield image, label
+            else:
+                for line in f:
+                    line = line.strip().split('\t')
+                    image, label = line[0], line[1]
+                    yield image, label
 
-    mapper = functools.partial(process_image_imagepath,
-        class_dim=class_dim, color_jitter=color_jitter, rotate=rotate,
-        rand_mirror=rand_mirror, normalize=normalize)
+    mapper = functools.partial(process_image,
+                               class_dim=class_dim,
+                               color_jitter=color_jitter,
+                               rotate=rotate,
+                               rand_mirror=rand_mirror,
+                               normalize=normalize)
     return paddle.reader.xmap_readers(mapper, reader, THREAD, BUF_SIZE)
 
 
 def load_bin(path, image_size):
-    bins, issame_list = pickle.load(open(path, 'rb'))
+    if six.PY2:
+        bins, issame_list = pickle.load(open(path, 'rb'))
+    else:
+        bins, issame_list = pickle.load(open(path, 'rb'), encoding='bytes')
     data_list = []
     for flip in [0, 1]:
-        data = np.empty((len(issame_list)*2, 3, image_size[0], image_size[1]))
+        data = np.empty((len(issame_list) * 2, 3, image_size[0], image_size[1]))
         data_list.append(data)
-    for i in xrange(len(issame_list)*2):
+    for i in range(len(issame_list) * 2):
         _bin = bins[i]
-        if not isinstance(_bin, basestring):
-            _bin = _bin.tostring()
-        img_ori = Image.open(StringIO(_bin))
+        if six.PY2:
+            if not isinstance(_bin, six.string_types):
+                _bin = _bin.tostring()
+            img_ori = Image.open(StringIO(_bin))
+        else:
+            img_ori = Image.open(BytesIO(_bin))
         for flip in [0, 1]:
             img = img_ori.copy()
             if flip == 1:
@@ -241,13 +271,18 @@ def load_bin(path, image_size):
         if i % 1000 == 0:
             print('loading bin', i)
     print(data_list[0].shape)
-    return (data_list, issame_list)
+    return data_list, issame_list
 
 
-def train(data_dir, file_list, num_classes):
-    file_path = os.path.join(data_dir, file_list)
-    return arc_iterator(file_path, class_dim=num_classes, color_jitter=False,
-        rotate=False, rand_mirror=True, normalize=True)
+def train(data_dir, num_classes):
+    file_path = os.path.join(data_dir, 'file_list.txt')
+    return arc_iterator(data_dir,
+                        file_path,
+                        class_dim=num_classes,
+                        color_jitter=False,
+                        rotate=False,
+                        rand_mirror=True,
+                        normalize=True)
 
 
 def test(data_dir, datasets):

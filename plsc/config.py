@@ -35,9 +35,9 @@ config.warmup_epochs = 0
 
 config.loss_type = "dist_arcface"
 config.num_classes = 85742
-config.image_shape = (3,112,112)
+config.image_shape = (3, 112, 112)
 config.margin = 0.5
 config.scale = 64.0
 config.lr = 0.1
-config.lr_steps = (100000,160000,220000)
+config.lr_steps = (100000, 160000, 220000)
 config.emb_dim = 512
