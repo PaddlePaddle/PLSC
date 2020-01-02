@@ -319,6 +319,27 @@ ins.train()
 
 ## 预测部署
 ### 预测模型导出
+通常，PLSC在训练过程中保存的模型只包含模型的参数信息，而不包括预测模型结构。为了部署PLSC预测库，需要将预训练模型导出为预测模型。预测模型包括预测所需要的模型参数和模型结构，用于后续地预测任务(参见[预测库使用指南](#预测库使用指南)。
+
+可以通过下面的代码将预训练模型导出为预测模型'export_for_inference.py'：
+
+```python
+from plsc import Entry
+
+if __name__ == "__main__":
+    ins = Entry()
+    ins.set_checkpoint_dir('./pretrain_model')
+    ins.set_model_save_dir('./inference_model')
+
+    ins.convert_for_prediction()
+```
+其中'./pretrain_model'目录为预训练模型参数目录，'./inference_model'为用于预测的模型目录。
+
+通过下面的命令行启动导出任务：
+```shell script
+python export_for_inference.py
+```
+
 ### 预测库使用指南
 
 ## 高级功能
@@ -408,8 +429,6 @@ softmax的计算公示如下图所示：
 * [自定义模型](docs/custom_models.md)
 
 ### 预测部署
-
-* [模型导出](docs/export_for_infer.md)
 * [C++预测库使用](docs/serving.md)
 
 ### 高级功能
