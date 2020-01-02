@@ -35,6 +35,41 @@
 
 ## 快速入门
 ### 安装说明
+Python版本要求：
+* python 2.7+
+#### 1. 安装PaddlePaddle
+##### 1. 1版本要求：
+* PaddlePaddle>= 1.6.2或开发版
+
+##### 1.2 pip安装
+
+当前，需要在GPU版本的PaddlePaddle下使用大规模分类库。
+
+```shell
+pip install paddlepaddle-gpu
+```
+
+关于PaddlePaddle对操作系统、CUDA、cuDNN等软件版本的兼容信息，以及更多PaddlePaddle的安装说明，请参考[PaddlePaddle安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/beginners_guide/install/index_cn.html)
+
+## 2. 安装依赖包
+
+```shell
+pip install -r requirements.txt
+```
+直接使用requirement.txt安装依赖包默认会安装最新的稳定版本PaddlePaddle。如需要使用开发版本的PaddlePaddle，请先通过下面的命令行卸载已安装的PaddlePaddle，并重新安装开发版本的PaddlePaddle。关于如何安装获取开发版本的PaddlePaddle，请参考[多版本whl包列表](https://www.paddlepaddle.org.cn/documentation/docs/zh/beginners_guide/install/Tables.html#ciwhls)
+
+```shell
+pip uninstall paddlepaddle-gpu
+```
+
+## 3. 安装PLSC大规模分类库
+
+```shell
+pip install plsc
+```
+
+可以
+
 ### 训练和验证
 ### API介绍
 
@@ -133,7 +168,6 @@ softmax的计算公示如下图所示：
 
 ### 快速入门
 
-* [安装说明](docs/installation.md)
 * [训练和验证](docs/usage.md)
 
 ### 基础功能
