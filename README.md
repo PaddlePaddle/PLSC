@@ -38,7 +38,7 @@
 Python版本要求：
 * python 2.7+
 #### 1. 安装PaddlePaddle
-##### 1. 1版本要求：
+##### 1.1 版本要求：
 * PaddlePaddle>= 1.6.2或开发版
 
 ##### 1.2 pip安装
@@ -51,7 +51,7 @@ pip install paddlepaddle-gpu
 
 关于PaddlePaddle对操作系统、CUDA、cuDNN等软件版本的兼容信息，以及更多PaddlePaddle的安装说明，请参考[PaddlePaddle安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/beginners_guide/install/index_cn.html)
 
-## 2. 安装依赖包
+#### 2. 安装依赖包
 
 ```shell
 pip install -r requirements.txt
@@ -62,13 +62,11 @@ pip install -r requirements.txt
 pip uninstall paddlepaddle-gpu
 ```
 
-## 3. 安装PLSC大规模分类库
+#### 3. 安装PLSC大规模分类库
 
 ```shell
 pip install plsc
 ```
-
-可以
 
 ### 训练和验证
 ### API介绍
