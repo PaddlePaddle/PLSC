@@ -579,6 +579,26 @@ build_network方法的输入如下：
 
 build_network方法返回用户自定义组网的输出变量。
 
+## 预训练模型和性能
+
+### 预训练模型
+
+我们提供了下面的预训练模型，以帮助用户对下游任务进行fine-tuning。
+
+| 模型             | 描述           |
+| :--------------- | :------------- |
+| [resnet50_distarcface_ms1m_arcface](https://plsc.bj.bcebos.com/pretrained_model/resnet50_distarcface_ms1mv2.tar.gz) | 该模型使用ResNet50网络训练，数据集为MS1M-ArcFace，训练阶段使用的loss_type为'dist_arcface'，预训练模型在lfw验证集上的验证精度为0.99817。 | 
+
+### 训练性能
+
+| 模型             | 训练集          | lfw      | agendb_30 | cfp_ff   | cfp_fp |
+| :--------------- | :------------- | :------ | :-----     | :------ | :----  |
+| ResNet50         | MS1M-ArcFace   | 0.99817 | 0.99827    | 0.99857 | 0.96314 |
+| ResNet50         | CASIA          | 0.9895  | 0.9095     | 0.99057 | 0.915 |
+
+备注：上述模型训练使用的loss_type为'dist_arcface'。更多关于ArcFace的内容请参考[ArcFace: Additive Angular Margin Loss for Deep Face Recognition](https://arxiv.org/abs/1801.07698)
+
+
 ## 设计思想
 
 解决大规模分类问题的核心思想是采用模型并行方案实现深度神经网络模型的全连接层以及之后的损失值计算。
@@ -618,24 +638,3 @@ softmax的计算公示如下图所示：
 由于softmax计算是基于全类别的logit值的，因此需要进行全局同步，以计算分母项。这需要执行*N*次AllGather操作，这里*N*是参与训练的GPU卡数。这种全局通信方式的开销较大。
 
 为了减少通信和计算代价，PLSC实现中仅同步其中的分母项。由于各个GPU卡上分母项是一个标量，所以可以显著降低通信开销。
-
-
-## 预训练模型和性能
-
-### 预训练模型
-
-我们提供了下面的预训练模型，以帮助用户对下游任务进行fine-tuning。
-
-| 模型             | 描述           |
-| :--------------- | :------------- |
-| [resnet50_distarcface_ms1m_arcface](https://plsc.bj.bcebos.com/pretrained_model/resnet50_distarcface_ms1mv2.tar.gz) | 该模型使用ResNet50网络训练，数据集为MS1M-ArcFace，训练阶段使用的loss_type为'dist_arcface'，预训练模型在lfw验证集上的验证精度为0.99817。 | 
-
-### 训练性能
-
-| 模型             | 训练集   | lfw  | agendb_30 | cfp_ff | cfp_fp |
-| :--------------- | :------------- | :------ | :----- | :------ | :----  |
-| ResNet50 | MS1M-ArcFace | 0.99817 | 0.99827 | 0.99857 | 0.96314 |
-| ResNet50 | CASIA | 0.9895 | 0.9095 | 0.99057 | 0.915 |
-
-备注：上述模型训练使用的loss_type为'dist_arcface'。更多关于ArcFace的内容请参考[ArcFace: Additive Angular Margin Loss for Deep Face Recognition](https://arxiv.org/abs/1801.07698)
-
