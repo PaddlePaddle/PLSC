@@ -658,11 +658,11 @@ build_network方法返回用户自定义组网的输出变量。
 
 对于全连接层计算，可以表示为矩阵乘法和加法，如下面的公示所示：
 
-<a href="https://www.codecogs.com/eqnedit.php?latex=y&space;=&space;XW&space;&plus;&space;b" target="_blank"><img src="https://latex.codecogs.com/gif.latex?y&space;=&space;XW&space;&plus;&space;b" title="y = XW + b" /></a>
+![FC计算公示](images/fc_computing.gif)
 
 其中，*W*和*b*全连接层参数，*X*是神经网络最后一层隐层的输出。将根据矩阵分块原理，全连接层计算又可以进一步地表示为下面的形式：
 
-![FC计算公示展开](images/fc_computing_block.png)
+![FC计算公示展开](images/fc_computing_block.gif)
 
 这里，*n*是分块的块数。因此，我们可以将神经网络的最后一层全连接参数分布到多张GPU卡，并在每张卡上分别完成全连接层的部分计算，从而实现整个全连接层的计算，并解决大规模分类问题面临的GPU显存空间不足的问题。
 
