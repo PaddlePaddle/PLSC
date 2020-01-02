@@ -676,7 +676,7 @@ build_network方法返回用户自定义组网的输出变量。
 
 softmax的计算公示如下图所示：
 
-![softmax计算公示](images/softmax_computing.png)
+![softmax计算公示](images/softmax_computing.gif)
 
 由于softmax计算是基于全类别的logit值的，因此需要进行全局同步，以计算分母项。这需要执行*N*次AllGather操作，这里*N*是参与训练的GPU卡数。这种全局通信方式的开销较大。
 
