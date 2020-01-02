@@ -668,7 +668,7 @@ build_network方法返回用户自定义组网的输出变量。
 
 需要注意的是，由于将神经网络模型最后一层全连接层参数划分到多张GPU卡，因此需要汇总各个GPU上的*X*参数，得到全连接层的全局输入*X*’(可以通过集合通信allgather实现)，并计算全连接层输出:
 
-![全局FC计算公示](images/fc_computing_block_global.png)
+![全局FC计算公示](images/fc_computing_block_global.gif)
 
 ### 通信优化
 
