@@ -117,6 +117,10 @@ class DistributedClassificationOptimizer(Optimizer):
                  fp16_user_dict=None):
         self._optimizer = optimizer
         self._batch_size = batch_size
+        self._use_fp16 = use_fp16
+
+        if self._use_fp16:
+            self.init_fp16_params(loss_type, fp16_user_dict)
 
     def fp16_backward(self,
                       block,
