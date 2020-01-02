@@ -183,6 +183,7 @@ class Base64Preprocessor(object):
     def close_db(self):
         self.conn.close()
         self.tempfile.close()
+        os.remove(self.sqlite3_file)
 
 
 def main():
