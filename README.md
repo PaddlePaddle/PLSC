@@ -15,6 +15,7 @@
 * 支持训练训练卡数的调整：加载模型参数的热启动训练可以使用和预训练不同的GPU卡数，并自动进行参数转换；
 * base64格式图像数据预处理：提供base64格式图像数据的预处理，包括数据的全局shuffle，数据自动切分；
 * 支持自定义模型：PLSC内建ResNet50、ResNet101和ResNet152模型，并支持用户自定义模型；
+* 支持模型参数在HDFS文件系统的自动上传和下载；
 * 全流程解决方案：提供从训练到部署的大规模分类问题全流程解决方案。
 
 ## 文档目录
@@ -392,6 +393,35 @@ bc.close()
 
 ## 高级功能
 ### 模型参数上传和下载(HDFS)
+
+当通过set_hdfs_info(fs_name,fs_ugi,fs_dir_for_save=None,fs_checkpoint_dir=None)函数设置了HDFS相关信息时，PLSC会在训练开始前自动下载云训练模型参数，并在训练结束后自动将保存的模型参数上传到HDFS指定目录。
+
+#### 模型参数上传
+使用模型参数上传的训练脚本示例如下：
+```python
+from plsc import Entry
+
+if __name__ == "__main__":
+    ins = Entry()
+    ins.set_model_save_dir('./saved_model')
+    ins.set_hdfs_info("you_hdfs_addr", "name,passwd", "some_dir")
+    ins.train()
+```
+#### 模型参数下载
+使用模型参数下载的训练脚本示例如下：
+```python
+from plsc import Entry
+
+if __name__ == "__main__":
+    ins = Entry()
+    ins.set_checkpoint_dir('./saved_model')
+    ins.set_hdfs_info("you_hdfs_addr",
+                      "name,passwd",
+                      fs_checkpoint_dir="some_dir")
+    ins.train()
+```
+该脚本将HDFS系统中"some_dir"目录下的所有模型参数下载到本地"./saved_model"目录。请确保"./saved_model"目录存在。
+
 ### Base64格式图像数据预处理
 ### 混合精度训练
 ### 分布式参数转换
