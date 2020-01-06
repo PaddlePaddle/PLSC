@@ -28,7 +28,7 @@ REQUIRED_PACKAGES = [
     'scipy>=0.19.0,<=1.2.1;python_version<"3.5"',
     'scipy;python_version>="3.5"',
     'scikit-learn<=0.20;python_version<"3.5"',
-    'scikit-learn>0.21;python_version>="3.5"'
+    'scikit-learn>0.21;python_version>="3.5"',
     'scipy;python_version>="3.5"',
     'sklearn',
     'easydict',
