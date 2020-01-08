@@ -152,6 +152,14 @@ paddle.distributed.launch模块用于启动多机/多卡分布式训练任务脚
 * node_ip: 当前训练机器的ip地址；
 * selected_gpus: 每个训练节点所使用的gpu设备列表，以逗号分隔。
 
+对于单机多卡训练任务，可以省略cluster_node_ips和node_ip两个参数，如下所示：
+
+```shell script
+python -m paddle.distributed.launch \
+    --selected_gpus=0,1,2,3,4,5,6,7 \
+    train.py
+```
+
 当仅使用一张GPU卡时，请使用下面的命令启动训练任务：
 ```shell script
 python train.py
@@ -184,8 +192,6 @@ if __name__ == "__main__":
 
 ```shell script
 python -m paddle.distributed.launch \
-    --cluster_node_ips="127.0.0.1" \
-    --node_ip="127.0.0.1" \
     --selected_gpus=0,1,2,3,4,5,6,7 \
     val.py
 ```
