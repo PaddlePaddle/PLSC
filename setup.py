@@ -16,13 +16,23 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+
 from setuptools import find_packages
 from setuptools import setup
-
 from plsc.version import plsc_version
 
+
 REQUIRED_PACKAGES = [
-    'sklearn', 'easydict', 'Pillow', 'numpy', 'scipy', 'six'
+    'numpy>=1.12,<=1.16.4;python_version<"3.5"',
+    'numpy>=1.12;python_version>="3.5"',
+    'scikit-learn<=0.20;python_version<"3.5"',
+    'scikit-learn;python_version>="3.5"',
+    'scipy>=0.19.0,<=1.2.1;python_version<"3.5"',
+    'scipy;python_version>="3.5"',
+    'sklearn',
+    'easydict',
+    'Pillow',
+    'six'
 ]
 
 
@@ -45,10 +55,6 @@ setup(
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Mathematics',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
