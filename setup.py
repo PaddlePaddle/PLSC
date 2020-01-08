@@ -23,7 +23,16 @@ from plsc.version import plsc_version
 
 
 REQUIRED_PACKAGES = [
-    'sklearn', 'easydict', 'Pillow', 'numpy', 'scipy', 'six'
+    'numpy>=1.12,<=1.16.4;python_version<"3.5"',
+    'numpy>=1.12;python_version>="3.5"',
+    'scikit-learn<=0.20;python_version<"3.5"',
+    'scikit-learn;python_version>="3.5"',
+    'scipy>=0.19.0,<=1.2.1;python_version<"3.5"',
+    'scipy;python_version>="3.5"',
+    'sklearn',
+    'easydict',
+    'Pillow',
+    'six'
 ]
 
 
