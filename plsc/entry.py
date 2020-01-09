@@ -566,6 +566,12 @@ class Entry(object):
         
         # Preporcess distributed parameters.
         file_name = os.path.join(checkpoint_dir, '.lock')
+        meta_file = os.path.join(checkpoint_dir, 'meta.json')
+        if not os.path.exists(meta_file):
+            logger.error("Please make sure the checkpoint dir {} exists, and "
+                         "parameters in that dir are validating.".format(
+                             checkpoint_dir))
+            exit()
         distributed = self.loss_type in ["dist_softmax", "dist_arcface"]
         if load_for_train and self.trainer_id == 0 and distributed:
             self.process_distributed_params(checkpoint_dir)
