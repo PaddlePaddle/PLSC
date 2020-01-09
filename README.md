@@ -524,7 +524,7 @@ set_mixed_precision 函数提供7个参数，其中use_fp16为必选项，决定
 
 - Nvidia Introduction: [Training With Mixed Precision](https://docs.nvidia.com/deeplearning/sdk/mixed-precision-training/index.html)
 
-## 训练性能
+#### 训练性能
 配置： Nvidia Tesla v100 GPU 单机8卡
 
 | 模型\速度 | FP32训练 | 混合精度训练 | 加速比 |
