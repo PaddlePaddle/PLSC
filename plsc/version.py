@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """ PLSC version string """
-plsc_version = "0.0.0"
+plsc_version = "0.1.1"
