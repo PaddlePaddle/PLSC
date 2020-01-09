@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import resnet
-from .resnet import *
 from . import base_model
+from . import dist_algo
+from . import resnet
 from .base_model import *
+from .dist_algo import *
+from .resnet import *
 
 __all__ = []
 __all__ += resnet.__all__
 __all__ += base_model.__all__
+__all__ += dist_algo.__all__

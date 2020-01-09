@@ -1,16 +1,19 @@
-import os
-import math
-import random
-import pickle
 import functools
+import math
+import os
+import pickle
+import random
+
 import numpy as np
 import paddle
 import six
 from PIL import Image, ImageEnhance
+
 try:
     from StringIO import StringIO
 except ImportError:
     from io import StringIO
+from io import BytesIO
 
 random.seed(0)
 
@@ -123,13 +126,13 @@ def RandomResizedCrop(img, size):
     return img
 
 
-def random_crop(img, size, scale=[0.08, 1.0], ratio=[3. / 4., 4. / 3.]):
+def random_crop(img, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.)):
     aspect_ratio = math.sqrt(random.uniform(*ratio))
     w = 1. * aspect_ratio
     h = 1. / aspect_ratio
 
-    bound = min((float(img.size[0]) / img.size[1]) / (w**2),
-                (float(img.size[1]) / img.size[0]) / (h**2))
+    bound = min((float(img.size[0]) / img.size[1]) / (w ** 2),
+                (float(img.size[1]) / img.size[0]) / (h ** 2))
     scale_max = min(scale[1], bound)
     scale_min = min(scale[0], bound)
 
@@ -222,28 +225,37 @@ def arc_iterator(data,
     def reader():
         if shuffle:
             random.shuffle(data)
-        for j in xrange(len(data)):
+        for j in range(len(data)):
             path, label = data[j]
             path = os.path.join(data_dir, path)
             yield path, label
 
-    mapper = functools.partial(process_image_imagepath, class_dim=class_dim,
-        color_jitter=color_jitter, rotate=rotate,
-        rand_mirror=rand_mirror, normalize=normalize)
+    mapper = functools.partial(process_image_imagepath,
+                               class_dim=class_dim,
+                               color_jitter=color_jitter,
+                               rotate=rotate,
+                               rand_mirror=rand_mirror,
+                               normalize=normalize)
     return paddle.reader.xmap_readers(mapper, reader, THREAD, BUF_SIZE)
 
 
 def load_bin(path, image_size):
-    bins, issame_list = pickle.load(open(path, 'rb'))
+    if six.PY2:
+        bins, issame_list = pickle.load(open(path, 'rb'))
+    else:
+        bins, issame_list = pickle.load(open(path, 'rb'), encoding='bytes')
     data_list = []
     for flip in [0, 1]:
-        data = np.empty((len(issame_list)*2, 3, image_size[0], image_size[1]))
+        data = np.empty((len(issame_list) * 2, 3, image_size[0], image_size[1]))
         data_list.append(data)
-    for i in range(len(issame_list)*2):
+    for i in range(len(issame_list) * 2):
         _bin = bins[i]
-        if not isinstance(_bin, six.string_types):
-            _bin = _bin.tostring()
-        img_ori = Image.open(StringIO(_bin))
+        if six.PY2:
+            if not isinstance(_bin, six.string_types):
+                _bin = _bin.tostring()
+            img_ori = Image.open(StringIO(_bin))
+        else:
+            img_ori = Image.open(BytesIO(_bin))
         for flip in [0, 1]:
             img = img_ori.copy()
             if flip == 1:
@@ -257,14 +269,19 @@ def load_bin(path, image_size):
         if i % 1000 == 0:
             print('loading bin', i)
     print(data_list[0].shape)
-    return (data_list, issame_list)
+    return data_list, issame_list
 
 
 def arc_train(data_dir, class_dim):
     train_image_list = get_train_image_list(data_dir)
-    return arc_iterator(train_image_list, shuffle=True, class_dim=class_dim,
-        data_dir=data_dir, color_jitter=False, rotate=False, rand_mirror=True,
-        normalize=True)
+    return arc_iterator(train_image_list,
+                        shuffle=True,
+                        class_dim=class_dim,
+                        data_dir=data_dir,
+                        color_jitter=False,
+                        rotate=False,
+                        rand_mirror=True,
+                        normalize=True)
 
 
 def test(data_dir, datasets):
