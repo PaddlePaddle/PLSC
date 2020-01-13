@@ -645,8 +645,78 @@ train_data/
 2. 使用paddle.batch封装reader生成器，得到新的生成器batched_reader；
 3. 将batched_reader赋值给plsc.Entry类示例的train_reader成员。
 
+为了便于描述，我们仍然假设用户训练数据组织结构如下：
 
-具体实现请参考[示例代码](./demo/custom_reader.py)
+```shell script
+train_data/
+|-- images
+`-- label.txt
+```
+
+定义样本生成器的代码如下所示(reader.py)：
+
+```python
+import random
+import os
+from PIL import Image
+
+def arc_train(data_dir):
+    label_file = os.path.join(data_dir, 'label.txt')
+    train_image_list = None
+    with open(label_file, 'r') as f:
+        train_image_list = f.readlines()
+    train_image_list = get_train_image_list(data_dir)
+
+    def reader():
+        for j in range(len(train_image_list)):
+            path, label = train_image_list[j]
+            path = os.path.join(data_dir, path)
+            img = Image.open(path)
+            if random.randint(0, 1) == 1:
+                img = img.transpose(Image.FLIP_LEFT_RIGHT)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            img = np.array(img).astype('float32').transpose((2, 0, 1))
+            yield img, label
+
+    return reader
+```
+
+使用用户自定义训练数据的训练代码如下：
+
+```python
+import argparse
+import paddle
+from plsc import Entry
+import reader
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--data_dir",
+                    type=str,
+                    default="./data",
+                    help="Directory for datasets.")
+args = parser.parse_args()
+
+
+def main():
+    global args
+    ins = Entry()
+    ins.set_dataset_dir(args.data_dir)
+    train_reader = reader.arc_train(args.data_dir)
+    # Batch the above samples;
+    batched_train_reader = paddle.batch(train_reader,
+                                        ins.train_batch_size)
+    # Set the reader to use during training to the above batch reader.
+    ins.train_reader = batched_train_reader
+
+    ins.train()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+更多详情请参考[示例代码](./demo/custom_reader.py)
 
 ## 预训练模型和性能
 
