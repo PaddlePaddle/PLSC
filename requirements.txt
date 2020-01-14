@@ -1,11 +1,5 @@
-numpy>=1.12, <=1.16.4 ; python_version<"3.5"
-numpy>=1.12 ; python_version>="3.5"
 scikit-learn<=0.20 ; python_version<"3.5"
 scikit-learn ; python_version>="3.5"
-scipy>=0.19.0, <=1.2.1 ; python_version<"3.5"
-scipy ; python_version>="3.5"
-Pillow
 sklearn
 easydict
-six
 paddlepaddle-gpu>=1.6.2
