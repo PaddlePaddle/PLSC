@@ -550,8 +550,11 @@ class Entry(object):
 
             # sync all trainers to avoid loading checkpoints before 
             # parameters are downloaded
-            file_name = os.path.join(checkpoint_dir, '.lock')
+            file_name = os.path.join(checkpoint_dir, '.download_lock')
             if self.trainer_id == 0:
+                if os.path.exists(file_name):
+                    logger.error("Why the file {} exists?".format(file_name))
+                    exit()
                 self.get_files_from_hdfs()
                 with open(file_name, 'w') as f:
                     pass
@@ -565,7 +568,7 @@ class Entry(object):
                         break
         
         # Preporcess distributed parameters.
-        file_name = os.path.join(checkpoint_dir, '.lock')
+        file_name = os.path.join(checkpoint_dir, '.convertor_lock')
         meta_file = os.path.join(checkpoint_dir, 'meta.json')
         if not os.path.exists(meta_file):
             logger.error("Please make sure the checkpoint dir {} exists, and "
@@ -574,6 +577,9 @@ class Entry(object):
             exit()
         distributed = self.loss_type in ["dist_softmax", "dist_arcface"]
         if load_for_train and self.trainer_id == 0 and distributed:
+            if os.path.exists(file_name):
+                logger.error("Why the file {} exists?".format(file_name))
+                exit()
             self.process_distributed_params(checkpoint_dir)
             with open(file_name, 'w') as f:
                 pass
