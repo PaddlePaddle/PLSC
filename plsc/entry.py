@@ -532,6 +532,40 @@ class Entry(object):
                 outputs={'Out': var},
                 attrs={'use_calc_stream': True})
 
+    def _sync_program(self):
+        """ Use allreduce operation to sync all trainers. """
+        if self.num_trainers == 1:
+            return
+        startup_prog = fluid.Program()
+        main_prog = fluid.Program()
+        with fluid.program_guard(main_prog, startup_prog):
+            sync_data = fluid.layers.fill_constant(shape=[1],
+                                                   value=0,
+                                                   dtype="float32")
+            out = fluid.layers.collective._c_allreduce(sync_data,
+                                                       use_calc_stream=True)
+
+        worker_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS")
+        current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
+
+        config = dist_transpiler.DistributeTranspilerConfig()
+        config.mode = "collective"
+        config.collective_mode = "grad_allreduce"
+        t = dist_transpiler.DistributeTranspiler(config=config)
+        t.transpile(trainer_id=self.trainer_id,
+                    trainers=worker_endpoints,
+                    startup_program=startup_prog,
+                    program=self.main_prog,
+                    current_endpoint=current_endpoint)
+
+        gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
+        place = fluid.CUDAPlace(gpu_id)
+        exe = fluid.Executor(place)
+        exe.run(startup_prog)
+        exe.run(main_prog)
+        logger.info("synced.")
+
+
     def load_checkpoint(self,
                         executor,
                         main_program,
@@ -550,25 +584,13 @@ class Entry(object):
 
             # sync all trainers to avoid loading checkpoints before 
             # parameters are downloaded
-            file_name = os.path.join(checkpoint_dir, '.download_lock')
             if self.trainer_id == 0:
-                if os.path.exists(file_name):
-                    logger.error("Why the file {} exists?".format(file_name))
-                    exit()
                 self.get_files_from_hdfs()
-                with open(file_name, 'w') as f:
-                    pass
-                time.sleep(10)
-                os.remove(file_name)     
+                self._sync_program()
             else:
-                while True:
-                    if not os.path.exists(file_name):
-                        time.sleep(1)
-                    else:
-                        break
+                self._sync_program()
         
         # Preporcess distributed parameters.
-        file_name = os.path.join(checkpoint_dir, '.convertor_lock')
         meta_file = os.path.join(checkpoint_dir, 'meta.json')
         if not os.path.exists(meta_file):
             logger.error("Please make sure the checkpoint dir {} exists, and "
@@ -577,21 +599,11 @@ class Entry(object):
             exit()
         distributed = self.loss_type in ["dist_softmax", "dist_arcface"]
         if load_for_train and self.trainer_id == 0 and distributed:
-            if os.path.exists(file_name):
-                logger.error("Why the file {} exists?".format(file_name))
-                exit()
             self.process_distributed_params(checkpoint_dir)
-            with open(file_name, 'w') as f:
-                pass
-            time.sleep(10)
-            os.remove(file_name)
+            self._sync_program()
         elif load_for_train and distributed:
             # wait trainer_id (0) to complete
-            while True:
-                if not os.path.exists(file_name):
-                    time.sleep(1)
-                else:
-                    break
+            self._sync_program()
 
         def if_exist(var):
             has_var = os.path.exists(os.path.join(checkpoint_dir, var.name))
