@@ -539,9 +539,8 @@ class Entry(object):
         startup_prog = fluid.Program()
         main_prog = fluid.Program()
         with fluid.program_guard(main_prog, startup_prog):
-            sync_data = fluid.layers.fill_constant(shape=[1],
-                                                   value=0,
-                                                   dtype="float32")
+            sync_data = fluid.layers.create_parameter(shape=[1],
+                                                      dtype="float32")
             out = fluid.layers.collective._c_allreduce(sync_data,
                                                        use_calc_stream=True)
 
@@ -555,7 +554,7 @@ class Entry(object):
         t.transpile(trainer_id=self.trainer_id,
                     trainers=worker_endpoints,
                     startup_program=startup_prog,
-                    program=self.main_prog,
+                    program=main_prog,
                     current_endpoint=current_endpoint)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
