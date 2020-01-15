@@ -585,9 +585,7 @@ class Entry(object):
             # parameters are downloaded
             if self.trainer_id == 0:
                 self.get_files_from_hdfs()
-                self._sync_program()
-            else:
-                self._sync_program()
+            self._sync_program()
         
         # Preporcess distributed parameters.
         meta_file = os.path.join(checkpoint_dir, 'meta.json')
