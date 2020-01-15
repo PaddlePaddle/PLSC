@@ -532,8 +532,9 @@ class Entry(object):
                 outputs={'Out': var},
                 attrs={'use_calc_stream': True})
 
-    def _sync_program(self):
+    def _barrier(self):
         """ Use allreduce operation to sync all trainers. """
+        logger.info("starting to sync...")
         if self.num_trainers == 1:
             return
         startup_prog = fluid.Program()
@@ -585,7 +586,7 @@ class Entry(object):
             # parameters are downloaded
             if self.trainer_id == 0:
                 self.get_files_from_hdfs()
-            self._sync_program()
+            self._barrier()
         
         # Preporcess distributed parameters.
         meta_file = os.path.join(checkpoint_dir, 'meta.json')
@@ -597,10 +598,10 @@ class Entry(object):
         distributed = self.loss_type in ["dist_softmax", "dist_arcface"]
         if load_for_train and self.trainer_id == 0 and distributed:
             self.process_distributed_params(checkpoint_dir)
-            self._sync_program()
+            self._barrier()
         elif load_for_train and distributed:
             # wait trainer_id (0) to complete
-            self._sync_program()
+            self._barrier()
 
         def if_exist(var):
             has_var = os.path.exists(os.path.join(checkpoint_dir, var.name))
