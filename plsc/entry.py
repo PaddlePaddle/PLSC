@@ -545,19 +545,6 @@ class Entry(object):
             out = fluid.layers.collective._c_allreduce(sync_data,
                                                        use_calc_stream=True)
 
-        worker_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS")
-        current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
-
-        config = dist_transpiler.DistributeTranspilerConfig()
-        config.mode = "collective"
-        config.collective_mode = "grad_allreduce"
-        t = dist_transpiler.DistributeTranspiler(config=config)
-        t.transpile(trainer_id=self.trainer_id,
-                    trainers=worker_endpoints,
-                    startup_program=startup_prog,
-                    program=main_prog,
-                    current_endpoint=current_endpoint)
-
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
         exe = fluid.Executor(place)
