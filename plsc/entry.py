@@ -130,6 +130,8 @@ class Entry(object):
         self.warmup_epochs = self.config.warmup_epochs
         self.calc_train_acc = False
 
+        self._barrier_program = None
+
         if self.checkpoint_dir:
             self.checkpoint_dir = os.path.abspath(self.checkpoint_dir)
         if self.model_save_dir:
@@ -537,19 +539,22 @@ class Entry(object):
         logger.info("starting to sync...")
         if self.num_trainers == 1:
             return
-        startup_prog = fluid.Program()
-        main_prog = fluid.Program()
-        with fluid.program_guard(main_prog, startup_prog):
-            sync_data = fluid.layers.create_parameter(shape=[1],
-                                                      dtype="float32")
-            out = fluid.layers.collective._c_allreduce(sync_data,
-                                                       use_calc_stream=True)
+        if self._barrier_program is None:
+            startup_prog = fluid.Program()
+            main_prog = fluid.Program()
+            with fluid.program_guard(main_prog, startup_prog):
+                sync_data = fluid.layers.create_parameter(shape=[1],
+                                                          dtype="float32")
+                out = fluid.layers.collective._c_allreduce(sync_data,
+                                                           use_calc_stream=True)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
         exe = fluid.Executor(place)
-        exe.run(startup_prog)
-        exe.run(main_prog)
+        if self._barrier_program is None:
+            exe.run(startup_prog)
+            self._barrier_program = main_prog
+        exe.run(self._barrier_program)
         logger.info("synced.")
 
 
@@ -589,6 +594,7 @@ class Entry(object):
         elif load_for_train and distributed:
             # wait trainer_id (0) to complete
             self._barrier()
+        self._barrier()
 
         def if_exist(var):
             has_var = os.path.exists(os.path.join(checkpoint_dir, var.name))
