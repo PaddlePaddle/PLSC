@@ -110,6 +110,7 @@ class Entry(object):
 
         self.use_fp16 = False
         self.fp16_user_dict = None
+        self.data_format = 'NCHW'
 
         self.val_targets = self.config.val_targets
         self.dataset_dir = self.config.dataset_dir
@@ -170,6 +171,8 @@ class Entry(object):
         Whether to use mixed precision training.
         """
         self.use_fp16 = use_fp16
+        if(self.use_fp16):
+            self.data_format = 'NHWC'
         self.fp16_user_dict = dict()
         self.fp16_user_dict['init_loss_scaling'] = init_loss_scaling
         self.fp16_user_dict['incr_every_n_steps'] = incr_every_n_steps
@@ -408,7 +411,8 @@ class Entry(object):
                                                    param_attr=self.param_attr,
                                                    bias_attr=self.bias_attr,
                                                    margin=self.margin,
-                                                   scale=self.scale)
+                                                   scale=self.scale,
+                                                   data_format=self.data_format)
 
                 acc1 = None
                 acc5 = None
@@ -618,7 +622,8 @@ class Entry(object):
 
                 emb = model.build_network(input=image,
                                           label=label,
-                                          is_train=False)
+                                          is_train=False,
+                                          data_format=self.data_format)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
@@ -883,7 +888,6 @@ class Entry(object):
             strategy = DistributedStrategy()
             strategy.mode = "collective"
             strategy.collective_mode = "grad_allreduce"
-
         emb, loss, acc1, acc5, optimizer = self.build_program(
             True,
             False,

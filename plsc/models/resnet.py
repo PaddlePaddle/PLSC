@@ -28,7 +28,8 @@ class ResNet(BaseModel):
     def build_network(self,
                       input,
                       label,
-                      is_train=True):
+                      is_train=True,
+                      data_format='NCHW'):
         layers = self.layers
         supported_layers = [50, 101, 152]
         assert layers in supported_layers, \
@@ -45,7 +46,7 @@ class ResNet(BaseModel):
 
         conv = self.conv_bn_layer(
             input=input, num_filters=64, filter_size=3, stride=1,
-            pad=1, act='prelu', is_train=is_train)
+            pad=1, act='prelu', is_train=is_train, data_format=data_format)
 
         for block in range(len(depth)):
             for i in range(depth[block]):
@@ -53,12 +54,14 @@ class ResNet(BaseModel):
                     input=conv,
                     num_filters=num_filters[block],
                     stride=2 if i == 0 else 1,
-                    is_train=is_train)
+                    is_train=is_train,
+                    data_format=data_format)
 
         bn = fluid.layers.batch_norm(input=conv,
                                      act=None,
                                      epsilon=2e-05,
-                                     is_test=False if is_train else True)
+                                     is_test=False if is_train else True,
+                                     data_layout=data_format)
         drop = fluid.layers.dropout(x=bn,
                                     dropout_prob=0.4,
                                     dropout_implementation='upscale_in_train',
@@ -74,7 +77,8 @@ class ResNet(BaseModel):
         emb = fluid.layers.batch_norm(input=fc,
                                       act=None,
                                       epsilon=2e-05,
-                                      is_test=False if is_train else True)
+                                      is_test=False if is_train else True,
+                                      data_layout=data_format)
         return emb
 
     def conv_bn_layer(self,
@@ -85,7 +89,8 @@ class ResNet(BaseModel):
                       pad=0,
                       groups=1,
                       is_train=True,
-                      act=None):
+                      act=None,
+                      data_format='NCHW'):
         conv = fluid.layers.conv2d(
             input=input,
             num_filters=num_filters,
@@ -96,13 +101,15 @@ class ResNet(BaseModel):
             param_attr=fluid.param_attr.ParamAttr(
                 initializer=fluid.initializer.Xavier(
                     uniform=False, fan_in=0.0)),
-            bias_attr=False)
+            bias_attr=False,
+            data_format=data_format)
         if act == 'prelu':
             bn = fluid.layers.batch_norm(input=conv,
                                          act=None,
                                          epsilon=2e-05,
                                          momentum=0.9,
-                                         is_test=False if is_train else True)
+                                         is_test=False if is_train else True,
+                                         data_layout=data_format)
             return fluid.layers.prelu(
                 bn,
                 mode="all",
@@ -112,62 +119,74 @@ class ResNet(BaseModel):
             return fluid.layers.batch_norm(input=conv,
                                            act=act,
                                            epsilon=2e-05,
-                                           is_test=False if is_train else True)
+                                           is_test=False if is_train else True,
+                                           data_layout=data_format)
 
-    def shortcut(self, input, ch_out, stride, is_train):
-        ch_in = input.shape[1]
+    def shortcut(self, input, ch_out, stride, is_train, data_format):
+        if data_format == 'NCHW':
+            ch_in = input.shape[1]
+        else:
+            ch_in = input.shape[-1]
         if ch_in != ch_out or stride != 1:
             return self.conv_bn_layer(input,
                                       ch_out,
                                       1,
                                       stride,
-                                      is_train=is_train)
+                                      is_train=is_train,
+                                      data_format=data_format)
         else:
             return input
 
-    def bottleneck_block(self, input, num_filters, stride, is_train):
+    def bottleneck_block(self, input, num_filters, stride, is_train, data_format):
         if self.layers < 101:
             bn1 = fluid.layers.batch_norm(input=input,
                                           act=None,
                                           epsilon=2e-05,
-                                          is_test=False if is_train else True)
+                                          is_test=False if is_train else True,
+                                          data_layout=data_format)
             conv1 = self.conv_bn_layer(input=bn1,
                                        num_filters=num_filters,
                                        filter_size=3,
                                        pad=1,
                                        act='prelu',
-                                       is_train=is_train)
+                                       is_train=is_train,
+                                       data_format=data_format)
             conv2 = self.conv_bn_layer(input=conv1,
                                        num_filters=num_filters,
                                        filter_size=3,
                                        stride=stride,
                                        pad=1,
-                                       is_train=is_train)
+                                       is_train=is_train,
+                                       data_format=data_format)
         else:
             bn0 = fluid.layers.batch_norm(input=input,
                                           act=None,
                                           epsilon=2e-05,
-                                          is_test=False if is_train else True)
+                                          is_test=False if is_train else True,
+                                          data_layout=data_format)
             conv0 = self.conv_bn_layer(input=bn0,
                                        num_filters=num_filters / 4,
                                        filter_size=1,
                                        pad=0,
                                        act='prelu',
-                                       is_train=is_train)
+                                       is_train=is_train,
+                                       data_format=data_format)
             conv1 = self.conv_bn_layer(input=conv0,
                                        num_filters=num_filters / 4,
                                        filter_size=3,
                                        pad=1,
                                        act='prelu',
-                                       is_train=is_train)
+                                       is_train=is_train,
+                                       data_format=data_format)
             conv2 = self.conv_bn_layer(input=conv1,
                                        num_filters=num_filters,
                                        filter_size=1,
                                        stride=stride,
                                        pad=0,
-                                       is_train=is_train)
+                                       is_train=is_train,
+                                       data_format=data_format)
 
-        short = self.shortcut(input, num_filters, stride, is_train=is_train)
+        short = self.shortcut(input, num_filters, stride, is_train=is_train, data_format=data_format)
         return fluid.layers.elementwise_add(x=short, y=conv2, act=None)
 
 

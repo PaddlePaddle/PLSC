@@ -52,7 +52,8 @@ class BaseModel(object):
                    bias_attr=None,
                    loss_type="dist_softmax",
                    margin=0.5,
-                   scale=64.0):
+                   scale=64.0,
+                   data_format='NCHW'):
         """
         Add the distributed fc layer for the custom model.
 
@@ -76,7 +77,7 @@ class BaseModel(object):
             "Supported loss types: {}, but given: {}".format(
                 supported_loss_types, loss_type)
 
-        emb = self.build_network(input, label, is_train)
+        emb = self.build_network(input, label, is_train, data_format=data_format)
         prob = None
         loss = None
         if loss_type == "softmax":
