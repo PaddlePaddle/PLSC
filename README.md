@@ -495,6 +495,12 @@ PLSC支持混合精度训练。使用混合精度训练可以提升训练的速�
 可以通过下面的代码设置开启混合精度训练：
 
 ```python
+# for speed up
+export FLAGS_sync_nccl_allreduce=1
+export FLAGS_cudnn_exhaustive_search=0
+export FLAGS_cudnn_batchnorm_spatial_persistent=1
+export FLAGS_eager_delete_tensor_gb=0
+
 from plsc import Entry
 
 def main():
