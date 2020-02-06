@@ -386,6 +386,8 @@ class Entry(object):
         num_trainers = self.num_trainers
 
         image_shape = [int(m) for m in self.image_shape]
+        if self.data_format == "NHWC":
+            image_shape=[image_shape[1], image_shape[2], image_shape[0]]
         # model definition
         model = self.model
         if model is None:
