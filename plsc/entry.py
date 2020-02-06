@@ -844,7 +844,8 @@ class Entry(object):
             test_reader = self.test_reader
         if not self.test_initialized:
             test_list, test_name_list = test_reader(self.dataset_dir,
-                                                    self.val_targets)
+                                                    self.val_targets,
+                                                    data_format=self.data_format)
             assert self._get_info('test_list') is None
             assert self._get_info('test_name_list') is None
             self._set_info('test_list', test_list)
