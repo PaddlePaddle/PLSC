@@ -693,7 +693,8 @@ class Entry(object):
 
         if self.predict_reader is None:
             predict_reader = paddle.batch(reader.arc_train(self.dataset_dir,
-                                                           self.num_classes),
+                                                           self.num_classes,
+                                                           data_format=self.data_format),
                                           batch_size=self.train_batch_size)
         else:
             predict_reader = self.predict_reader
@@ -925,7 +926,7 @@ class Entry(object):
 
         if self.train_reader is None:
             train_reader = paddle.batch(reader.arc_train(
-                self.dataset_dir, self.num_classes),
+                self.dataset_dir, self.num_classes, data_format=self.data_format),
                 batch_size=self.train_batch_size)
         else:
             train_reader = self.train_reader

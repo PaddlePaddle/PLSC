@@ -172,7 +172,8 @@ def process_image(sample,
                   color_jitter,
                   rotate,
                   rand_mirror,
-                  normalize):
+                  normalize,
+                  data_format='NCHW'):
     img_data = base64.b64decode(sample[0])
     img = Image.open(StringIO(img_data))
 
@@ -198,6 +199,9 @@ def process_image(sample,
 
     assert sample[1] < class_dim, \
         "label of train dataset should be less than the class_dim."
+    
+    if data_format == 'NHWC':
+        img = img.transpose((1, 2, 0))
 
     return img, sample[1]
 
@@ -208,7 +212,8 @@ def arc_iterator(data_dir,
                  color_jitter=False,
                  rotate=False,
                  rand_mirror=False,
-                 normalize=False):
+                 normalize=False,
+                 data_format='NCHW'):
     trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))
     num_trainers = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
 
@@ -237,11 +242,12 @@ def arc_iterator(data_dir,
                                color_jitter=color_jitter,
                                rotate=rotate,
                                rand_mirror=rand_mirror,
-                               normalize=normalize)
+                               normalize=normalize,
+                               data_format=data_format)
     return paddle.reader.xmap_readers(mapper, reader, THREAD, BUF_SIZE)
 
 
-def load_bin(path, image_size):
+def load_bin(path, image_size, data_format ='NCHW'):
     if six.PY2:
         bins, issame_list = pickle.load(open(path, 'rb'))
     else:
@@ -267,6 +273,8 @@ def load_bin(path, image_size):
             img = np.array(img).astype('float32').transpose((2, 0, 1))
             img -= img_mean
             img /= img_std
+            if data_format == 'NHWC':
+                img = img.transpose((1, 2, 0))
             data_list[flip][i][:] = img
         if i % 1000 == 0:
             print('loading bin', i)
@@ -274,7 +282,7 @@ def load_bin(path, image_size):
     return data_list, issame_list
 
 
-def train(data_dir, num_classes):
+def train(data_dir, num_classes, data_format ='NCHW'):
     file_path = os.path.join(data_dir, 'file_list.txt')
     return arc_iterator(data_dir,
                         file_path,
@@ -282,16 +290,17 @@ def train(data_dir, num_classes):
                         color_jitter=False,
                         rotate=False,
                         rand_mirror=True,
-                        normalize=True)
+                        normalize=True,
+                        data_format=data_format)
 
 
-def test(data_dir, datasets):
+def test(data_dir, datasets, data_format ='NCHW'):
     test_list = []
     test_name_list = []
     for name in datasets.split(','):
         path = os.path.join(data_dir, name+".bin")
         if os.path.exists(path):
-            data_set = load_bin(path, (DATA_DIM, DATA_DIM))
+            data_set = load_bin(path, (DATA_DIM, DATA_DIM), data_format=data_format)
             test_list.append(data_set)
             test_name_list.append(name)
             print('test', name)
