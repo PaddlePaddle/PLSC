@@ -493,14 +493,18 @@ python tools/process_base64_files.py --data_dir=./dataset --file_list=file_list.
 PLSC支持混合精度训练。使用混合精度训练可以提升训练的速度，同时减少训练使用的显存开销。
 #### 使用指南
 可以通过下面的代码设置开启混合精度训练：
-
-```python
-# for speed up
+```
 export FLAGS_sync_nccl_allreduce=1
 export FLAGS_cudnn_exhaustive_search=0
 export FLAGS_cudnn_batchnorm_spatial_persistent=1
 export FLAGS_eager_delete_tensor_gb=0
 
+python -m paddle.distributed.launch \
+    --log_dir=log \
+    train.py
+```
+上述train.sh脚本中，设置了一些常用的优化性能的环境变量，详情可参考[分布式GPU训练优秀实践](https://www.paddlepaddle.org.cn/documentation/docs/zh/advanced_usage/best_practice/dist_training_gpu.html)。通过`paddle.distributed.launch`启动的train.py脚本如下：
+```python
 from plsc import Entry
 
 def main():
