@@ -67,12 +67,6 @@ class HybridTrainPipe(Pipeline):
                                     shard_id=shard_id,
                                     num_shards=num_shards,
                                     random_shuffle=random_shuffle)
-        #self.input_jpeg = ops.ExternalSource()
-        #self.input_label = ops.ExternalSource()
-        #self.input_iter = iter(eii)
-
-        # set internal nvJPEG buffers size to handle full-sized ImageNet images
-        # without additional reallocations
         device_memory_padding = 211025920
         host_memory_padding = 140544512
         self.decode = ops.ImageDecoder(
@@ -94,33 +88,26 @@ class HybridTrainPipe(Pipeline):
         rng = self.coin()
         jpegs, labels = self.input(name="Reader")
         images = self.decode(jpegs)
-        #self.jpeg = self.input_jpeg()
-        #self.label = self.input_label()
-        #images = self.decode(self.jpeg)
         output = self.cmnp(images.gpu(), mirror=rng)
-        #return [output, self.to_int64(self.label.gpu())]
         return [output, self.to_int64(labels.gpu())]
 
     def __len__(self):
         return self.epoch_size("Reader")
-        #return 1281167
 
 
-class HybridRectValPipe(Pipeline):
+class HybridValPipe(Pipeline):
     """
-    Create rectangle validate pipe line.
+    Create validate pipe line.
     """
     def __init__(self,
                  file_root,
                  file_list,
                  batch_size,
-                 eii,
-                 crop,
-                 interp,
                  mean,
                  std,
                  device_id,
                  shard_id=0,
+                 eii=None,
                  num_shards=1,
                  random_shuffle=False,
                  num_threads=4,
@@ -182,6 +169,7 @@ class HybridRectValPipe(Pipeline):
 
 def build(batch_size,
           data_dir,
+          epoch_id,
           file_list=None,
           mode='train',
           trainer_id=None,
@@ -205,51 +193,30 @@ def build(batch_size,
                               file_list, file_root))
     if mode != 'train':
         raise ValueError("Only support train mode now.")
-        pipe = HybridRectValPipe(file_root,
-                                 file_list,
-                                 batch_size,
-                                 eii,
-                                 crop,
-                                 interp,
-                                 mean,
-                                 std,
-                                 device_id=gpu_id,
-                                 data_layout=data_layout)
-        return DALIGenericIterator(pipe,
-                                   ['test_image', 'feed_label'],
-                                   size=len(pipe),
-                                   dynamic_shape=True,
-                                   fill_last_batch=False,
-                                   last_batch_padded=True)
 
-    if trainer_id is not None and trainers_num is not None:
-        assert trainer_id is not None and trainers_num is not None, \
-            "Please set trainer_id and trainers_num."
+    assert trainer_id is not None and trainers_num is not None, \
+        "Please set trainer_id and trainers_num."
     print("dali gpu_id: {}, shard_id: {}, num_shards: {}".format(
                                                                  gpu_id,
                                                                  trainer_id,
                                                                  trainers_num))
-    shard_id=trainer_id
-    num_shards=trainers_num
-    epoch_id = settings.epoch_id
     pipe = HybridTrainPipe(data_dir,
                            file_list,
                            batch_size,
                            mean,
                            std,
                            device_id=gpu_id,
-                           shard_id=shard_id,
-                           num_shards=num_shards,
+                           shard_id=trainer_id,
+                           num_shards=trainers_num,
                            seed=epoch_id,
-                           eii=eii,
                            data_layout=data_layout,
                            num_threads=4)
     pipe.build()
     pipelines = [pipe]
-    sample_per_shard = len(pipe) // num_shards
+    sample_per_shard = len(pipe) // trainers_num
     
     return DALIGenericIterator(pipelines,
-                               ['train_image', 'feed_label'],
+                               ['image', 'label'],
                                size=sample_per_shard)
 
 
