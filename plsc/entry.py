@@ -95,6 +95,7 @@ class Entry(object):
         self.startup_program = fluid.Program()
         self.test_program = fluid.Program()
         self.predict_program = fluid.Program()
+        self.use_dali = False
 
         self.fs_name = None
         self.fs_ugi = None
@@ -224,6 +225,13 @@ class Entry(object):
         self.calc_train_acc = calc
         logger.info("Calculating acc1 and acc5 during training: {}.".format(
             calc))
+
+    def set_use_dali(self, use_dali=True):
+        """
+        Whether to calcuate acc1 and acc5 during training.
+        """
+        self.use_dali = use_dali
+        logger.info("Use dali: {}.".format(use_dali))
 
     def set_dataset_dir(self, directory):
         """
@@ -462,7 +470,7 @@ class Entry(object):
                         emb,
                         nranks=num_trainers,
                         use_calc_stream=True)
-        return emb, loss, acc1, acc5, optimizer
+        return emb, loss, acc1, acc5, optimizer, image, label
 
     def get_files_from_hdfs(self):
         assert self.fs_checkpoint_dir, \
@@ -799,8 +807,8 @@ class Entry(object):
         # add ops to broadcast bn-related parameters from trainer 0 to other
         # trainers for distributed tests.
         if not self.test_initialized:
-            emb, loss, _, _, _ = self.build_program(False,
-                                                    self.num_trainers > 1)
+            emb, loss = self.build_program(False,
+                                           self.num_trainers > 1)[0:2]
             emb_name = emb.name
             assert self._get_info(emb_name) is None
             self._set_info('emb_name', emb.name)
@@ -884,7 +892,7 @@ class Entry(object):
             strategy.mode = "collective"
             strategy.collective_mode = "grad_allreduce"
 
-        emb, loss, acc1, acc5, optimizer = self.build_program(
+        emb, loss, acc1, acc5, optimizer, image, label = self.build_program(
             True,
             False,
             dist_strategy=strategy)
@@ -924,11 +932,18 @@ class Entry(object):
                 self.dataset_dir, self.num_classes),
                 batch_size=self.train_batch_size)
         else:
-            train_reader = self.train_reader
+            if self.use_dali:
+                data_iter = self.train_reader
+            else:
+                train_reader = self.train_reader
 
-        feeder = fluid.DataFeeder(place=place,
-                                  feed_list=['image', 'label'],
-                                  program=origin_prog)
+        if not self.use_dali:
+            data_loader = fluid.io.DataLoader.from_generator(
+                                  feed_list=[image, label],
+                                  capacity=64,
+                                  use_double_buffer=True,
+                                  iterable=True)
+            data_loader.set_sample_list_generator(train_reader, place)
     
         if self.calc_train_acc:
             fetch_list = [loss.name, global_lr.name,
@@ -942,21 +957,23 @@ class Entry(object):
         global_batch_size = self.global_train_batch_size
         for pass_id in range(self.train_epochs):
             self.train_pass_id = pass_id
+            if not self.use_dali:
+                data_iter = data_loader()
             train_info = [[], [], [], []]
             local_train_info = [[], [], [], []]
-            for batch_id, data in enumerate(train_reader()):
+            for batch_id, data in enumerate(data_iter):
                 nsamples += global_batch_size
                 t1 = time.time()
                 acc1 = None
                 acc5 = None
                 if self.calc_train_acc:
                     loss, lr, acc1, acc5 = exe.run(train_prog,
-                                                   feed=feeder.feed(data),
+                                                   feed=data,
                                                    fetch_list=fetch_list,
                                                    use_program_cache=True)
                 else:
                     loss, lr = exe.run(train_prog,
-                                       feed=feeder.feed(data),
+                                       feed=data,
                                        fetch_list=fetch_list,
                                        use_program_cache=True)
                 t2 = time.time()
@@ -995,6 +1012,8 @@ class Entry(object):
             logger.info("End pass {}, train_loss {:.6f}".format(pass_id,
                                                                 train_loss))
             sys.stdout.flush()
+            if self.use_dali:
+                data_iter.reset()
 
             if self.with_test:
                 self.test()
