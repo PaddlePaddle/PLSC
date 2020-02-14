@@ -971,15 +971,15 @@ class Entry(object):
                     avg_lr = np.mean(local_train_info[1])
                     speed = nsamples / local_time
                     if self.calc_train_acc:
-                        logger.info("Pass:{} batch:%d lr:{:.8f} loss:{:.6f} "
+                        logger.info("Pass:{} batch:{} lr:{:.8f} loss:{:.6f} "
                                     "qps:{:.2f} acc1:{:.6f} acc5:{:.6f}".format(
                             pass_id,
                             batch_id,
                             avg_lr,
                             avg_loss,
                             speed,
-                            acc1,
-                            acc5))
+                            acc1[0],
+                            acc5[0]))
                     else:
                         logger.info("Pass:{} batch:{} lr:{:.8f} loss:{:.6f} "
                                     "qps:{:.2f}".format(pass_id,
