@@ -228,7 +228,7 @@ class Entry(object):
 
     def set_use_dali(self, use_dali=True):
         """
-        Whether to calcuate acc1 and acc5 during training.
+        Whether to use nvidia dali.
         """
         self.use_dali = use_dali
         logger.info("Use dali: {}.".format(use_dali))
