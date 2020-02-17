@@ -38,6 +38,7 @@ def main():
     ins.set_dataset_dir(args.data_dir)
     ins.set_train_epochs(args.num_epochs)
     ins.set_loss_type(args.loss_type)
+    ins.set_mixed_precision(True)
     # 1. Build a dali reader
     gpu_id = ins.trainer_id % 8 # Assume 8 card per machine
     dali_iter = dali.train(ins.train_batch_size,
