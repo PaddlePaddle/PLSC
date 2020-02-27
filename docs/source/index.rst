@@ -1,14 +1,13 @@
-.. PLSC documentation master file, created by
-   sphinx-quickstart on Thu Feb 27 10:54:35 2020.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+:github_url: https://github.com/PaddlePaddle/PLSC
 
-Welcome to PLSC's documentation!
-================================
-
+快速开始
+========
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 1
+   :caption: 快速开始
+   :hidden:
+
+   instruction.rst
 
 
 
@@ -18,3 +17,23 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+.. toctree::
+   :maxdepth: 1
+   :caption: 使用示例
+
+   examples/index.rst
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API参考
+
+   api/plsc
+
+开发团队
+=======
+PLSC由百度Nimitz团队开发和维护。
+
+许可协议
+========
+PLSC使用Apache License 2.0。
