@@ -25,7 +25,7 @@
 请参考[预测部署指南](docs/source/md/serving.md)获取预测部署使用指南。
 
 ## 高阶功能
-[进阶指南](docs/source/md/advanced.md)提供了更多高阶功能的使用指南，如HDFS文件系统的自动上传和下载等。
+请参考[进阶指南](docs/source/md/advanced.md)获取更多高阶功能的使用指南，如HDFS文件系统的自动上传和下载等。
 
 
 ## 预训练模型和性能
