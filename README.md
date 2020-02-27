@@ -18,23 +18,34 @@
 * 支持模型参数在HDFS文件系统的自动上传和下载；
 * 全流程解决方案：提供从训练到部署的大规模分类问题全流程解决方案。
 
-## 文档目录
-* [快速入门](#快速入门)
-    * [安装说明](#安装说明)
-    * [训练和验证](#训练和验证)
-    * [API介绍](#API介绍)
-* [预测部署](#预测部署)
-    * [预测模型导出](#预测模型导出)
-    * [预测库使用指南](#预测库使用指南)
-* [高级功能](#高级功能)
-    * [模型参数上传和下载(HDFS)](#模型参数上传和下载(HDFS))
-    * [Base64格式图像数据预处理](#Base64格式图像数据预处理)
-    * [混合精度训练](#混合精度训练)
-    * [自定义模型](#自定义模型)
-    * [自定义训练数据](#自定义训练数据)
-* [预训练模型和性能](#预训练模型和性能)
-    * [预训练模型](#预训练模型)
-    * [训练性能](#训练性能)
+## 快速开始
+请参考[快速开始](docs/source/md/quick_start.md)获取安装指南和快速使用示例。
+
+## 预测部署
+请参考[预测部署指南](docs/source/md/serving.md)获取预测部署使用指南。
+
+## 高阶功能
+[进阶指南](docs/source/md/advanced.md)提供了更多高阶功能的使用指南，如HDFS文件系统的自动上传和下载等。
+
+
+## 预训练模型和性能
+### 预训练模型
+
+我们提供了下面的预训练模型，以帮助用户对下游任务进行fine-tuning。
+
+| 模型             | 描述           |
+| :--------------- | :------------- |
+| [resnet50_distarcface_ms1m_arcface](https://plsc.bj.bcebos.com/pretrained_model/resnet50_distarcface_ms1mv2.tar.gz) | 该模型使用ResNet50网络训练，数据集为MS1M-ArcFace，训练阶段使用的loss_type为'dist_arcface'，预训练模型在lfw验证集上的验证精度为0.99817。 | 
+
+### 训练性能
+
+| 模型             | 训练集          | lfw      | agendb_30 | cfp_ff   | cfp_fp |
+| :--------------- | :------------- | :------ | :-----     | :------ | :----  |
+| ResNet50         | MS1M-ArcFace   | 0.99817 | 0.99827    | 0.99857 | 0.96314 |
+| ResNet50         | CASIA          | 0.9895  | 0.9095     | 0.99057 | 0.915 |
+
+备注：上述模型训练使用的loss_type为'dist_arcface'。更多关于ArcFace的内容请参考[ArcFace: Additive Angular Margin Loss for Deep Face Recognition](https://arxiv.org/abs/1801.07698)
+
 
 ## 快速入门
 ### 安装说明
@@ -720,19 +731,4 @@ if __name__ == "__main__":
 
 ## 预训练模型和性能
 
-### 预训练模型
 
-我们提供了下面的预训练模型，以帮助用户对下游任务进行fine-tuning。
-
-| 模型             | 描述           |
-| :--------------- | :------------- |
-| [resnet50_distarcface_ms1m_arcface](https://plsc.bj.bcebos.com/pretrained_model/resnet50_distarcface_ms1mv2.tar.gz) | 该模型使用ResNet50网络训练，数据集为MS1M-ArcFace，训练阶段使用的loss_type为'dist_arcface'，预训练模型在lfw验证集上的验证精度为0.99817。 | 
-
-### 训练性能
-
-| 模型             | 训练集          | lfw      | agendb_30 | cfp_ff   | cfp_fp |
-| :--------------- | :------------- | :------ | :-----     | :------ | :----  |
-| ResNet50         | MS1M-ArcFace   | 0.99817 | 0.99827    | 0.99857 | 0.96314 |
-| ResNet50         | CASIA          | 0.9895  | 0.9095     | 0.99057 | 0.915 |
-
-备注：上述模型训练使用的loss_type为'dist_arcface'。更多关于ArcFace的内容请参考[ArcFace: Additive Angular Margin Loss for Deep Face Recognition](https://arxiv.org/abs/1801.07698)
