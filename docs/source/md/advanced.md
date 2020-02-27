@@ -1,4 +1,4 @@
-# 高级功能
+# 进阶指南
 ## 模型参数上传和下载(HDFS)
 
 当通过set_hdfs_info(fs_name,fs_ugi,fs_dir_for_save=None,fs_checkpoint_dir=None)函数设置了HDFS相关信息时，PLSC会在训练开始前自动下载云训练模型参数，并在训练结束后自动将保存的模型参数上传到HDFS指定目录。
