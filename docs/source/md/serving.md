@@ -68,5 +68,5 @@ fc.connect('127.0.0.1:8010')
 #调用server端预测，输入为样本列表list类型，返回值为样本对应的embedding结果,list类型，shape为 batch size * embedding size
 result = fc.encode([image])
 print(result[0])
-bc.close()
+fc.close()
 ```
