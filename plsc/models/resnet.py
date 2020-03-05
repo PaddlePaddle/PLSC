@@ -126,7 +126,7 @@ class ResNet(BaseModel):
             return input
 
     def bottleneck_block(self, input, num_filters, stride, is_train):
-        if self.layers < 101:
+        if self.layers < 500:
             bn1 = fluid.layers.batch_norm(input=input,
                                           act=None,
                                           epsilon=2e-05,
