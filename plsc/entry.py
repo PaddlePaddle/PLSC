@@ -45,11 +45,14 @@ from .utils.learning_rate import lr_warmup
 from .utils.parameter_converter import ParameterConverter
 from .utils.verification import evaluate
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%d %b %Y %H:%M:%S')
+log_handler = logging.StreamHandler()
+log_format = logging.Formatter(
+    '%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s')
+log_handler.setFormatter(log_format)
 logger = logging.getLogger(__name__)
+logger.addHandler(log_handler)
+logger.setLevel(logging.INFO)
+logger.propagate = False
 
 
 class Entry(object):
