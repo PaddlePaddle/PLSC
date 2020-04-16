@@ -41,9 +41,9 @@
 
 ### 训练性能
 
-| 模型             | 训练集         | lfw     | agendb\_30 | cfp\_ff | cfp\_fp | MegaFace (Id/Ver) |
-| :--------------- | :------------- | :------ | :-----     | :------ | :----   | :-------------- ｜
-| ResNet50         | MS1M-ArcFace   | 0.99817 | 0.99827    | 0.99857 | 0.96314 | 0.98000/0.99300 |
-| ResNet50         | CASIA          | 0.98950 | 0.90950    | 0.99057 | 0.91500 | N/A |
+| 模型       | 训练集        | lfw     | agendb\_30 | cfp\_ff | cfp\_fp | MegaFace (IdVer) |
+| :--------- | :------------ | :------ | :------    | :------ | :------ | :--------------   ｜
+| ResNet50   | MS1M-ArcFace  | 0.99817 | 0.99827    | 0.99857 | 0.96314 | 0.98000/0.99300   |
+| ResNet50   | CASIA         | 0.98950 | 0.90950    | 0.99057 | 0.91500 | N/A               |
 
 备注：上述模型训练使用的loss_type为'dist_arcface'。更多关于ArcFace的内容请参考[ArcFace: Additive Angular Margin Loss for Deep Face Recognition](https://arxiv.org/abs/1801.07698)
