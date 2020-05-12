@@ -34,7 +34,6 @@ import paddle.fluid.transpiler.distribute_transpiler as dist_transpiler
 import sklearn
 from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
 from paddle.fluid.optimizer import Optimizer
-from paddle.fluid.transpiler.details.program_utils import program_to_code
 
 from . import config
 from .models import DistributedClassificationOptimizer
@@ -921,14 +920,6 @@ class Entry(object):
         else:
             origin_prog = self.train_program
             train_prog = self.train_program
-
-        if trainer_id == 0:
-            with open('start.program', 'w') as fout:
-                program_to_code(self.startup_program, fout, True)
-            with open('main.program', 'w') as fout:
-                program_to_code(train_prog, fout, True)
-            with open('origin.program', 'w') as fout:
-                program_to_code(origin_prog, fout, True)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
