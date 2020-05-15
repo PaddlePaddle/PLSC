@@ -33,7 +33,7 @@ class BaseModel(object):
     def __init__(self):
         super(BaseModel, self).__init__()
 
-    def build_network(self, input, label, is_train=True):
+    def build_network(self, input, is_train=True):
         """
         Construct the custom model, and we will add the distributed fc layer
         at the end of your model automatically.

@@ -142,12 +142,13 @@ class Entry(object):
         self.lr_decay_factor = 0.1
         self.log_period = 200
 
-        self.input_info = {'image': {'shape': [3, 224, 224]
+        self.input_info = {'image': {'shape': [3, 224, 224],
                                      'dtype': 'float32'},
                            'label': {'shape':[1],
                                      'dtype': 'int64'}
-                          })
+                          }
         self.data_list = []
+        self.data_name_list = ['image', 'label']
 
         logger.info('=' * 30)
         logger.info("Default configuration:")
@@ -159,7 +160,7 @@ class Entry(object):
         logger.info('default log period: {}'.format(self.log_period))
         logger.info('=' * 30)
 
-    def set_input_info(info):
+    def set_input_info(self, info, name_list):
         """
         Set the information of inputs which is a dict. The keys are the names
         of inputs, and the values are the shapes (in list) of the inputs.
@@ -174,8 +175,12 @@ class Entry(object):
                                      name))
             assert isinstance(info[name]['shape'], list)
             assert isinstance(info[name]['dtype'], str)
+        assert len(name_list) == len(info.keys())
+        for name in name_list:
+            assert name in info
 
         self.input_info = info
+        self.data_name_list = name_list
 
     def set_val_targets(self, targets):
         """
@@ -438,7 +443,7 @@ class Entry(object):
         with fluid.program_guard(main_program, startup_program):
             with fluid.unique_name.guard():
                 input = {}
-                for name in self.input_info.keys():
+                for name in self.data_name_list:
                     shape = self.input_info[name]['shape']
                     dtype = self.input_info[name]['dtype']
                     data = fluid.layers.data(name=name,
@@ -447,8 +452,7 @@ class Entry(object):
                     input[name] = data
                     self.data_list.append(data)
 
-                emb, loss, prob = model.get_output(input=image,
-                                                   label=label,
+                emb, loss, prob = model.get_output(input=input,
                                                    num_ranks=num_trainers,
                                                    rank_id=trainer_id,
                                                    is_train=is_train,
@@ -970,9 +974,9 @@ class Entry(object):
         data_loader = fluid.io.DataLoader.from_generator(
                 feed_list=self.data_list,
                 capacity=16,
-                iterable=ITERABLE,
+                iterable=True,
                 use_double_buffer=True)
-        data_loader.set_batch_generator(train_reader, places=place)
+        data_loader.set_sample_generator(train_reader, batch_size=self.train_batch_size, places=place)
     
         if self.calc_train_acc:
             fetch_list = [loss.name, global_lr.name,
@@ -1000,7 +1004,7 @@ class Entry(object):
                                                    use_program_cache=True)
                 else:
                     loss, lr = exe.run(train_prog,
-                                       feed=feeder.feed(data),
+                                       feed=data,
                                        fetch_list=fetch_list,
                                        use_program_cache=True)
                 t2 = time.time()
