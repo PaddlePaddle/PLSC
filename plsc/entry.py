@@ -142,6 +142,13 @@ class Entry(object):
         self.lr_decay_factor = 0.1
         self.log_period = 200
 
+        self.input_info = {'image': {'shape': [3, 224, 224]
+                                     'dtype': 'float32'},
+                           'label': {'shape':[1],
+                                     'dtype': 'int64'}
+                          })
+        self.data_list = []
+
         logger.info('=' * 30)
         logger.info("Default configuration:")
         for key in self.config:
@@ -151,6 +158,24 @@ class Entry(object):
         logger.info('default lr_decay_factor: {}'.format(self.lr_decay_factor))
         logger.info('default log period: {}'.format(self.log_period))
         logger.info('=' * 30)
+
+    def set_input_info(info):
+        """
+        Set the information of inputs which is a dict. The keys are the names
+        of inputs, and the values are the shapes (in list) of the inputs.
+        """
+        if not isinstance(info, dict):
+            raise ValueError("The parameter must be of type of dict")
+        if len(info.keys()) == 0:
+            raise ValueError("The parameter you passed has no inputs")
+        for name in info.keys():
+            if not isinstance(info[name], dict):
+                raise ValueError("The type for input {} must be dict.".format(
+                                     name))
+            assert isinstance(info[name]['shape'], list)
+            assert isinstance(info[name]['dtype'], str)
+
+        self.input_info = info
 
     def set_val_targets(self, targets):
         """
@@ -404,7 +429,6 @@ class Entry(object):
         trainer_id = self.trainer_id
         num_trainers = self.num_trainers
 
-        image_shape = [int(m) for m in self.image_shape]
         # model definition
         model = self.model
         if model is None:
@@ -413,12 +437,15 @@ class Entry(object):
         startup_program = self.startup_program
         with fluid.program_guard(main_program, startup_program):
             with fluid.unique_name.guard():
-                image = fluid.layers.data(name='image',
-                                          shape=image_shape,
-                                          dtype='float32')
-                label = fluid.layers.data(name='label',
-                                          shape=[1],
-                                          dtype='int64')
+                input = {}
+                for name in self.input_info.keys():
+                    shape = self.input_info[name]['shape']
+                    dtype = self.input_info[name]['dtype']
+                    data = fluid.layers.data(name=name,
+                                          shape=shape,
+                                          dtype=dtype)
+                    input[name] = data
+                    self.data_list.append(data)
 
                 emb, loss, prob = model.get_output(input=image,
                                                    label=label,
@@ -940,9 +967,12 @@ class Entry(object):
         else:
             train_reader = self.train_reader
 
-        feeder = fluid.DataFeeder(place=place,
-                                  feed_list=['image', 'label'],
-                                  program=origin_prog)
+        data_loader = fluid.io.DataLoader.from_generator(
+                feed_list=self.data_list,
+                capacity=16,
+                iterable=ITERABLE,
+                use_double_buffer=True)
+        data_loader.set_batch_generator(train_reader, places=place)
     
         if self.calc_train_acc:
             fetch_list = [loss.name, global_lr.name,
@@ -958,14 +988,14 @@ class Entry(object):
             self.train_pass_id = pass_id
             train_info = [[], [], [], []]
             local_train_info = [[], [], [], []]
-            for batch_id, data in enumerate(train_reader()):
+            for batch_id, data in enumerate(data_loader()):
                 nsamples += global_batch_size
                 t1 = time.time()
                 acc1 = None
                 acc5 = None
                 if self.calc_train_acc:
                     loss, lr, acc1, acc5 = exe.run(train_prog,
-                                                   feed=feeder.feed(data),
+                                                   feed=data,
                                                    fetch_list=fetch_list,
                                                    use_program_cache=True)
                 else:
