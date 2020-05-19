@@ -76,7 +76,7 @@ class BaseModel(object):
                 supported_loss_types, loss_type)
 
         emb = self.build_network(input, is_train)
-        label = input['label']
+        label = input.label
         prob = None
         loss = None
         if loss_type == "softmax":
