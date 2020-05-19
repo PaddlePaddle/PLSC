@@ -74,7 +74,7 @@ class InputField(object):
 
         return self.input_slots[name]
 
-    def build(self, capacity=64, iterable=False):
+    def build(self, capacity=64, iterable=True):
 
         for _name, _shape, _dtype, _lod_level in zip(
                 self.names, self.shapes, self.dtypes, self.lod_levels):
