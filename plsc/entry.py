@@ -23,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import logging
 
 import numpy as np
 import paddle
