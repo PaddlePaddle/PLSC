@@ -147,6 +147,7 @@ class Entry(object):
                             'shape':[1],
                             'dtype': 'int64'}
                           ]
+        self.input_field = None
 
         logger.info('=' * 30)
         logger.info("Default configuration:")
@@ -158,18 +159,16 @@ class Entry(object):
         logger.info('default log period: {}'.format(self.log_period))
         logger.info('=' * 30)
 
-    def set_input_info(self, input_fields):
+    def set_input_info(self, input):
         """
         Set the information of inputs which is a list or tuple. Each element
         is a dict which contains the info of a input, including name, dtype
         and shape.
         """
-        if not (isinstance(input_fields, list) or 
-                isinstance(input_fields, tuple)):
-            raise ValueError("The parameter 'input_fileds' must be "
-                             "list or tuple.")
+        if not (isinstance(input, list) or isinstance(input, tuple)):
+            raise ValueError("The type of 'input' must be list or tuple.")
 
-        self.input_info = input_fields
+        self.input_info = input
 
     def set_val_targets(self, targets):
         """
@@ -710,18 +709,20 @@ class Entry(object):
                              load_for_train=False)
 
         if self.predict_reader is None:
-            predict_reader = paddle.batch(reader.arc_train(self.dataset_dir,
-                                                           self.num_classes),
-                                          batch_size=self.train_batch_size)
+            predict_reader = reader.arc_train(self.dataset_dir,
+                                              self.num_classes)
         else:
             predict_reader = self.predict_reader
 
-        input_field.loader.set_batch_generator(predict_reader)
+        input_field.loader.set_sample_generator(
+                predict_reader,
+                batch_size=self.train_batch_size,
+                places=place)
 
         fetch_list = [emb.name]
         for data in input_field.loader:
             emb = exe.run(main_program,
-                          feed=input_field.feed_list,
+                          feed=data,
                           fetch_list=fetch_list,
                           use_program_cache=True)
             print("emb: ", emb)
@@ -939,9 +940,10 @@ class Entry(object):
         else:
             train_reader = self.train_reader
 
-        self.input_field.loader.set_sample_generator(train_reader,
-                                                     batch_size=self.train_batch_size,
-                                                     places=place)
+        self.input_field.loader.set_sample_generator(
+                train_reader,
+                batch_size=self.train_batch_size,
+                places=place)
     
         if self.calc_train_acc:
             fetch_list = [loss.name, global_lr.name,
