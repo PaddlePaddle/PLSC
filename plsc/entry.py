@@ -142,10 +142,10 @@ class Entry(object):
         self.log_period = 200
 
         self.input_info = [{'name': 'image',
-                            'shape': [3, 224, 224],
+                            'shape': [-1, 3, 224, 224],
                             'dtype': 'float32'},
                            {'name': 'label',
-                            'shape':[1],
+                            'shape':[-1, 1],
                             'dtype': 'int64'}
                           ]
         self.input_field = None
@@ -168,6 +168,20 @@ class Entry(object):
         """
         if not (isinstance(input, list) or isinstance(input, tuple)):
             raise ValueError("The type of 'input' must be list or tuple.")
+
+        has_label = False
+        for element in input:
+            assert isinstance(element, dict), (
+                "The type of elements for input must be dict")
+            assert 'name' in element.keys(), (
+                "Every element has to contain the key 'name'")
+            assert 'shape' in element.keys(), (
+                "Every element has to contain the key 'shape'")
+            assert 'dtype' in element.keys(), (
+                "Every element has to contain the key 'dtype'")
+            if element['name'] == 'label':
+                has_label = True
+        assert has_label, "The input must contain a field named 'label'"
 
         self.input_info = input
 
@@ -732,7 +746,7 @@ class Entry(object):
                   exe,
                   test_list,
                   test_name_list,
-                  feed_list,
+                  feeder,
                   fetch_list):
         trainer_id = self.trainer_id
         real_test_batch_size = self.global_test_batch_size
@@ -742,6 +756,14 @@ class Entry(object):
             for j in range(len(data_list)):
                 data = data_list[j]
                 embeddings = None
+                # For multi-card test, the dataset can be partitioned into two
+                # part. For the first part, the total number of samples is
+                # divisiable by the number of cards. And then, these samples
+                # are split on different cards and tested parallely. For the
+                # second part, these samples are tested on all cards but only
+                # the result of the first card is used.
+
+                # The number of steps for parallel test.
                 parallel_test_steps = data.shape[0] // real_test_batch_size
                 for idx in range(parallel_test_steps):
                     start = idx * real_test_batch_size
@@ -754,7 +776,7 @@ class Entry(object):
                     assert len(_data) == self.test_batch_size
                     [_embeddings] = exe.run(self.test_program,
                                             fetch_list=fetch_list,
-                                            feed=feed_list,
+                                            feed=feeder.feed(_data),
                                             use_program_cache=True)
                     if embeddings is None:
                         embeddings = np.zeros((data.shape[0],
@@ -771,7 +793,7 @@ class Entry(object):
                         _data.append((data[k], 0))
                     [_embeddings] = exe.run(self.test_program,
                                             fetch_list=fetch_list,
-                                            feed=feed_list,
+                                            feed=feeder.feed(_data),
                                             use_program_cache=True)
                     _embeddings = _embeddings[0:self.test_batch_size, :]
                     embeddings[beg:end, :] = _embeddings[
@@ -877,7 +899,7 @@ class Entry(object):
                                  load_for_train=False)
 
         feeder = fluid.DataFeeder(place=place,
-                                  feed_list=['image', 'label'],
+                                  feed_list=self.input_field.feed_list_str,
                                   program=test_program)
         fetch_list = [emb_name]
 
