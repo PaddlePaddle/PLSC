@@ -45,7 +45,7 @@
 | :--------------- | :------------- |
 | [resnet50_distarcface_ms1m_arcface](https://plsc.bj.bcebos.com/pretrained_model/resnet50_distarcface_ms1mv2.tar.gz) | 该模型使用ResNet50网络训练，数据集为MS1M-ArcFace，训练阶段使用的loss_type为'dist_arcface'，预训练模型在lfw验证集上的验证精度为0.99817。 | 
 
-### 训练性能
+### 训练精度
 
 | 模型       | 训练集        | lfw     | agendb\_30 | cfp\_ff | cfp\_fp | MegaFace (Id/Ver) |
 | :--------- | :------------ | :------ | :------    | :------ | :------ | :--------------   |
