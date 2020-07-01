@@ -33,7 +33,7 @@ class BaseModel(object):
     def __init__(self):
         super(BaseModel, self).__init__()
 
-    def build_network(self, input, label, is_train=True):
+    def build_network(self, input, is_train=True):
         """
         Construct the custom model, and we will add the distributed fc layer
         at the end of your model automatically.
@@ -43,7 +43,6 @@ class BaseModel(object):
 
     def get_output(self,
                    input,
-                   label,
                    num_classes,
                    num_ranks=1,
                    rank_id=0,
@@ -76,7 +75,8 @@ class BaseModel(object):
             "Supported loss types: {}, but given: {}".format(
                 supported_loss_types, loss_type)
 
-        emb = self.build_network(input, label, is_train)
+        emb = self.build_network(input, is_train)
+        label = input.label
         prob = None
         loss = None
         if loss_type == "softmax":

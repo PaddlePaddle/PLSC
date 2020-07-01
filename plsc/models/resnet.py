@@ -27,7 +27,6 @@ class ResNet(BaseModel):
 
     def build_network(self,
                       input,
-                      label,
                       is_train=True):
         layers = self.layers
         supported_layers = [50, 101, 152]
@@ -44,7 +43,7 @@ class ResNet(BaseModel):
         num_filters = [64, 128, 256, 512]
 
         conv = self.conv_bn_layer(
-            input=input, num_filters=64, filter_size=3, stride=1,
+            input=input.image, num_filters=64, filter_size=3, stride=1,
             pad=1, act='prelu', is_train=is_train)
 
         for block in range(len(depth)):

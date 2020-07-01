@@ -17,14 +17,13 @@ from __future__ import print_function
 
 import errno
 import json
-import logging
-import math
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
+import logging
 
 import numpy as np
 import paddle
@@ -43,6 +42,7 @@ from .utils import jpeg_reader as reader
 from .utils.learning_rate import lr_warmup
 from .utils.parameter_converter import ParameterConverter
 from .utils.verification import evaluate
+from .utils.input_field import InputField
 
 log_handler = logging.StreamHandler()
 log_format = logging.Formatter(
@@ -116,7 +116,6 @@ class Entry(object):
         self.val_targets = self.config.val_targets
         self.dataset_dir = self.config.dataset_dir
         self.num_classes = self.config.num_classes
-        self.image_shape = self.config.image_shape
         self.loss_type = self.config.loss_type
         self.margin = self.config.margin
         self.scale = self.config.scale
@@ -142,6 +141,15 @@ class Entry(object):
         self.lr_decay_factor = 0.1
         self.log_period = 200
 
+        self.input_info = [{'name': 'image',
+                            'shape': [-1, 3, 224, 224],
+                            'dtype': 'float32'},
+                           {'name': 'label',
+                            'shape':[-1, 1],
+                            'dtype': 'int64'}
+                          ]
+        self.input_field = None
+
         logger.info('=' * 30)
         logger.info("Default configuration:")
         for key in self.config:
@@ -151,6 +159,31 @@ class Entry(object):
         logger.info('default lr_decay_factor: {}'.format(self.lr_decay_factor))
         logger.info('default log period: {}'.format(self.log_period))
         logger.info('=' * 30)
+
+    def set_input_info(self, input):
+        """
+        Set the information of inputs which is a list or tuple. Each element
+        is a dict which contains the info of a input, including name, dtype
+        and shape.
+        """
+        if not (isinstance(input, list) or isinstance(input, tuple)):
+            raise ValueError("The type of 'input' must be list or tuple.")
+
+        has_label = False
+        for element in input:
+            assert isinstance(element, dict), (
+                "The type of elements for input must be dict")
+            assert 'name' in element.keys(), (
+                "Every element has to contain the key 'name'")
+            assert 'shape' in element.keys(), (
+                "Every element has to contain the key 'shape'")
+            assert 'dtype' in element.keys(), (
+                "Every element has to contain the key 'dtype'")
+            if element['name'] == 'label':
+                has_label = True
+        assert has_label, "The input must contain a field named 'label'"
+
+        self.input_info = input
 
     def set_val_targets(self, targets):
         """
@@ -314,12 +347,6 @@ class Entry(object):
         self.loss_type = loss_type
         logger.info("Set loss_type to {}.".format(loss_type))
 
-    def set_image_shape(self, shape):
-        if not isinstance(shape, (list, tuple)):
-            raise ValueError("Shape must be of type list or tuple")
-        self.image_shape = shape
-        logger.info("Set image_shape to {}.".format(shape))
-
     def set_optimizer(self, optimizer):
         if not isinstance(optimizer, Optimizer):
             raise ValueError("Optimizer must be of type Optimizer")
@@ -404,7 +431,6 @@ class Entry(object):
         trainer_id = self.trainer_id
         num_trainers = self.num_trainers
 
-        image_shape = [int(m) for m in self.image_shape]
         # model definition
         model = self.model
         if model is None:
@@ -413,15 +439,11 @@ class Entry(object):
         startup_program = self.startup_program
         with fluid.program_guard(main_program, startup_program):
             with fluid.unique_name.guard():
-                image = fluid.layers.data(name='image',
-                                          shape=image_shape,
-                                          dtype='float32')
-                label = fluid.layers.data(name='label',
-                                          shape=[1],
-                                          dtype='int64')
+                input_field = InputField(self.input_info)
+                input_field.build()
+                self.input_field = input_field
 
-                emb, loss, prob = model.get_output(input=image,
-                                                   label=label,
+                emb, loss, prob = model.get_output(input=input_field,
                                                    num_ranks=num_trainers,
                                                    rank_id=trainer_id,
                                                    is_train=is_train,
@@ -449,7 +471,7 @@ class Entry(object):
                             num_or_sections=num_trainers)
                         prob = fluid.layers.concat(prob_list, axis=1)
                         label_all = fluid.layers.collective._c_allgather(
-                            label,
+                            input_field.label,
                             nranks=num_trainers,
                             use_calc_stream=True)
                         acc1 = fluid.layers.accuracy(input=prob,
@@ -461,10 +483,10 @@ class Entry(object):
                 else:
                     if self.calc_train_acc:
                         acc1 = fluid.layers.accuracy(input=prob,
-                                                     label=label,
+                                                     label=input_field.label,
                                                      k=1)
                         acc5 = fluid.layers.accuracy(input=prob,
-                                                     label=label,
+                                                     label=input_field.label,
                                                      k=5)
 
                 optimizer = None
@@ -489,7 +511,7 @@ class Entry(object):
     def get_files_from_hdfs(self):
         assert self.fs_checkpoint_dir, \
             logger.error("Please set the fs_checkpoint_dir paramerters for "
-                         "set_hdfs_info to get models from hdfs.")
+                         "set_llllllhdfs_info to get models from hdfs.")
         self.fs_checkpoint_dir = os.path.join(self.fs_checkpoint_dir, '*')
         cmd = "hadoop fs -D fs.default.name="
         cmd += self.fs_name + " "
@@ -631,15 +653,10 @@ class Entry(object):
         startup_program = self.startup_program
         with fluid.program_guard(main_program, startup_program):
             with fluid.unique_name.guard():
-                image = fluid.layers.data(name='image',
-                                          shape=image_shape,
-                                          dtype='float32')
-                label = fluid.layers.data(name='label',
-                                          shape=[1],
-                                          dtype='int64')
+                input_field = InputField(self.input_info)
+                input_field.build()
 
-                emb = model.build_network(input=image,
-                                          label=label,
+                emb = model.build_network(input=input_field,
                                           is_train=False)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
@@ -658,8 +675,12 @@ class Entry(object):
             logger.info("model_save_dir for inference model ({}) exists, "
                         "we will overwrite it.".format(self.model_save_dir))
             shutil.rmtree(self.model_save_dir)
+        feed_var_names = []
+        for name in input_field.feed_list_str:
+            if name == "label": continue
+            feed_var_names.append(name)
         fluid.io.save_inference_model(self.model_save_dir,
-                                      feeded_var_names=[image.name],
+                                      feeded_var_names=feed_var_names,
                                       target_vars=[emb],
                                       executor=exe,
                                       main_program=main_program)
@@ -678,7 +699,6 @@ class Entry(object):
 
     def predict(self):
         model_name = self.model_name
-        image_shape = [int(m) for m in self.image_shape]
         # model definition
         model = self.model
         if model is None:
@@ -687,15 +707,10 @@ class Entry(object):
         startup_program = self.startup_program
         with fluid.program_guard(main_program, startup_program):
             with fluid.unique_name.guard():
-                image = fluid.layers.data(name='image',
-                                          shape=image_shape,
-                                          dtype='float32')
-                label = fluid.layers.data(name='label',
-                                          shape=[1],
-                                          dtype='int64')
+                input_field = InputField(self.input_info)
+                input_field.build()
 
-                emb = model.build_network(input=image,
-                                          label=label,
+                emb = model.build_network(input=input_field,
                                           is_train=False)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
@@ -709,20 +724,20 @@ class Entry(object):
                              load_for_train=False)
 
         if self.predict_reader is None:
-            predict_reader = paddle.batch(reader.arc_train(self.dataset_dir,
-                                                           self.num_classes),
-                                          batch_size=self.train_batch_size)
+            predict_reader = reader.arc_train(self.dataset_dir,
+                                              self.num_classes)
         else:
             predict_reader = self.predict_reader
 
-        feeder = fluid.DataFeeder(place=place,
-                                  feed_list=['image', 'label'],
-                                  program=main_program)
+        input_field.loader.set_sample_generator(
+                predict_reader,
+                batch_size=self.train_batch_size,
+                places=place)
 
         fetch_list = [emb.name]
-        for data in predict_reader():
+        for data in input_field.loader:
             emb = exe.run(main_program,
-                          feed=feeder.feed(data),
+                          feed=data,
                           fetch_list=fetch_list,
                           use_program_cache=True)
             print("emb: ", emb)
@@ -741,6 +756,14 @@ class Entry(object):
             for j in range(len(data_list)):
                 data = data_list[j]
                 embeddings = None
+                # For multi-card test, the dataset can be partitioned into two
+                # part. For the first part, the total number of samples is
+                # divisiable by the number of cards. And then, these samples
+                # are split on different cards and tested parallely. For the
+                # second part, these samples are tested on all cards but only
+                # the result of the first card is used.
+
+                # The number of steps for parallel test.
                 parallel_test_steps = data.shape[0] // real_test_batch_size
                 for idx in range(parallel_test_steps):
                     start = idx * real_test_batch_size
@@ -876,7 +899,7 @@ class Entry(object):
                                  load_for_train=False)
 
         feeder = fluid.DataFeeder(place=place,
-                                  feed_list=['image', 'label'],
+                                  feed_list=self.input_field.feed_list_str,
                                   program=test_program)
         fetch_list = [emb_name]
 
@@ -940,9 +963,10 @@ class Entry(object):
         else:
             train_reader = self.train_reader
 
-        feeder = fluid.DataFeeder(place=place,
-                                  feed_list=['image', 'label'],
-                                  program=origin_prog)
+        self.input_field.loader.set_sample_generator(
+                train_reader,
+                batch_size=self.train_batch_size,
+                places=place)
     
         if self.calc_train_acc:
             fetch_list = [loss.name, global_lr.name,
@@ -958,19 +982,19 @@ class Entry(object):
             self.train_pass_id = pass_id
             train_info = [[], [], [], []]
             local_train_info = [[], [], [], []]
-            for batch_id, data in enumerate(train_reader()):
+            for batch_id, data in enumerate(self.input_field.loader):
                 nsamples += global_batch_size
                 t1 = time.time()
                 acc1 = None
                 acc5 = None
                 if self.calc_train_acc:
                     loss, lr, acc1, acc5 = exe.run(train_prog,
-                                                   feed=feeder.feed(data),
+                                                   feed=data,
                                                    fetch_list=fetch_list,
                                                    use_program_cache=True)
                 else:
                     loss, lr = exe.run(train_prog,
-                                       feed=feeder.feed(data),
+                                       feed=data,
                                        fetch_list=fetch_list,
                                        use_program_cache=True)
                 t2 = time.time()
