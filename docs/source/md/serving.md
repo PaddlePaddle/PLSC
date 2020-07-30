@@ -36,7 +36,7 @@ pip3 install plsc-serving
 ```shell script
 pip install ujson
 ```
-* 复制[client脚本](./serving/client/face_service/face_service.py)到使用路径。
+* 复制[client脚本](../../../serving/client/face_service/face_service.py)到使用路径。
 
 ### 使用指南
 
