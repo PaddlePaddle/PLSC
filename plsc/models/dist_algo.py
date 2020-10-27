@@ -35,6 +35,8 @@ from ..utils.fp16_utils import update_loss_scaling, move_optimize_ops_back
 from ..utils.fp16_lists import AutoMixedPrecisionLists
 from six.moves import reduce
 
+new_scope = fluid.core.Scope()
+
 __all__ = ['distributed_arcface_classify', 'distributed_softmax_classify',
            'DistributedClassificationOptimizer']
 
@@ -356,9 +358,12 @@ class DistributedClassificationOptimizer(Optimizer):
             block._remove_op(index)
             block._remove_op(index - 1)
 
-            self.insert_commom_backward_op(block, index, shard_logit, shard_prob,
-                                            shard_label, shard_dim, op_role_key,
-                                            backward_role, loss_backward_role)
+            with fluid.scope_guard(new_scope):
+                self.insert_commom_backward_op(block, index, shard_logit,
+                                               shard_prob, shard_label,
+                                               shard_dim, op_role_key,
+                                               backward_role,
+                                               loss_backward_role)
             return ret
         else:
             scaled_params_grads = self.fp16_backward(block, scalar, startup_program,
@@ -382,9 +387,15 @@ class DistributedClassificationOptimizer(Optimizer):
                 block._remove_op(index)
                 block._remove_op(index - 1)
 
-                self.insert_dist_arcface_backward_op(block, index, shard_logit, shard_prob,
-                                                    shard_label, shard_dim, op_role_key,
-                                                    backward_role, loss_backward_role)
+                with fluid.scope_guard(new_scope):
+                    self.insert_dist_arcface_backward_op(block, index,
+                                                         shard_logit,
+                                                         shard_prob,
+                                                         shard_label,
+                                                         shard_dim,
+                                                         op_role_key,
+                                                         backward_role,
+                                                         loss_backward_role)
 
             elif self._loss_type == 'dist_softmax':
                 assert block.ops[index - 1].type == 'reduce_sum'
@@ -397,9 +408,16 @@ class DistributedClassificationOptimizer(Optimizer):
                 block._remove_op(index)
                 block._remove_op(index - 1)
 
-                self.insert_dist_softmax_backward_op(block, index, shard_logit, shard_prob,
-                                                    shard_label, shard_dim, op_role_key,
-                                                    backward_role, loss_backward_role)
+                with fluid.scope_guard(new_scope):
+                    self.insert_dist_softmax_backward_op(block,
+                                                         index,
+                                                         shard_logit,
+                                                         shard_prob,
+                                                         shard_label,
+                                                         shard_dim,
+                                                         op_role_key,
+                                                         backward_role,
+                                                         loss_backward_role)
 
             if self._use_dynamic_loss_scaling:
                 grads = [layers.reduce_sum(g) for [_, g] in scaled_params_grads]
@@ -659,13 +677,14 @@ def distributed_softmax_classify(x,
 
     if name is None:
         name = 'dist@softmax@rank@%05d' % rank_id
-    helper = LayerHelper(name, **locals())
-    classifier = DistributedClassifier(class_num, nranks, rank_id, helper)
-    return classifier.softmax_classify(x,
-                                       label,
-                                       param_attr,
-                                       use_bias,
-                                       bias_attr)
+    with fluid.scope_guard(new_scope):
+        helper = LayerHelper(name, **locals())
+        classifier = DistributedClassifier(class_num, nranks, rank_id, helper)
+        return classifier.softmax_classify(x,
+                                           label,
+                                           param_attr,
+                                           use_bias,
+                                           bias_attr)
 
 
 def distributed_arcface_classify(x,
@@ -728,10 +747,11 @@ def distributed_arcface_classify(x,
     """
     if name is None:
         name = 'dist@arcface@rank@%05d' % rank_id
-    helper = LayerHelper(name, **locals())
-    classifier = DistributedClassifier(class_num, nranks, rank_id, helper)
-    return classifier.arcface_classify(x=x,
-                                       label=label,
-                                       margin=margin,
-                                       logit_scale=logit_scale,
-                                       param_attr=param_attr)
+    with fluid.scope_guard(new_scope):
+        helper = LayerHelper(name, **locals())
+        classifier = DistributedClassifier(class_num, nranks, rank_id, helper)
+        return classifier.arcface_classify(x=x,
+                                           label=label,
+                                           margin=margin,
+                                           logit_scale=logit_scale,
+                                           param_attr=param_attr)

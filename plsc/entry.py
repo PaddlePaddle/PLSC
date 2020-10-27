@@ -54,6 +54,8 @@ logger.addHandler(log_handler)
 logger.setLevel(logging.INFO)
 logger.propagate = False
 
+import models
+new_scope = models.dist_algo.new_scope
 
 class Entry(object):
     """
