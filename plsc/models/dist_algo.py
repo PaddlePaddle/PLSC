@@ -35,8 +35,6 @@ from ..utils.fp16_utils import update_loss_scaling, move_optimize_ops_back
 from ..utils.fp16_lists import AutoMixedPrecisionLists
 from six.moves import reduce
 
-new_scope = fluid.core.Scope()
-
 __all__ = ['distributed_arcface_classify', 'distributed_softmax_classify',
            'DistributedClassificationOptimizer']
 
@@ -358,7 +356,7 @@ class DistributedClassificationOptimizer(Optimizer):
             block._remove_op(index)
             block._remove_op(index - 1)
 
-            with fluid.scope_guard(new_scope):
+            with fluid.name_scope("dist_fc"):
                 self.insert_commom_backward_op(block, index, shard_logit,
                                                shard_prob, shard_label,
                                                shard_dim, op_role_key,
@@ -387,7 +385,7 @@ class DistributedClassificationOptimizer(Optimizer):
                 block._remove_op(index)
                 block._remove_op(index - 1)
 
-                with fluid.scope_guard(new_scope):
+                with fluid.name_scope("dist_fc"):
                     self.insert_dist_arcface_backward_op(block, index,
                                                          shard_logit,
                                                          shard_prob,
@@ -408,7 +406,7 @@ class DistributedClassificationOptimizer(Optimizer):
                 block._remove_op(index)
                 block._remove_op(index - 1)
 
-                with fluid.scope_guard(new_scope):
+                with fluid.name_scope("dist_fc"):
                     self.insert_dist_softmax_backward_op(block,
                                                          index,
                                                          shard_logit,
@@ -677,7 +675,7 @@ def distributed_softmax_classify(x,
 
     if name is None:
         name = 'dist@softmax@rank@%05d' % rank_id
-    with fluid.scope_guard(new_scope):
+    with fluid.name_scope("dist_fc"):
         helper = LayerHelper(name, **locals())
         classifier = DistributedClassifier(class_num, nranks, rank_id, helper)
         return classifier.softmax_classify(x,
@@ -747,7 +745,7 @@ def distributed_arcface_classify(x,
     """
     if name is None:
         name = 'dist@arcface@rank@%05d' % rank_id
-    with fluid.scope_guard(new_scope):
+    with fluid.name_scope("dist_fc"):
         helper = LayerHelper(name, **locals())
         classifier = DistributedClassifier(class_num, nranks, rank_id, helper)
         return classifier.arcface_classify(x=x,
