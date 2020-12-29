@@ -143,6 +143,8 @@ class Entry(object):
             self.model_save_dir = os.path.abspath(self.model_save_dir)
         if self.dataset_dir:
             self.dataset_dir = os.path.abspath(self.dataset_dir)
+
+        self.use_quant = False
         
         self.lr_decay_factor = 0.1
         self.log_period = 200
@@ -165,6 +167,12 @@ class Entry(object):
         logger.info('default lr_decay_factor: {}'.format(self.lr_decay_factor))
         logger.info('default log period: {}'.format(self.log_period))
         logger.info('=' * 30)
+
+    def set_use_quant(self, quant):
+        """
+        Whether to use quantization
+        """
+        self.use_quant = quant
 
     def set_input_info(self, input):
         """
@@ -950,13 +958,14 @@ class Entry(object):
             origin_prog = self.train_program
             train_prog = self.train_program
 
-        qpp = QuantizeProgramPass(
-            activation_quantize_type='abs_max',
-            weight_quantize_type='abs_max',
-            quantizable_op_type=[
-                'conv2d', 'depthwise_conv2d', 'mul', 'pool2d'
-            ])
-        qpp.apply(train_prog, self.startup_program)
+        if self.use_quant:
+            qpp = QuantizeProgramPass(
+                activation_quantize_type='abs_max',
+                weight_quantize_type='abs_max',
+                quantizable_op_type=[
+                    'conv2d', 'depthwise_conv2d', 'mul', 'pool2d'
+                ])
+            qpp.apply(train_prog, self.startup_program)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
