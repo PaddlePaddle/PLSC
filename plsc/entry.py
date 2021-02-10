@@ -28,15 +28,11 @@ import logging
 
 import numpy as np
 import paddle
-import paddle.fluid as fluid
-import paddle.fluid.incubate.fleet.base.role_maker as role_maker
-import paddle.fluid.transpiler.distribute_transpiler as dist_transpiler
 import sklearn
-from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
-from paddle.fluid.optimizer import Optimizer
+import paddle
+import paddle.distributed.fleet as fleet
 
 from paddle.fluid.contrib.slim.quantization.quantize_program_pass import QuantizeProgramPass
-from paddle.fluid import core
 
 paddle.enable_static()
 
@@ -45,7 +41,6 @@ from .models import DistributedClassificationOptimizer
 from .models import base_model
 from .models import resnet
 from .utils import jpeg_reader as reader
-from .utils.learning_rate import lr_warmup
 from .utils.parameter_converter import ParameterConverter
 from .utils.verification import evaluate
 from .utils.input_field import InputField
@@ -69,11 +64,15 @@ class Entry(object):
         """
         Check the validation of parameters.
         """
-        supported_types = ["softmax", "arcface",
-                           "dist_softmax", "dist_arcface"]
+        supported_types = [
+            "softmax",
+            "arcface",
+            "dist_softmax",
+            "dist_arcface",
+        ]
         assert self.loss_type in supported_types, \
             "All supported types are {}, but given {}.".format(
-                supported_types, self.loss_type)
+             supported_types, self.loss_type)
 
         if self.loss_type in ["dist_softmax", "dist_arcface"]:
             assert self.num_trainers > 1, \
@@ -99,10 +98,10 @@ class Entry(object):
         self.test_reader = None
         self.predict_reader = None
 
-        self.train_program = fluid.Program()
-        self.startup_program = fluid.Program()
-        self.test_program = fluid.Program()
-        self.predict_program = fluid.Program()
+        self.train_program = paddle.static.Program()
+        self.startup_program = paddle.static.Program()
+        self.test_program = paddle.static.Program()
+        self.predict_program = paddle.static.Program()
 
         self.fs_name = None
         self.fs_ugi = None
@@ -145,25 +144,27 @@ class Entry(object):
             self.dataset_dir = os.path.abspath(self.dataset_dir)
 
         self.use_quant = False
-        
+
         self.lr_decay_factor = 0.1
         self.log_period = 200
 
-        self.input_info = [{'name': 'image',
-                            'shape': [-1, 3, 112, 112],
-                            'dtype': 'float32'},
-                           {'name': 'label',
-                            'shape':[-1, 1],
-                            'dtype': 'int64'}
-                          ]
+        self.input_info = [{
+            'name': 'image',
+            'shape': [-1, 3, 112, 112],
+            'dtype': 'float32'
+        }, {
+            'name': 'label',
+            'shape': [-1, 1],
+            'dtype': 'int64'
+        }]
         self.input_field = None
 
         logger.info('=' * 30)
         logger.info("Default configuration:")
         for key in self.config:
             logger.info('\t' + str(key) + ": " + str(self.config[key]))
-        logger.info('trainer_id: {}, num_trainers: {}'.format(
-            trainer_id, num_trainers))
+        logger.info('trainer_id: {}, num_trainers: {}'.format(trainer_id,
+                                                              num_trainers))
         logger.info('default lr_decay_factor: {}'.format(self.lr_decay_factor))
         logger.info('default log period: {}'.format(self.log_period))
         logger.info('=' * 30)
@@ -174,17 +175,17 @@ class Entry(object):
         """
         self.use_quant = quant
 
-    def set_input_info(self, input):
+    def set_input_info(self, input_holder):
         """
         Set the information of inputs which is a list or tuple. Each element
         is a dict which contains the info of a input, including name, dtype
         and shape.
         """
-        if not (isinstance(input, list) or isinstance(input, tuple)):
-            raise ValueError("The type of 'input' must be list or tuple.")
+        if not isinstance(input, (list, tuple)):
+            raise ValueError("The type of 'input' must be a list or tuple.")
 
         has_label = False
-        for element in input:
+        for element in input_holder:
             assert isinstance(element, dict), (
                 "The type of elements for input must be dict")
             assert 'name' in element.keys(), (
@@ -197,7 +198,7 @@ class Entry(object):
                 has_label = True
         assert has_label, "The input must contain a field named 'label'"
 
-        self.input_info = input
+        self.input_holder = input_holder
 
     def set_val_targets(self, targets):
         """
@@ -209,7 +210,8 @@ class Entry(object):
     def set_train_batch_size(self, batch_size):
         self.train_batch_size = batch_size
         self.global_train_batch_size = batch_size * self.num_trainers
-        logger.info("Set train batch size to {}.".format(batch_size))
+        logger.info("Set train batch size per trainer to {}.".format(
+            batch_size))
 
     def set_log_period(self, period):
         self.log_period = period
@@ -241,19 +243,22 @@ class Entry(object):
         self.fp16_user_dict = dict()
         self.fp16_user_dict['init_loss_scaling'] = init_loss_scaling
         self.fp16_user_dict['incr_every_n_steps'] = incr_every_n_steps
-        self.fp16_user_dict['decr_every_n_nan_or_inf'] = decr_every_n_nan_or_inf
+        self.fp16_user_dict[
+            'decr_every_n_nan_or_inf'] = decr_every_n_nan_or_inf
         self.fp16_user_dict['incr_ratio'] = incr_ratio
         self.fp16_user_dict['decr_ratio'] = decr_ratio
-        self.fp16_user_dict['use_dynamic_loss_scaling'] = use_dynamic_loss_scaling
+        self.fp16_user_dict[
+            'use_dynamic_loss_scaling'] = use_dynamic_loss_scaling
         self.fp16_user_dict['amp_lists'] = amp_lists
         logger.info("Use mixed precision training: {}.".format(use_fp16))
         for key in self.fp16_user_dict:
-            logger.info("Set init {} to {}.".format(key, self.fp16_user_dict[key]))
+            logger.info("Set {} to {}.".format(key, self.fp16_user_dict[key]))
 
     def set_test_batch_size(self, batch_size):
         self.test_batch_size = batch_size
         self.global_test_batch_size = batch_size * self.num_trainers
-        logger.info("Set test batch size to {}.".format(batch_size))
+        logger.info("Set test batch size per trainer to {}.".format(
+            batch_size))
 
     def set_hdfs_info(self,
                       fs_name,
@@ -354,7 +359,9 @@ class Entry(object):
         logger.info("Set warmup_epochs to {}.".format(num))
 
     def set_loss_type(self, loss_type):
-        supported_types = ["dist_softmax", "dist_arcface", "softmax", "arcface"]
+        supported_types = [
+            "dist_softmax", "dist_arcface", "softmax", "arcface"
+        ]
         if loss_type not in supported_types:
             raise ValueError("All supported loss types: {}".format(
                 supported_types))
@@ -376,8 +383,8 @@ class Entry(object):
         logger.info("Set param_attr for distfc to {}.".format(self.param_attr))
         if self.bias_attr:
             self.bias_attr = bias_attr
-            logger.info(
-                "Set bias_attr for distfc to {}.".format(self.bias_attr))
+            logger.info("Set bias_attr for distfc to {}.".format(
+                self.bias_attr))
 
     def _get_optimizer(self):
         if not self.optimizer:
@@ -386,30 +393,33 @@ class Entry(object):
 
             global_batch_size = self.global_train_batch_size
             train_image_num = self.train_image_num
-            images_per_trainer = int(math.ceil(
-                train_image_num * 1.0 / self.num_trainers))
-            steps_per_pass = int(math.ceil(
-                images_per_trainer * 1.0 / self.train_batch_size))
+            images_per_trainer = int(
+                math.ceil(train_image_num * 1.0 / self.num_trainers))
+            steps_per_pass = int(
+                math.ceil(images_per_trainer * 1.0 / self.train_batch_size))
             logger.info("Steps per epoch: %d" % steps_per_pass)
             warmup_steps = steps_per_pass * self.warmup_epochs
             batch_denom = 1024
             base_lr = start_lr * global_batch_size / batch_denom
             lr_decay_factor = self.lr_decay_factor
-            lr = [base_lr * (lr_decay_factor ** i) for i in range(len(bd) + 1)]
+            lr = [base_lr * (lr_decay_factor**i) for i in range(len(bd) + 1)]
             logger.info("LR boundaries: {}".format(bd))
             logger.info("lr_step: {}".format(lr))
             if self.warmup_epochs:
-                lr_val = lr_warmup(fluid.layers.piecewise_decay(boundaries=bd,
-                                                                values=lr),
-                                   warmup_steps,
-                                   start_lr,
-                                   base_lr)
+                lr_val = paddle.optimizer.lr.LinearWarmup(
+                    paddle.optimizer.lr.PiecewiseDecay(
+                        boundaries=bd, values=lr),
+                    warmup_steps,
+                    start_lr,
+                    base_lr)
             else:
-                lr_val = fluid.layers.piecewise_decay(boundaries=bd, values=lr)
+                lr_val = paddle.optimizer.lr.PiecewiseDecay(
+                    boundaries=bd, values=lr)
 
-            optimizer = fluid.optimizer.Momentum(
-                learning_rate=lr_val, momentum=0.9,
-                regularization=fluid.regularizer.L2Decay(5e-4))
+            optimizer = paddle.optimizer.Momentum(
+                learning_rate=lr_val,
+                momentum=0.9,
+                weight_decay=paddle.regularizer.L2Decay(5e-4))
             self.optimizer = optimizer
 
         if self.loss_type in ["dist_softmax", "dist_arcface"]:
@@ -430,8 +440,7 @@ class Entry(object):
                 decr_ratio=self.fp16_user_dict['decr_ratio'],
                 use_dynamic_loss_scaling=self.fp16_user_dict[
                     'use_dynamic_loss_scaling'],
-                amp_lists=self.fp16_user_dict['amp_lists']
-            )
+                amp_lists=self.fp16_user_dict['amp_lists'])
         return self.optimizer
 
     def build_program(self,
@@ -457,16 +466,17 @@ class Entry(object):
                 input_field.build()
                 self.input_field = input_field
 
-                emb, loss, prob = model.get_output(input=input_field,
-                                                   num_ranks=num_trainers,
-                                                   rank_id=trainer_id,
-                                                   is_train=is_train,
-                                                   num_classes=self.num_classes,
-                                                   loss_type=self.loss_type,
-                                                   param_attr=self.param_attr,
-                                                   bias_attr=self.bias_attr,
-                                                   margin=self.margin,
-                                                   scale=self.scale)
+                emb, loss, prob = model.get_output(
+                    input=input_field,
+                    num_ranks=num_trainers,
+                    rank_id=trainer_id,
+                    is_train=is_train,
+                    num_classes=self.num_classes,
+                    loss_type=self.loss_type,
+                    param_attr=self.param_attr,
+                    bias_attr=self.bias_attr,
+                    margin=self.margin,
+                    scale=self.scale)
 
                 acc1 = None
                 acc5 = None
@@ -480,28 +490,22 @@ class Entry(object):
                             nranks=num_trainers,
                             use_calc_stream=True)
                         prob_list = fluid.layers.split(
-                            prob_all,
-                            dim=0,
-                            num_or_sections=num_trainers)
+                            prob_all, dim=0, num_or_sections=num_trainers)
                         prob = fluid.layers.concat(prob_list, axis=1)
                         label_all = fluid.layers.collective._c_allgather(
                             input_field.label,
                             nranks=num_trainers,
                             use_calc_stream=True)
-                        acc1 = fluid.layers.accuracy(input=prob,
-                                                     label=label_all,
-                                                     k=1)
-                        acc5 = fluid.layers.accuracy(input=prob,
-                                                     label=label_all,
-                                                     k=5)
+                        acc1 = fluid.layers.accuracy(
+                            input=prob, label=label_all, k=1)
+                        acc5 = fluid.layers.accuracy(
+                            input=prob, label=label_all, k=5)
                 else:
                     if self.calc_train_acc:
-                        acc1 = fluid.layers.accuracy(input=prob,
-                                                     label=input_field.label,
-                                                     k=1)
-                        acc5 = fluid.layers.accuracy(input=prob,
-                                                     label=input_field.label,
-                                                     k=5)
+                        acc1 = fluid.layers.accuracy(
+                            input=prob, label=input_field.label, k=1)
+                        acc5 = fluid.layers.accuracy(
+                            input=prob, label=input_field.label, k=5)
 
                 optimizer = None
                 if is_train:
@@ -517,9 +521,7 @@ class Entry(object):
                         optimizer = optimizer._optimizer
                 elif use_parallel_test:
                     emb = fluid.layers.collective._c_allgather(
-                        emb,
-                        nranks=num_trainers,
-                        use_calc_stream=True)
+                        emb, nranks=num_trainers, use_calc_stream=True)
         return emb, loss, acc1, acc5, optimizer
 
     def get_files_from_hdfs(self):
@@ -535,9 +537,8 @@ class Entry(object):
         cmd += " " + self.checkpoint_dir
         logger.info("hdfs download cmd: {}".format(cmd))
         cmd = cmd.split(' ')
-        process = subprocess.Popen(cmd,
-                                   stdout=sys.stdout,
-                                   stderr=subprocess.STDOUT)
+        process = subprocess.Popen(
+            cmd, stdout=sys.stdout, stderr=subprocess.STDOUT)
         process.wait()
 
     def put_files_to_hdfs(self, local_dir):
@@ -552,15 +553,15 @@ class Entry(object):
         cmd += " " + self.fs_dir_for_save
         logger.info("hdfs upload cmd: {}".format(cmd))
         cmd = cmd.split(' ')
-        process = subprocess.Popen(cmd,
-                                   stdout=sys.stdout,
-                                   stderr=subprocess.STDOUT)
+        process = subprocess.Popen(
+            cmd, stdout=sys.stdout, stderr=subprocess.STDOUT)
         process.wait()
 
     def process_distributed_params(self, local_dir):
         local_dir = os.path.abspath(local_dir)
         output_dir = tempfile.mkdtemp()
-        converter = ParameterConverter(local_dir, output_dir, self.num_trainers)
+        converter = ParameterConverter(local_dir, output_dir,
+                                       self.num_trainers)
         converter.process()
 
         for file in os.listdir(local_dir):
@@ -579,8 +580,10 @@ class Entry(object):
         Before test, we broadcast bathnorm-related parameters to all
         other trainers from trainer-0.
         """
-        bn_vars = [var for var in program.list_vars()
-                   if 'batch_norm' in var.name and var.persistable]
+        bn_vars = [
+            var for var in program.list_vars()
+            if 'batch_norm' in var.name and var.persistable
+        ]
         block = program.current_block()
         for var in bn_vars:
             block._insert_op(
@@ -596,8 +599,8 @@ class Entry(object):
                         use_per_trainer_checkpoint=False,
                         load_for_train=True):
         if use_per_trainer_checkpoint:
-            checkpoint_dir = os.path.join(
-                self.checkpoint_dir, str(self.trainer_id))
+            checkpoint_dir = os.path.join(self.checkpoint_dir,
+                                          str(self.trainer_id))
         else:
             checkpoint_dir = self.checkpoint_dir
 
@@ -614,14 +617,14 @@ class Entry(object):
                 with open(file_name, 'w') as f:
                     pass
                 time.sleep(10)
-                os.remove(file_name)     
+                os.remove(file_name)
             else:
                 while True:
                     if not os.path.exists(file_name):
                         time.sleep(1)
                     else:
                         break
-        
+
         # Preporcess distributed parameters.
         file_name = os.path.join(checkpoint_dir, '.lock')
         meta_file = os.path.join(checkpoint_dir, 'meta.json')
@@ -651,10 +654,11 @@ class Entry(object):
                 logger.info('var: %s found' % (var.name))
             return has_var
 
-        fluid.io.load_vars(executor,
-                           checkpoint_dir,
-                           predicate=if_exist,
-                           main_program=main_program)
+        fluid.io.load_vars(
+            executor,
+            checkpoint_dir,
+            predicate=if_exist,
+            main_program=main_program)
 
     def convert_for_prediction(self):
         model_name = self.model_name
@@ -670,8 +674,7 @@ class Entry(object):
                 input_field = InputField(self.input_info)
                 input_field.build()
 
-                emb = model.build_network(input=input_field,
-                                          is_train=False)
+                emb = model.build_network(input=input_field, is_train=False)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
@@ -679,9 +682,8 @@ class Entry(object):
         exe.run(startup_program)
 
         assert self.checkpoint_dir, "No checkpoint found for converting."
-        self.load_checkpoint(executor=exe,
-                             main_program=main_program,
-                             load_for_train=False)
+        self.load_checkpoint(
+            executor=exe, main_program=main_program, load_for_train=False)
 
         assert self.model_save_dir, \
             "Does not set model_save_dir for inference model converting."
@@ -693,11 +695,12 @@ class Entry(object):
         for name in input_field.feed_list_str:
             if name == "label": continue
             feed_var_names.append(name)
-        fluid.io.save_inference_model(self.model_save_dir,
-                                      feeded_var_names=feed_var_names,
-                                      target_vars=[emb],
-                                      executor=exe,
-                                      main_program=main_program)
+        fluid.io.save_inference_model(
+            self.model_save_dir,
+            feeded_var_names=feed_var_names,
+            target_vars=[emb],
+            executor=exe,
+            main_program=main_program)
         if self.fs_name:
             self.put_files_to_hdfs(self.model_save_dir)
 
@@ -724,8 +727,7 @@ class Entry(object):
                 input_field = InputField(self.input_info)
                 input_field.build()
 
-                emb = model.build_network(input=input_field,
-                                          is_train=False)
+                emb = model.build_network(input=input_field, is_train=False)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
         place = fluid.CUDAPlace(gpu_id)
@@ -733,9 +735,8 @@ class Entry(object):
         exe.run(startup_program)
 
         assert self.checkpoint_dir, "No checkpoint found for predicting."
-        self.load_checkpoint(executor=exe,
-                             main_program=main_program,
-                             load_for_train=False)
+        self.load_checkpoint(
+            executor=exe, main_program=main_program, load_for_train=False)
 
         if self.predict_reader is None:
             predict_reader = reader.arc_train(self.dataset_dir,
@@ -744,9 +745,7 @@ class Entry(object):
             predict_reader = self.predict_reader
 
         input_field.loader.set_sample_generator(
-                predict_reader,
-                batch_size=self.train_batch_size,
-                places=place)
+            predict_reader, batch_size=self.train_batch_size, places=place)
 
         fetch_list = [emb.name]
         for data in input_field.loader:
@@ -756,12 +755,7 @@ class Entry(object):
                           use_program_cache=True)
             print("emb: ", emb)
 
-    def _run_test(self,
-                  exe,
-                  test_list,
-                  test_name_list,
-                  feeder,
-                  fetch_list):
+    def _run_test(self, exe, test_list, test_name_list, feeder, fetch_list):
         trainer_id = self.trainer_id
         real_test_batch_size = self.global_test_batch_size
         for i in range(len(test_list)):
@@ -810,8 +804,8 @@ class Entry(object):
                                             feed=feeder.feed(_data),
                                             use_program_cache=True)
                     _embeddings = _embeddings[0:self.test_batch_size, :]
-                    embeddings[beg:end, :] = _embeddings[
-                                             (self.test_batch_size - count):, :]
+                    embeddings[beg:end, :] = _embeddings[(self.test_batch_size
+                                                          - count):, :]
                     beg = end
                 embeddings_list.append(embeddings)
 
@@ -824,27 +818,20 @@ class Entry(object):
 
             embeddings = embeddings_list[0] + embeddings_list[1]
             embeddings = sklearn.preprocessing.normalize(embeddings)
-            _, _, accuracy, val, val_std, far = evaluate(embeddings,
-                                                         issame_list,
-                                                         nrof_folds=10)
+            _, _, accuracy, val, val_std, far = evaluate(
+                embeddings, issame_list, nrof_folds=10)
             acc, std = np.mean(accuracy), np.std(accuracy)
 
             if self.train_pass_id >= 0:
-                logger.info('[{}][{}]XNorm: {:.5f}'.format(test_name_list[i],
-                                                           self.train_pass_id,
-                                                           xnorm))
+                logger.info('[{}][{}]XNorm: {:.5f}'.format(test_name_list[
+                    i], self.train_pass_id, xnorm))
                 logger.info('[{}][{}]Accuracy-Flip: {:.5f}+-{:.5f}'.format(
-                    test_name_list[i],
-                    self.train_pass_id,
-                    acc,
-                    std))
+                    test_name_list[i], self.train_pass_id, acc, std))
             else:
                 logger.info('[{}]XNorm: {:.5f}'.format(test_name_list[i],
                                                        xnorm))
                 logger.info('[{}]Accuracy-Flip: {:.5f}+-{:.5f}'.format(
-                    test_name_list[i],
-                    acc,
-                    std))
+                    test_name_list[i], acc, std))
             sys.stdout.flush()
 
     def test(self):
@@ -875,11 +862,12 @@ class Entry(object):
                 config.mode = "collective"
                 config.collective_mode = "grad_allreduce"
                 t = dist_transpiler.DistributeTranspiler(config=config)
-                t.transpile(trainer_id=trainer_id,
-                            trainers=worker_endpoints,
-                            startup_program=self.startup_program,
-                            program=self.test_program,
-                            current_endpoint=current_endpoint)
+                t.transpile(
+                    trainer_id=trainer_id,
+                    trainers=worker_endpoints,
+                    startup_program=self.startup_program,
+                    program=self.test_program,
+                    current_endpoint=current_endpoint)
         else:
             emb_name = self._get_info('emb_name')
 
@@ -908,23 +896,19 @@ class Entry(object):
 
         if not self.has_run_train:
             assert self.checkpoint_dir, "No checkpoint found for test."
-            self.load_checkpoint(executor=exe,
-                                 main_program=test_program,
-                                 load_for_train=False)
+            self.load_checkpoint(
+                executor=exe, main_program=test_program, load_for_train=False)
 
-        feeder = fluid.DataFeeder(place=place,
-                                  feed_list=self.input_field.feed_list_str,
-                                  program=test_program)
+        feeder = fluid.DataFeeder(
+            place=place,
+            feed_list=self.input_field.feed_list_str,
+            program=test_program)
         fetch_list = [emb_name]
 
         self.test_initialized = True
 
         test_start = time.time()
-        self._run_test(exe,
-                       test_list,
-                       test_name_list,
-                       feeder,
-                       fetch_list)
+        self._run_test(exe, test_list, test_name_list, feeder, fetch_list)
         test_end = time.time()
         logger.info("test time: {:.4f}".format(test_end - test_start))
 
@@ -944,13 +928,10 @@ class Entry(object):
             strategy.collective_mode = "grad_allreduce"
 
         emb, loss, acc1, acc5, optimizer = self.build_program(
-            True,
-            False,
-            dist_strategy=strategy)
-    
-        global_lr = optimizer._global_learning_rate(
-            program=self.train_program)
-    
+            True, False, dist_strategy=strategy)
+
+        global_lr = optimizer._global_learning_rate(program=self.train_program)
+
         if num_trainers > 1:
             origin_prog = fleet._origin_program
             train_prog = fleet.main_program
@@ -980,22 +961,18 @@ class Entry(object):
             self.load_checkpoint(executor=exe, main_program=origin_prog)
 
         if self.train_reader is None:
-            train_reader = reader.arc_train(
-                self.dataset_dir, self.num_classes)
+            train_reader = reader.arc_train(self.dataset_dir, self.num_classes)
         else:
             train_reader = self.train_reader
 
         self.input_field.loader.set_sample_generator(
-                train_reader,
-                batch_size=self.train_batch_size,
-                places=place)
-    
+            train_reader, batch_size=self.train_batch_size, places=place)
+
         if self.calc_train_acc:
-            fetch_list = [loss.name, global_lr.name,
-                          acc1.name, acc5.name]
+            fetch_list = [loss.name, global_lr.name, acc1.name, acc5.name]
         else:
             fetch_list = [loss.name, global_lr.name]
-    
+
         local_time = 0.0
         nsamples = 0
         inspect_steps = self.log_period
@@ -1032,21 +1009,14 @@ class Entry(object):
                     speed = nsamples / local_time
                     if self.calc_train_acc:
                         logger.info("Pass:{} batch:{} lr:{:.8f} loss:{:.6f} "
-                                    "qps:{:.2f} acc1:{:.6f} acc5:{:.6f}".format(
-                            pass_id,
-                            batch_id,
-                            avg_lr,
-                            avg_loss,
-                            speed,
-                            acc1[0],
-                            acc5[0]))
+                                    "qps:{:.2f} acc1:{:.6f} acc5:{:.6f}".
+                                    format(pass_id, batch_id, avg_lr, avg_loss,
+                                           speed, acc1[0], acc5[0]))
                     else:
-                        logger.info("Pass:{} batch:{} lr:{:.8f} loss:{:.6f} "
-                                    "qps:{:.2f}".format(pass_id,
-                                                        batch_id,
-                                                        avg_lr,
-                                                        avg_loss,
-                                                        speed))
+                        logger.info(
+                            "Pass:{} batch:{} lr:{:.8f} loss:{:.6f} "
+                            "qps:{:.2f}".format(pass_id, batch_id, avg_lr,
+                                                avg_loss, speed))
                     local_time = 0
                     nsamples = 0
                     local_train_info = [[], [], [], []]
@@ -1061,8 +1031,8 @@ class Entry(object):
 
             # save model
             if self.model_save_dir:
-                model_save_dir = os.path.join(
-                    self.model_save_dir, str(pass_id))
+                model_save_dir = os.path.join(self.model_save_dir,
+                                              str(pass_id))
                 if not os.path.exists(model_save_dir):
                     # may be more than one processes trying
                     # to create the directory
@@ -1073,23 +1043,21 @@ class Entry(object):
                             raise
                         pass
                 if trainer_id == 0:
-                    fluid.io.save_persistables(exe,
-                                               model_save_dir,
+                    fluid.io.save_persistables(exe, model_save_dir,
                                                origin_prog)
                 else:
+
                     def save_var(var):
                         to_save = "dist@" in var.name and '@rank@' in var.name
                         return to_save and var.persistable
 
-                    fluid.io.save_vars(exe,
-                                       model_save_dir,
-                                       origin_prog,
-                                       predicate=save_var)
+                    fluid.io.save_vars(
+                        exe, model_save_dir, origin_prog, predicate=save_var)
 
             # save training info
             if self.model_save_dir and trainer_id == 0:
-                config_file = os.path.join(
-                    self.model_save_dir, str(pass_id), 'meta.json')
+                config_file = os.path.join(self.model_save_dir,
+                                           str(pass_id), 'meta.json')
                 train_info = dict()
                 train_info["pretrain_nranks"] = self.num_trainers
                 train_info["emb_dim"] = self.emb_dim
