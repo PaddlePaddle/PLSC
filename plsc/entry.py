@@ -460,8 +460,8 @@ class Entry(object):
             model = resnet.__dict__[model_name](emb_dim=self.emb_dim)
         main_program = self.train_program if is_train else self.test_program
         startup_program = self.startup_program
-        with fluid.program_guard(main_program, startup_program):
-            with fluid.unique_name.guard():
+        with paddle.static.program_guard(main_program, startup_program):
+            with paddle.utils.unique_name.guard():
                 input_field = InputField(self.input_info)
                 input_field.build()
                 self.input_field = input_field
@@ -724,14 +724,14 @@ class Entry(object):
         startup_program = self.startup_program
         with fluid.program_guard(main_program, startup_program):
             with fluid.unique_name.guard():
-                input_field = InputField(self.input_info)
+                input_field = InputField(self.input_holder)
                 input_field.build()
 
                 emb = model.build_network(input=input_field, is_train=False)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
-        place = fluid.CUDAPlace(gpu_id)
-        exe = fluid.Executor(place)
+        place = paddle.CUDAPlace(gpu_id)
+        exe = paddle.static.Executor(place)
         exe.run(startup_program)
 
         assert self.checkpoint_dir, "No checkpoint found for predicting."
@@ -753,7 +753,6 @@ class Entry(object):
                           feed=data,
                           fetch_list=fetch_list,
                           use_program_cache=True)
-            print("emb: ", emb)
 
     def _run_test(self, exe, test_list, test_name_list, feeder, fetch_list):
         trainer_id = self.trainer_id
@@ -872,8 +871,8 @@ class Entry(object):
             emb_name = self._get_info('emb_name')
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
-        place = fluid.CUDAPlace(gpu_id)
-        exe = fluid.Executor(place)
+        place = paddle.CUDAPlace(gpu_id)
+        exe = paddle.static.Executor(place)
         if not self.has_run_train:
             exe.run(self.startup_program)
 
@@ -921,9 +920,8 @@ class Entry(object):
 
         strategy = None
         if num_trainers > 1:
-            role = role_maker.PaddleCloudRoleMaker(is_collective=True)
-            fleet.init(role)
-            strategy = DistributedStrategy()
+            fleet.init(is_collective=True)
+            strategy = fleet.DistributedStrategy()
             strategy.mode = "collective"
             strategy.collective_mode = "grad_allreduce"
 
@@ -932,12 +930,8 @@ class Entry(object):
 
         global_lr = optimizer._global_learning_rate(program=self.train_program)
 
-        if num_trainers > 1:
-            origin_prog = fleet._origin_program
-            train_prog = fleet.main_program
-        else:
-            origin_prog = self.train_program
-            train_prog = self.train_program
+        origin_prog = self.train_program
+        train_prog = self.train_program
 
         if self.use_quant:
             qpp = QuantizeProgramPass(
@@ -949,8 +943,8 @@ class Entry(object):
             qpp.apply(train_prog, self.startup_program)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
-        place = fluid.CUDAPlace(gpu_id)
-        exe = fluid.Executor(place)
+        place = paddle.CUDAPlace(gpu_id)
+        exe = paddle.static.Executor(place)
         exe.run(self.startup_program)
 
         if self.checkpoint_dir:
