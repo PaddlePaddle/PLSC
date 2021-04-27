@@ -1,3 +1,17 @@
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import functools
 import math
 import os
@@ -33,12 +47,12 @@ def get_train_image_list(data_dir):
     trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))
     trainer_count = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
     per_node_lines = (len(train_list) + trainer_count - 1) // trainer_count
-    train_list += train_list[0:per_node_lines
-                             * trainer_count-len(train_list)]
-    lines = train_list[trainer_id * per_node_lines:(trainer_id + 1)
-                        * per_node_lines]
-    print("read images from %d, length: %d, total: %d"
-          % (trainer_id * per_node_lines, per_node_lines, len(train_list)))
+    train_list += train_list[0:per_node_lines * trainer_count - len(
+        train_list)]
+    lines = train_list[trainer_id * per_node_lines:(trainer_id + 1) *
+                       per_node_lines]
+    print("read images from %d, length: %d, total: %d" %
+          (trainer_id * per_node_lines, per_node_lines, len(train_list)))
 
     for i, item in enumerate(lines):
         path, label = item.strip().split()
@@ -60,7 +74,7 @@ def resize_short(img, target_size):
     return img
 
 
-def Scale(img, size):
+def scale(img, size):
     w, h = img.size
     if (w <= h and w == size) or (h <= w and h == size):
         return img
@@ -74,7 +88,7 @@ def Scale(img, size):
         return img.resize((ow, oh), Image.BILINEAR)
 
 
-def CenterCrop(img, size):
+def center_crop(img, size):
     w, h = img.size
     th, tw = int(size), int(size)
     x1 = int(round((w - tw) / 2.))
@@ -97,7 +111,7 @@ def crop_image(img, target_size, center):
     return img
 
 
-def RandomResizedCrop(img, size):
+def random_resized_crop(img, size):
     for attempt in range(10):
         area = img.size[0] * img.size[1]
         target_area = random.uniform(0.08, 1.0) * area
@@ -114,14 +128,14 @@ def RandomResizedCrop(img, size):
             y1 = random.randint(0, img.size[1] - h)
 
             img = img.crop((x1, y1, x1 + w, y1 + h))
-            assert(img.size == (w, h))
+            assert (img.size == (w, h))
 
             return img.resize((size, size), Image.BILINEAR)
 
     w = min(img.size[0], img.size[1])
     i = (img.size[1] - w) // 2
     j = (img.size[0] - w) // 2
-    img = img.crop((i, j, i+w, j+w))
+    img = img.crop((i, j, i + w, j + w))
     img = img.resize((size, size), Image.BILINEAR)
     return img
 
@@ -131,8 +145,8 @@ def random_crop(img, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.)):
     w = 1. * aspect_ratio
     h = 1. / aspect_ratio
 
-    bound = min((float(img.size[0]) / img.size[1]) / (w ** 2),
-                (float(img.size[1]) / img.size[0]) / (h ** 2))
+    bound = min((float(img.size[0]) / img.size[1]) / (w**2),
+                (float(img.size[1]) / img.size[0]) / (h**2))
     scale_max = min(scale[1], bound)
     scale_min = min(scale[0], bound)
 
@@ -179,18 +193,14 @@ def distort_color(img):
     return img
 
 
-def process_image_imagepath(sample,
-                            class_dim,
-                            color_jitter,
-                            rotate,
-                            rand_mirror,
-                            normalize):
+def process_image_imagepath(sample, class_dim, color_jitter, rotate,
+                            rand_mirror, normalize):
     imgpath = sample[0]
     img = Image.open(imgpath)
 
     if rotate:
         img = rotate_image(img)
-        img = RandomResizedCrop(img, DATA_DIM)
+        img = random_resized_crop(img, DATA_DIM)
 
     if color_jitter:
         img = distort_color(img)
@@ -230,12 +240,13 @@ def arc_iterator(data,
             path = os.path.join(data_dir, path)
             yield path, label
 
-    mapper = functools.partial(process_image_imagepath,
-                               class_dim=class_dim,
-                               color_jitter=color_jitter,
-                               rotate=rotate,
-                               rand_mirror=rand_mirror,
-                               normalize=normalize)
+    mapper = functools.partial(
+        process_image_imagepath,
+        class_dim=class_dim,
+        color_jitter=color_jitter,
+        rotate=rotate,
+        rand_mirror=rand_mirror,
+        normalize=normalize)
     return paddle.reader.xmap_readers(mapper, reader, THREAD, BUF_SIZE)
 
 
@@ -246,7 +257,8 @@ def load_bin(path, image_size):
         bins, issame_list = pickle.load(open(path, 'rb'), encoding='bytes')
     data_list = []
     for flip in [0, 1]:
-        data = np.empty((len(issame_list) * 2, 3, image_size[0], image_size[1]))
+        data = np.empty(
+            (len(issame_list) * 2, 3, image_size[0], image_size[1]))
         data_list.append(data)
     for i in range(len(issame_list) * 2):
         _bin = bins[i]
@@ -274,21 +286,22 @@ def load_bin(path, image_size):
 
 def arc_train(data_dir, class_dim):
     train_image_list = get_train_image_list(data_dir)
-    return arc_iterator(train_image_list,
-                        shuffle=True,
-                        class_dim=class_dim,
-                        data_dir=data_dir,
-                        color_jitter=False,
-                        rotate=False,
-                        rand_mirror=True,
-                        normalize=True)
+    return arc_iterator(
+        train_image_list,
+        shuffle=True,
+        class_dim=class_dim,
+        data_dir=data_dir,
+        color_jitter=False,
+        rotate=False,
+        rand_mirror=True,
+        normalize=True)
 
 
 def test(data_dir, datasets):
     test_list = []
     test_name_list = []
     for name in datasets.split(','):
-        path = os.path.join(data_dir, name+".bin")
+        path = os.path.join(data_dir, name + ".bin")
         if os.path.exists(path):
             data_set = load_bin(path, (DATA_DIM, DATA_DIM))
             test_list.append(data_set)
