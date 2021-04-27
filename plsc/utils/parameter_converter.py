@@ -20,7 +20,7 @@ import os
 import shutil
 from functools import cmp_to_key
 
-import paddle.fluid as fluid
+import paddle
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,8 +57,9 @@ class ParameterConverter(object):
         """
         meta_file = os.path.join(self.model_dir, 'meta.json')
         if not os.path.exists(meta_file):
-            logger.error("Meta file does not exist, make sure your pre-trained "
-                         "models are legal.")
+            logger.error(
+                "Meta file does not exist, make sure your pre-trained "
+                "models are legal.")
             exit()
 
         with open(meta_file, 'r') as handle:
@@ -73,9 +74,7 @@ class ParameterConverter(object):
 
         logger.info("Parameters for pre-training: pretrain_nranks ({}), "
                     "emb_dim ({}), and num_classes ({}).".format(
-            self.pretrain_nranks,
-            self.emb_dim,
-            self.num_classes))
+                        self.pretrain_nranks, self.emb_dim, self.num_classes))
         logger.debug("Parameters for inference or fine-tuning: "
                      "nranks ({}).".format(self.nranks))
 
@@ -92,7 +91,8 @@ class ParameterConverter(object):
             logger.error("The directory for pre-trained model ({}) does not "
                          "exist, please check it.".format(model_dir))
             exit()
-        logger.info("The directory for pre-trained model: {}".format(model_dir))
+        logger.info("The directory for pre-trained model: {}".format(
+            model_dir))
         for file in os.listdir(model_dir):
             if 'dist@' in file and '@rank@' in file:
                 var_names.append(file)
@@ -116,8 +116,8 @@ class ParameterConverter(object):
         var2 = None
         advance = False
         emb_dim = self.emb_dim
-        main_program = fluid.Program()
-        startup_program = fluid.Program()
+        main_program = paddle.static.Program()
+        startup_program = paddle.static.Program()
         num_classes = self.num_classes
 
         load_var_name = param_names[name_index]
@@ -129,27 +129,25 @@ class ParameterConverter(object):
 
         last_train_nshards = num_classes - (train_nranks - 1) * train_nshards
 
-        with fluid.program_guard(main_program, startup_program):
+        with paddle.static.program_guard(main_program, startup_program):
             if name_index == train_nranks - 1:
                 var_dim = last_train_nshards
             else:
                 var_dim = train_nshards
 
             shape = [var_dim] if as_bias else [emb_dim, var_dim]
-            var = fluid.layers.create_parameter(shape,
-                                                dtype=dtype,
-                                                name=load_var_name)
+            var = paddle.static.create_parameter(
+                shape, dtype=dtype, name=load_var_name)
 
             if as_bias:
-                var = fluid.layers.slice(var,
-                                         axes=[0],
-                                         starts=[var.shape[0] - remainder],
-                                         ends=[var.shape[0]])
+                var = paddle.slice(
+                    var,
+                    axes=[0],
+                    starts=[var.shape[0] - remainder],
+                    ends=[var.shape[0]])
             else:
-                var = fluid.layers.split(var,
-                                         [var.shape[1] - remainder,
-                                          remainder],
-                                         dim=1)[1]
+                var = paddle.split(
+                    var, [var.shape[1] - remainder, remainder], dim=1)[1]
 
             save_var_dim = nshards
             if remainder < nshards:
@@ -165,9 +163,8 @@ class ParameterConverter(object):
                     else:
                         var_dim = train_nshards
                     shape = [var_dim] if as_bias else [emb_dim, var_dim]
-                    var2 = fluid.layers.create_parameter(shape,
-                                                         dtype=dtype,
-                                                         name=load_var_name)
+                    var2 = paddle.static.create_parameter(
+                        shape, dtype=dtype, name=load_var_name)
 
                     if remainder + var_dim < nshards:
                         # The last train rank
@@ -184,38 +181,31 @@ class ParameterConverter(object):
             else:
                 remainder = remainder - nshards
             if var2 is not None:
-                var = fluid.layers.concat([var, var2], axis=0 if as_bias else 1)
+                var = paddle.concat([var, var2], axis=0 if as_bias else 1)
 
             shape = [save_var_dim] if as_bias else [emb_dim, save_var_dim]
-            to_save_var = fluid.layers.create_parameter(
-                shape,
-                dtype=dtype,
-                name=save_var_name + '_temp')
+            to_save_var = paddle.static.create_parameter(
+                shape, dtype=dtype, name=save_var_name + '_temp')
             if save_var_dim != nshards:  # get last dim
                 if as_bias:
-                    temp_var = fluid.layers.slice(
+                    temp_var = paddle.slice(
                         var,
                         axes=[0],
                         starts=[var.shape[0] - save_var_dim],
                         ends=[var.shape[0]])
                 else:
-                    temp_var = fluid.layers.split(
-                        var,
-                        [var.shape[1] - save_var_dim, save_var_dim],
+                    temp_var = paddle.split(
+                        var, [var.shape[1] - save_var_dim, save_var_dim],
                         dim=1)[1]
-                fluid.layers.assign(temp_var, to_save_var)
+                paddle.assign(temp_var, to_save_var)
             else:
                 if as_bias:
-                    temp_var = fluid.layers.slice(var,
-                                                  axes=[0],
-                                                  starts=[0],
-                                                  ends=[nshards])
+                    temp_var = paddle.slice(
+                        var, axes=[0], starts=[0], ends=[nshards])
                 else:
-                    temp_var = fluid.layers.split(
-                        var,
-                        [nshards, var.shape[1] - nshards],
-                        dim=1)[0]
-                fluid.layers.assign(temp_var, to_save_var)
+                    temp_var = paddle.split(
+                        var, [nshards, var.shape[1] - nshards], dim=1)[0]
+                paddle.assign(temp_var, to_save_var)
 
         def expected_var(var):
             has_var = os.path.exists(os.path.join(self.model_dir, var.name))
@@ -223,20 +213,15 @@ class ParameterConverter(object):
                 return True
             return False
 
-        place = fluid.CPUPlace()
-        exe = fluid.Executor(place)
+        place = paddle.CPUPlace()
+        exe = paddle.static.Executor(place)
         exe.run(startup_program)
-        fluid.io.load_vars(exe,
-                           dirname=self.model_dir,
-                           predicate=expected_var,
-                           main_program=main_program)
+        paddle.static.load(
+            main_program, self.model_dir, exe, predicate=expected_var)
         exe.run(main_program)
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
-        fluid.io.save_vars(exe,
-                           self.output_dir,
-                           vars=[to_save_var],
-                           main_program=main_program)
+        paddle.static.save(main_program, self.output_dir)
         srcfile = os.path.join(self.output_dir, to_save_var.name)
         dstfile = os.path.join(self.output_dir, save_var_name)
         shutil.move(srcfile, dstfile)
@@ -263,14 +248,8 @@ class ParameterConverter(object):
         for save_rank_id in range(nranks):
             assert name_index < train_nranks
             remainder_var_dim, advance = self.split_load_and_save(
-                name_index,
-                param_names,
-                save_rank_id,
-                remainder_var_dim,
-                as_bias,
-                train_nshards,
-                train_nranks,
-                nshards)
+                name_index, param_names, save_rank_id, remainder_var_dim,
+                as_bias, train_nshards, train_nranks, nshards)
             name_index += 1 if advance else 0
         processed_var_count = name_index + 1
 
@@ -284,10 +263,8 @@ class ParameterConverter(object):
                          "number of ranks ({}) for inference or "
                          "fine-tuning.".format(save_rank_id + 1, nranks))
 
-    def split_distfc_parameters(self,
-                                weight_param_names,
-                                weight_velocity_param_names,
-                                bias_param_names,
+    def split_distfc_parameters(self, weight_param_names,
+                                weight_velocity_param_names, bias_param_names,
                                 bias_velocity_param_names):
         """
         Split each distributed fc-related parameter according to number of ranks
@@ -315,8 +292,8 @@ class ParameterConverter(object):
                              dtype="float32"):
         advance = 0
         emb_dim = self.emb_dim
-        main_program = fluid.Program()
-        startup_program = fluid.Program()
+        main_program = paddle.static.Program()
+        startup_program = paddle.static.Program()
         num_classes = self.num_classes
 
         load_var_name = param_names[name_index]
@@ -328,27 +305,25 @@ class ParameterConverter(object):
 
         last_train_nshards = num_classes - (train_nranks - 1) * train_nshards
 
-        with fluid.program_guard(main_program, startup_program):
+        with paddle.static.program_guard(main_program, startup_program):
             if name_index == train_nranks - 1:
                 var_dim = last_train_nshards
             else:
                 var_dim = train_nshards
 
             shape = [var_dim] if as_bias else [emb_dim, var_dim]
-            var = fluid.layers.create_parameter(shape,
-                                                dtype=dtype,
-                                                name=load_var_name)
+            var = paddle.static.create_parameter(
+                shape, dtype=dtype, name=load_var_name)
 
             if as_bias:
-                var = fluid.layers.slice(var,
-                                         axes=[0],
-                                         starts=[var.shape[0] - remainder],
-                                         ends=[var.shape[0]])
+                var = paddle.slice(
+                    var,
+                    axes=[0],
+                    starts=[var.shape[0] - remainder],
+                    ends=[var.shape[0]])
             else:
-                var = fluid.layers.split(var,
-                                         [var.shape[1] - remainder,
-                                          remainder],
-                                         dim=1)[1]
+                var = paddle.split(
+                    var, [var.shape[1] - remainder, remainder], dim=1)[1]
             to_concat_var_list = [var]
             while remainder < nshards and name_index < train_nranks - 1:
                 name_index += 1
@@ -359,27 +334,22 @@ class ParameterConverter(object):
                 else:
                     var_dim = train_nshards
                 shape = [var_dim] if as_bias else [emb_dim, var_dim]
-                var = fluid.layers.create_parameter(shape,
-                                                    dtype=dtype,
-                                                    name=load_var_name)
+                var = paddle.static.create_parameter(
+                    shape, dtype=dtype, name=load_var_name)
 
                 to_concat_var_list.append(var)
                 remainder += var_dim
             if len(to_concat_var_list) > 1:
-                var = fluid.layers.concat(to_concat_var_list,
-                                          axis=0 if as_bias else 1)
+                var = paddle.concat(
+                    to_concat_var_list, axis=0 if as_bias else 1)
             save_var_dim = nshards
             if remainder > nshards:
                 if as_bias:
-                    var = fluid.layers.slice(var,
-                                             axes=[0],
-                                             starts=[0],
-                                             ends=[nshards])
+                    var = paddle.slice(
+                        var, axes=[0], starts=[0], ends=[nshards])
                 else:
-                    var = fluid.layers.split(
-                        var,
-                        [nshards, var.shape[1] - nshards],
-                        dim=1)[0]
+                    var = paddle.split(
+                        var, [nshards, var.shape[1] - nshards], dim=1)[0]
                 remainder = remainder - nshards
             elif remainder == nshards:
                 if name_index == train_nranks - 2:
@@ -402,12 +372,10 @@ class ParameterConverter(object):
                 save_var_dim = remainder
 
             shape = [save_var_dim] if as_bias else [emb_dim, save_var_dim]
-            to_save_var = fluid.layers.create_parameter(
-                shape,
-                dtype=dtype,
-                name=save_var_name + '_temp')
+            to_save_var = paddle.static.create_parameter(
+                shape, dtype=dtype, name=save_var_name + '_temp')
 
-            fluid.layers.assign(var, to_save_var)
+            paddle.assign(var, to_save_var)
 
         def expected_var(var):
             has_var = os.path.exists(os.path.join(self.model_dir, var.name))
@@ -415,20 +383,15 @@ class ParameterConverter(object):
                 return True
             return False
 
-        place = fluid.CPUPlace()
-        exe = fluid.Executor(place)
+        place = paddle.CPUPlace()
+        exe = paddle.static.Executor(place)
         exe.run(startup_program)
-        fluid.io.load_vars(exe,
-                           dirname=self.model_dir,
-                           predicate=expected_var,
-                           main_program=main_program)
+        paddle.static.load(
+            main_program, dirname=self.model_dir, exe, predicate=expected_var)
         exe.run(main_program)
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
-        fluid.io.save_vars(exe,
-                           self.output_dir,
-                           vars=[to_save_var],
-                           main_program=main_program)
+        paddle.static.save(main_program, self.output_dir)
         srcfile = os.path.join(self.output_dir, to_save_var.name)
         dstfile = os.path.join(self.output_dir, save_var_name)
         shutil.move(srcfile, dstfile)
@@ -453,14 +416,9 @@ class ParameterConverter(object):
         name_index = 0  # index of name of pre-trained parameter to process
         for save_rank_id in range(nranks):
             assert name_index < train_nranks
-            remainder_dim, advance = self.concat_load_and_save(name_index,
-                                                               param_names,
-                                                               save_rank_id,
-                                                               remainder_dim,
-                                                               as_bias,
-                                                               train_nshards,
-                                                               train_nranks,
-                                                               nshards)
+            remainder_dim, advance = self.concat_load_and_save(
+                name_index, param_names, save_rank_id, remainder_dim, as_bias,
+                train_nshards, train_nranks, nshards)
             name_index += advance
         processed_var_count = name_index + 1
 
@@ -474,10 +432,8 @@ class ParameterConverter(object):
                          "number of ranks ({}) for inference or "
                          "fine-tuning.".format(save_rank_id + 1, nranks))
 
-    def concat_distfc_parameters(self,
-                                 weight_param_names,
-                                 weight_velocity_param_names,
-                                 bias_param_names,
+    def concat_distfc_parameters(self, weight_param_names,
+                                 weight_velocity_param_names, bias_param_names,
                                  bias_velocity_param_names):
         """
         Concat distributed fc-related parameters according to number of ranks
@@ -499,14 +455,20 @@ class ParameterConverter(object):
     def process(self):
         self.load_config()
         var_names = self.find_var_names()
-        weight_param_names = [name for name in var_names
-                              if '.w' in name and 'velocity' not in name]
-        weight_velocity_param_names = [name for name in var_names
-                                       if '.w' in name and 'velocity' in name]
-        bias_param_names = [name for name in var_names
-                            if '.b' in name and 'velocity' not in name]
-        bias_velocity_param_names = [name for name in var_names
-                                     if '.b' in name and 'velocity' in name]
+        weight_param_names = [
+            name for name in var_names
+            if '.w' in name and 'velocity' not in name
+        ]
+        weight_velocity_param_names = [
+            name for name in var_names if '.w' in name and 'velocity' in name
+        ]
+        bias_param_names = [
+            name for name in var_names
+            if '.b' in name and 'velocity' not in name
+        ]
+        bias_velocity_param_names = [
+            name for name in var_names if '.b' in name and 'velocity' in name
+        ]
 
         def parameter_name_compare(x, y):
             """
@@ -563,21 +525,18 @@ class ParameterConverter(object):
                 "Pre-training and inference (or fine-tuning) have the same "
                 "number of ranks, nothing to do.")
         elif pretrain_nranks < nranks:
-            self.split_distfc_parameters(weight_param_names,
-                                         weight_velocity_param_names,
-                                         bias_param_names,
-                                         bias_velocity_param_names)
+            self.split_distfc_parameters(
+                weight_param_names, weight_velocity_param_names,
+                bias_param_names, bias_velocity_param_names)
         else:
-            self.concat_distfc_parameters(weight_param_names,
-                                          weight_velocity_param_names,
-                                          bias_param_names,
-                                          bias_velocity_param_names)
+            self.concat_distfc_parameters(
+                weight_param_names, weight_velocity_param_names,
+                bias_param_names, bias_velocity_param_names)
 
         logger.info("Done.")
 
 
 if __name__ == "__main__":
-    converter = ParameterConverter('./trained_model',
-                                   "./trained_model_temp",
+    converter = ParameterConverter('./trained_model', "./trained_model_temp",
                                    8)
     converter.process()
