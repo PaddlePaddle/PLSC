@@ -74,52 +74,20 @@ class InputField(object):
 
         return self.input_slots[name]
 
-    def build(self, capacity=64, iterable=True):
+    def build(self, dataset, place, batch_size, num_workers=4):
 
         for _name, _shape, _dtype, _lod_level in zip(
                 self.names, self.shapes, self.dtypes, self.lod_levels):
-            self.input_slots[_name] = fluid.data(
+            self.input_slots[_name] = paddle.static.data(
                 name=_name, shape=_shape, dtype=_dtype, lod_level=_lod_level)
 
         for name in self.feed_list_str:
             self.feed_list.append(self.input_slots[name])
 
-        self.loader = fluid.io.DataLoader.from_generator(
+        self.loader = paddle.io.DataLoader(
+            dataset,
             feed_list=self.feed_list,
-            capacity=capacity,
-            iterable=iterable,
-            use_double_buffer=True)
-
-
-if __name__ == "__main__":
-
-    mnist_input_slots = [{
-        "name": "image",
-        "shape": (-1, 32, 32, 1),
-        "dtype": "int32"
-    }, {
-        "name": "label",
-        "shape": [-1, 1],
-        "dtype": "int64"
-    }]
-
-    input_field = InputField(mnist_input_slots)
-
-    input_field += {
-        "name": "large_image",
-        "shape": (-1, 64, 64, 1),
-        "dtype": "int32"
-    }
-    input_field += {
-        "name": "large_color_image",
-        "shape": (-1, 64, 64, 3),
-        "dtype": "int32"
-    }
-
-    input_field.build()
-
-    print(input_field.feed_list)
-
-    print(input_field.image)
-
-    print(input_field.large_color_image)
+            places=place,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            capacity=capacity)

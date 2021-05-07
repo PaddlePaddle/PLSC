@@ -14,7 +14,7 @@
 
 from __future__ import print_function
 
-from paddle.fluid import core
+from paddle import core
 from paddle.fluid import layers
 
 
@@ -134,9 +134,10 @@ def check_op_validation(ops, idx, cur_op):
         if not op.attr('op_role') & int(OPTIMIZE):
             for input_name in op.input_arg_names:
                 if input_name in cur_op.output_arg_names:
-                    raise ValueError("There must be no next op that inputs {0} "
-                                     "variable after {1} op (optimize_role)".
-                                     format(var_name, cur_op.type))
+                    raise ValueError(
+                        "There must be no next op that inputs {0} "
+                        "variable after {1} op (optimize_role)".format(
+                            var_name, cur_op.type))
     return True
 
 
@@ -158,9 +159,9 @@ def move_optimize_ops_back(block):
                         zip(op.input_names,
                             [block.var(name) for name in op.input_arg_names])),
                     dict(
-                        zip(op.output_names,
-                            [block.var(name) for name in op.output_arg_names])),
-                    op.all_attrs()
+                        zip(op.output_names, [
+                            block.var(name) for name in op.output_arg_names
+                        ])), op.all_attrs()
                 ])
                 block._remove_op(idx)
     for op in reversed(optimize_ops):
@@ -335,75 +336,115 @@ def update_role_var_grad(main_prog, params_grads):
     move_optimize_ops_back(block)
 
 
-def update_loss_scaling(is_overall_finite, prev_loss_scaling, num_good_steps,
-                        num_bad_steps, incr_every_n_steps,
-                        decr_every_n_nan_or_inf, incr_ratio, decr_ratio):
+def check_finite_and_unscale(x, scale, name=None):
     """
-    Update loss scaling according to overall gradients. If all gradients is
-    finite after incr_every_n_steps, loss scaling will increase by incr_ratio.
+    Check if input X contains all finite data, if yes, scale it by input Scale.
+
+    $$Out = X / scale$$
+
+    If any tensor in X contains Inf or Nan, the Out will generate a indicator.
+    FoundInfinite will be 1 (True), and Out will not be scaled. In this case, the data of 
+    Out should not be used, and its data may not be deterministic. 
+    Otherwise, FoundInfinite will be 0 (False).
+    Args:
+        x(list|tuple): The input tensors of check_finite_and_unscale operator.
+        scale: The scale of check_finite_and_unscale operator.
+    """
+    check_type(x, 'x', (tuple, list), 'check_finite_and_unscale')
+    for e in x:
+        check_variable_and_dtype(e, "x", ['float16', 'float32', 'float64'],
+                                 'check_finite_and_unscale')
+
+    helper = LayerHelper("check_finite_and_unscale", **locals())
+    found_inf = helper.create_variable_for_type_inference(dtype='bool')
+
+    inputs = {'X': x, 'Scale': scale}
+    outputs = {'Out': x, 'FoundInfinite': found_inf}
+    helper.append_op(
+        type='check_finite_and_unscale', inputs=inputs, outputs=outputs)
+
+    return x, found_inf
+
+
+def update_loss_scaling(x,
+                        found_inf,
+                        prev_loss_scaling,
+                        num_good_steps,
+                        num_bad_steps,
+                        incr_every_n_steps,
+                        decr_every_n_nan_or_inf,
+                        incr_ratio,
+                        decr_ratio,
+                        stop_update=False,
+                        name=None):
+    """
+    Update loss scaling according to overall gradients. If all gradients is 
+    finite after incr_every_n_steps, loss scaling will increase by incr_ratio. 
     Otherwise, loss scaling will decrease by decr_ratio after
     decr_every_n_nan_or_inf steps and each step some gradients are infinite.
 
     Args:
-        is_overall_finite (Variable): A boolean variable indicates whether
-                                     all gradients are finite.
+        x(list|tuple): The input tensors of update_loss_scaling operator.
+        found_inf (Variable): A boolean variable indicates whether 
+                                     there is any infinite gradient.
         prev_loss_scaling (Variable): Previous loss scaling.
-        num_good_steps (Variable): A variable accumulates good steps in which
+        num_good_steps (Variable): A variable accumulates good steps in which 
                                    all gradients are finite.
-        num_bad_steps (Variable): A variable accumulates bad steps in which
+        num_bad_steps (Variable): A variable accumulates bad steps in which 
                                   some gradients are infinite.
-        incr_every_n_steps (Variable): A variable represents increasing loss
-                                       scaling every n consecutive steps with
+        incr_every_n_steps (int): A variable represents increasing loss 
+                                       scaling every n consecutive steps with 
                                        finite gradients.
-        decr_every_n_nan_or_inf (Variable): A variable represents decreasing
-                                            loss scaling every n accumulated
+        decr_every_n_nan_or_inf (int): A variable represents decreasing 
+                                            loss scaling every n accumulated 
                                             steps with nan or inf gradients.
-        incr_ratio(float): The multiplier to use when increasing the loss
+        incr_ratio(float): The multiplier to use when increasing the loss 
                            scaling.
-        decr_ratio(float): The less-than-one-multiplier to use when decreasing
+        decr_ratio(float): The less-than-one-multiplier to use when decreasing 
                            loss scaling.
     """
-    zero_steps = layers.fill_constant(shape=[1], dtype='int32', value=0)
-    with layers.Switch() as switch:
-        with switch.case(is_overall_finite):
-            should_incr_loss_scaling = layers.less_than(incr_every_n_steps,
-                                                        num_good_steps + 1)
-            with layers.Switch() as switch1:
-                with switch1.case(should_incr_loss_scaling):
-                    new_loss_scaling = prev_loss_scaling * incr_ratio
-                    loss_scaling_is_finite = layers.isfinite(new_loss_scaling)
-                    with layers.Switch() as switch2:
-                        with switch2.case(loss_scaling_is_finite):
-                            layers.assign(new_loss_scaling, prev_loss_scaling)
-                        with switch2.default():
-                            pass
-                    layers.assign(zero_steps, num_good_steps)
-                    layers.assign(zero_steps, num_bad_steps)
 
-                with switch1.default():
-                    layers.increment(num_good_steps)
-                    layers.assign(zero_steps, num_bad_steps)
+    check_variable_and_dtype(prev_loss_scaling, "prev_loss_scaling",
+                             ['float32', 'float64'], "update_loss_scaling")
+    check_type(x, 'x', (tuple, list), 'update_loss_scaling')
+    for e in x:
+        check_variable_and_dtype(e, "x", ['float16', 'float32', 'float64'],
+                                 'update_loss_scaling')
+        if e.dtype == core.VarDesc.VarType.FP16:
+            assert prev_loss_scaling.dtype == core.VarDesc.VarType.FP32, \
+                "The dtype of prev_loss_scaling should be float32 when the dtype of x is float16."
+        else:
+            assert prev_loss_scaling.dtype == e.dtype, "The dtype of prev_loss_scaling should be equal to the dtype of x."
 
-        with switch.default():
-            should_decr_loss_scaling = layers.less_than(decr_every_n_nan_or_inf,
-                                                        num_bad_steps + 1)
-            with layers.Switch() as switch3:
-                with switch3.case(should_decr_loss_scaling):
-                    new_loss_scaling = prev_loss_scaling * decr_ratio
-                    static_loss_scaling = \
-                        layers.fill_constant(shape=[1],
-                                             dtype='float32',
-                                             value=1.0)
-                    less_than_one = layers.less_than(new_loss_scaling,
-                                                     static_loss_scaling)
-                    with layers.Switch() as switch4:
-                        with switch4.case(less_than_one):
-                            layers.assign(static_loss_scaling,
-                                          prev_loss_scaling)
-                        with switch4.default():
-                            layers.assign(new_loss_scaling, prev_loss_scaling)
-                    layers.assign(zero_steps, num_good_steps)
-                    layers.assign(zero_steps, num_bad_steps)
-                with switch3.default():
-                    layers.assign(zero_steps, num_good_steps)
-                    layers.increment(num_bad_steps)
+    helper = LayerHelper("update_loss_scaling", **locals())
+
+    inputs = {
+        'X': x,
+        'FoundInfinite': found_inf,
+        'PrevLossScaling': prev_loss_scaling,
+        'InGoodSteps': num_good_steps,
+        'InBadSteps': num_bad_steps
+    }
+
+    outputs = {
+        'Out': x,
+        'LossScaling': prev_loss_scaling,
+        'OutGoodSteps': num_good_steps,
+        'OutBadSteps': num_bad_steps
+    }
+
+    attrs = {
+        'incr_every_n_steps': incr_every_n_steps,
+        'decr_every_n_nan_or_inf': decr_every_n_nan_or_inf,
+        'incr_ratio': incr_ratio,
+        'decr_ratio': decr_ratio,
+        'stop_update': stop_update
+    }
+
+    helper.append_op(
+        type='update_loss_scaling',
+        inputs=inputs,
+        outputs=outputs,
+        attrs=attrs)
+
+    return x

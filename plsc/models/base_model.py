@@ -14,8 +14,8 @@
 
 import math
 
-import paddle.fluid as fluid
-from paddle.fluid import unique_name
+import paddle
+from paddle.utils import unique_name
 
 from . import dist_algo
 
@@ -69,8 +69,9 @@ class BaseModel(object):
             margin: the margin parameter for arcface and dist_arcface
             scale: the scale parameter for arcface and dist_arcface
         """
-        supported_loss_types = ["dist_softmax", "dist_arcface",
-                                "softmax", "arcface"]
+        supported_loss_types = [
+            "dist_softmax", "dist_arcface", "softmax", "arcface"
+        ]
         assert loss_type in supported_loss_types, \
             "Supported loss types: {}, but given: {}".format(
                 supported_loss_types, loss_type)
@@ -80,36 +81,31 @@ class BaseModel(object):
         prob = None
         loss = None
         if loss_type == "softmax":
-            loss, prob = BaseModel._fc_classify(emb,
-                                                label,
-                                                num_classes,
-                                                param_attr,
-                                                bias_attr)
+            loss, prob = BaseModel._fc_classify(emb, label, num_classes,
+                                                param_attr, bias_attr)
         elif loss_type == "arcface":
-            loss, prob = BaseModel._arcface(emb,
-                                            label,
-                                            num_classes,
-                                            param_attr,
-                                            margin,
-                                            scale)
+            loss, prob = BaseModel._arcface(emb, label, num_classes,
+                                            param_attr, margin, scale)
         elif loss_type == "dist_arcface":
-            loss = dist_algo.distributed_arcface_classify(x=emb,
-                                                          label=label,
-                                                          class_num=num_classes,
-                                                          nranks=num_ranks,
-                                                          rank_id=rank_id,
-                                                          margin=margin,
-                                                          logit_scale=scale,
-                                                          param_attr=param_attr)
+            loss = dist_algo.distributed_arcface_classify(
+                x=emb,
+                label=label,
+                class_num=num_classes,
+                nranks=num_ranks,
+                rank_id=rank_id,
+                margin=margin,
+                logit_scale=scale,
+                param_attr=param_attr)
         elif loss_type == "dist_softmax":
-            loss = dist_algo.distributed_softmax_classify(x=emb,
-                                                          label=label,
-                                                          class_num=num_classes,
-                                                          nranks=num_ranks,
-                                                          rank_id=rank_id,
-                                                          param_attr=param_attr,
-                                                          use_bias=True,
-                                                          bias_attr=bias_attr)
+            loss = dist_algo.distributed_softmax_classify(
+                x=emb,
+                label=label,
+                class_num=num_classes,
+                nranks=num_ranks,
+                rank_id=rank_id,
+                param_attr=param_attr,
+                use_bias=True,
+                bias_attr=bias_attr)
 
         return emb, loss, prob
 
@@ -117,52 +113,51 @@ class BaseModel(object):
     def _fc_classify(input, label, out_dim, param_attr, bias_attr):
         if param_attr is None:
             stddev = 1.0 / math.sqrt(input.shape[1] * 1.0)
-            param_attr = fluid.param_attr.ParamAttr(
-                initializer=fluid.initializer.Uniform(-stddev, stddev))
+            param_attr = paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Uniform(-stddev, stddev))
 
-        out = fluid.layers.fc(input=input,
-                              size=out_dim,
-                              param_attr=param_attr,
-                              bias_attr=bias_attr)
-        loss, prob = fluid.layers.softmax_with_cross_entropy(
-            logits=out,
-            label=label,
-            return_softmax=True)
-        avg_loss = fluid.layers.mean(x=loss)
+        out = paddle.static.nn.fc(input=input,
+                                  size=out_dim,
+                                  weight_attr=param_attr,
+                                  bias_attr=bias_attr)
+        loss, prob = paddle.nn.functional.softmax_with_cross_entropy(
+            logits=out, label=label, return_softmax=True)
+        avg_loss = paddle.mean(x=loss)
         return avg_loss, prob
 
     @staticmethod
     def _arcface(input, label, out_dim, param_attr, margin, scale):
-        input_norm = fluid.layers.sqrt(
-            fluid.layers.reduce_sum(fluid.layers.square(input), dim=1))
-        input = fluid.layers.elementwise_div(input, input_norm, axis=0)
+        input_norm = paddle.sqrt(
+            paddle.reduce_sum(
+                paddle.square(input), dim=1))
+        input = paddle.elementwise_div(input, input_norm, axis=0)
 
         if param_attr is None:
-            param_attr = fluid.param_attr.ParamAttr(
-                initializer=fluid.initializer.Xavier(uniform=False, fan_in=0.0))
-        weight = fluid.layers.create_parameter(
+            param_attr = paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Xavier(
+                    uniform=False, fan_in=0.0))
+        weight = paddle.static.create_parameter(
             shape=[input.shape[1], out_dim],
             dtype='float32',
             name=unique_name.generate('final_fc_w'),
             attr=param_attr)
 
-        weight_norm = fluid.layers.sqrt(
-            fluid.layers.reduce_sum(fluid.layers.square(weight), dim=0))
-        weight = fluid.layers.elementwise_div(weight, weight_norm, axis=1)
-        cos = fluid.layers.mul(input, weight)
+        weight_norm = paddle.sqrt(
+            paddle.reduce_sum(
+                paddle.square(weight), dim=0))
+        weight = paddle.elementwise_div(weight, weight_norm, axis=1)
+        cos = paddle.mul(input, weight)
 
-        theta = fluid.layers.acos(cos)
-        margin_cos = fluid.layers.cos(theta + margin)
-        one_hot = fluid.layers.one_hot(label, out_dim)
+        theta = paddle.acos(cos)
+        margin_cos = paddle.cos(theta + margin)
+        one_hot = paddle.one_hot(label, out_dim)
         diff = (margin_cos - cos) * one_hot
         target_cos = cos + diff
-        logit = fluid.layers.scale(target_cos, scale=scale)
+        logit = paddle.scale(target_cos, scale=scale)
 
-        loss, prob = fluid.layers.softmax_with_cross_entropy(
-            logits=logit,
-            label=label,
-            return_softmax=True)
-        avg_loss = fluid.layers.mean(x=loss)
+        loss, prob = paddle.softmax_with_cross_entropy(
+            logits=logit, label=label, return_softmax=True)
+        avg_loss = paddle.mean(x=loss)
 
         one_hot.stop_gradient = True
 

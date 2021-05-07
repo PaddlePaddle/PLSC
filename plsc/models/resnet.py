@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle.fluid as fluid
+import paddle
 
 from .base_model import BaseModel
 
@@ -25,9 +25,7 @@ class ResNet(BaseModel):
         self.layers = layers
         self.emb_dim = emb_dim
 
-    def build_network(self,
-                      input,
-                      is_train=True):
+    def build_network(self, input, is_train=True):
         layers = self.layers
         supported_layers = [50, 101, 152]
         assert layers in supported_layers, \
@@ -43,8 +41,13 @@ class ResNet(BaseModel):
         num_filters = [64, 128, 256, 512]
 
         conv = self.conv_bn_layer(
-            input=input.image, num_filters=64, filter_size=3, stride=1,
-            pad=1, act='prelu', is_train=is_train)
+            input=input.image,
+            num_filters=64,
+            filter_size=3,
+            stride=1,
+            pad=1,
+            act='prelu',
+            is_train=is_train)
 
         for block in range(len(depth)):
             for i in range(depth[block]):
@@ -54,26 +57,29 @@ class ResNet(BaseModel):
                     stride=2 if i == 0 else 1,
                     is_train=is_train)
 
-        bn = fluid.layers.batch_norm(input=conv,
-                                     act=None,
-                                     epsilon=2e-05,
-                                     is_test=False if is_train else True)
-        drop = fluid.layers.dropout(x=bn,
-                                    dropout_prob=0.4,
-                                    dropout_implementation='upscale_in_train',
-                                    is_test=False if is_train else True)
-        fc = fluid.layers.fc(
+        bn = paddle.static.nn.batch_norm(
+            input=conv,
+            act=None,
+            epsilon=2e-05,
+            is_test=False if is_train else True)
+        drop = paddle.nn.functional.dropout(
+            x=bn,
+            dropout_prob=0.4,
+            mode='upscale_in_train',
+            training=True if is_train else False)
+        fc = paddle.static.nn.fc(
             input=drop,
             size=self.emb_dim,
-            param_attr=fluid.param_attr.ParamAttr(
-                initializer=fluid.initializer.Xavier(uniform=False,
-                                                     fan_in=0.0)),
-            bias_attr=fluid.param_attr.ParamAttr(
-                initializer=fluid.initializer.ConstantInitializer()))
-        emb = fluid.layers.batch_norm(input=fc,
-                                      act=None,
-                                      epsilon=2e-05,
-                                      is_test=False if is_train else True)
+            param_attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Xavier(
+                    uniform=False, fan_in=0.0)),
+            bias_attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.ConstantInitializer()))
+        emb = paddle.static.nn.batch_norm(
+            input=fc,
+            act=None,
+            epsilon=2e-05,
+            is_test=False if is_train else True)
         return emb
 
     def conv_bn_layer(self,
@@ -85,89 +91,95 @@ class ResNet(BaseModel):
                       groups=1,
                       is_train=True,
                       act=None):
-        conv = fluid.layers.conv2d(
+        conv = paddle.static.nn.conv2d(
             input=input,
             num_filters=num_filters,
             filter_size=filter_size,
             stride=stride,
             padding=pad,
             groups=groups,
-            param_attr=fluid.param_attr.ParamAttr(
-                initializer=fluid.initializer.Xavier(
+            param_attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Xavier(
                     uniform=False, fan_in=0.0)),
             bias_attr=False)
         if act == 'prelu':
-            bn = fluid.layers.batch_norm(input=conv,
-                                         act=None,
-                                         epsilon=2e-05,
-                                         momentum=0.9,
-                                         is_test=False if is_train else True)
-            return fluid.layers.prelu(
+            bn = paddle.static.nn.batch_norm(
+                input=conv,
+                act=None,
+                epsilon=2e-05,
+                momentum=0.9,
+                is_test=False if is_train else True)
+            return paddle.static.nn.prelu(
                 bn,
                 mode="all",
-                param_attr=fluid.param_attr.ParamAttr(
-                    initializer=fluid.initializer.Constant(0.25)))
+                param_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(0.25)))
         else:
-            return fluid.layers.batch_norm(input=conv,
-                                           act=act,
-                                           epsilon=2e-05,
-                                           is_test=False if is_train else True)
+            return paddle.static.nn.batch_norm(
+                input=conv,
+                act=act,
+                epsilon=2e-05,
+                is_test=False if is_train else True)
 
     def shortcut(self, input, ch_out, stride, is_train):
         ch_in = input.shape[1]
         if ch_in != ch_out or stride != 1:
-            return self.conv_bn_layer(input,
-                                      ch_out,
-                                      1,
-                                      stride,
-                                      is_train=is_train)
+            return self.conv_bn_layer(
+                input, ch_out, 1, stride, is_train=is_train)
         else:
             return input
 
     def bottleneck_block(self, input, num_filters, stride, is_train):
         if self.layers < 500:
-            bn1 = fluid.layers.batch_norm(input=input,
-                                          act=None,
-                                          epsilon=2e-05,
-                                          is_test=False if is_train else True)
-            conv1 = self.conv_bn_layer(input=bn1,
-                                       num_filters=num_filters,
-                                       filter_size=3,
-                                       pad=1,
-                                       act='prelu',
-                                       is_train=is_train)
-            conv2 = self.conv_bn_layer(input=conv1,
-                                       num_filters=num_filters,
-                                       filter_size=3,
-                                       stride=stride,
-                                       pad=1,
-                                       is_train=is_train)
+            bn1 = paddle.static.nn.batch_norm(
+                input=input,
+                act=None,
+                epsilon=2e-05,
+                is_test=False if is_train else True)
+            conv1 = self.conv_bn_layer(
+                input=bn1,
+                num_filters=num_filters,
+                filter_size=3,
+                pad=1,
+                act='prelu',
+                is_train=is_train)
+            conv2 = self.conv_bn_layer(
+                input=conv1,
+                num_filters=num_filters,
+                filter_size=3,
+                stride=stride,
+                pad=1,
+                is_train=is_train)
         else:
-            bn0 = fluid.layers.batch_norm(input=input,
-                                          act=None,
-                                          epsilon=2e-05,
-                                          is_test=False if is_train else True)
-            conv0 = self.conv_bn_layer(input=bn0,
-                                       num_filters=num_filters / 4,
-                                       filter_size=1,
-                                       pad=0,
-                                       act='prelu',
-                                       is_train=is_train)
-            conv1 = self.conv_bn_layer(input=conv0,
-                                       num_filters=num_filters / 4,
-                                       filter_size=3,
-                                       pad=1,
-                                       act='prelu',
-                                       is_train=is_train)
-            conv2 = self.conv_bn_layer(input=conv1,
-                                       num_filters=num_filters,
-                                       filter_size=1,
-                                       stride=stride,
-                                       pad=0,
-                                       is_train=is_train)
+            bn0 = paddle.static.nn.batch_norm(
+                input=input,
+                act=None,
+                epsilon=2e-05,
+                is_test=False if is_train else True)
+            conv0 = self.conv_bn_layer(
+                input=bn0,
+                num_filters=num_filters / 4,
+                filter_size=1,
+                pad=0,
+                act='prelu',
+                is_train=is_train)
+            conv1 = self.conv_bn_layer(
+                input=conv0,
+                num_filters=num_filters / 4,
+                filter_size=3,
+                pad=1,
+                act='prelu',
+                is_train=is_train)
+            conv2 = self.conv_bn_layer(
+                input=conv1,
+                num_filters=num_filters,
+                filter_size=1,
+                stride=stride,
+                pad=0,
+                is_train=is_train)
 
         short = self.shortcut(input, num_filters, stride, is_train=is_train)
-        return fluid.layers.elementwise_add(x=short, y=conv2, act=None)
+        return paddle.elementwise_add(x=short, y=conv2, act=None)
 
 
 def ResNet50(emb_dim=512):
