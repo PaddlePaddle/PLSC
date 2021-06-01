@@ -116,26 +116,26 @@ class BaseModel(object):
             param_attr = paddle.ParamAttr(
                 initializer=paddle.nn.initializer.Uniform(-stddev, stddev))
 
-        out = paddle.static.nn.fc(input=input,
+        out = paddle.static.nn.fc(x=input,
                                   size=out_dim,
                                   weight_attr=param_attr,
                                   bias_attr=bias_attr)
         loss, prob = paddle.nn.functional.softmax_with_cross_entropy(
-            logits=out, label=label, return_softmax=True)
+            logits=out,
+            label=paddle.reshape(label, (-1, 1)),
+            return_softmax=True)
         avg_loss = paddle.mean(x=loss)
         return avg_loss, prob
 
     @staticmethod
     def _arcface(input, label, out_dim, param_attr, margin, scale):
         input_norm = paddle.sqrt(
-            paddle.reduce_sum(
-                paddle.square(input), dim=1))
-        input = paddle.elementwise_div(input, input_norm, axis=0)
+            paddle.sum(paddle.square(input), axis=1, keepdim=True))
+        input = paddle.divide(input, input_norm)
 
         if param_attr is None:
             param_attr = paddle.ParamAttr(
-                initializer=paddle.nn.initializer.Xavier(
-                    uniform=False, fan_in=0.0))
+                initializer=paddle.nn.initializer.XavierNormal(fan_in=0.0))
         weight = paddle.static.create_parameter(
             shape=[input.shape[1], out_dim],
             dtype='float32',
@@ -143,20 +143,21 @@ class BaseModel(object):
             attr=param_attr)
 
         weight_norm = paddle.sqrt(
-            paddle.reduce_sum(
-                paddle.square(weight), dim=0))
-        weight = paddle.elementwise_div(weight, weight_norm, axis=1)
-        cos = paddle.mul(input, weight)
+            paddle.sum(paddle.square(weight), axis=0, keepdim=True))
+        weight = paddle.divide(weight, weight_norm)
+        cos = paddle.matmul(input, weight)
 
         theta = paddle.acos(cos)
         margin_cos = paddle.cos(theta + margin)
-        one_hot = paddle.one_hot(label, out_dim)
-        diff = (margin_cos - cos) * one_hot
-        target_cos = cos + diff
+        one_hot = paddle.nn.functional.one_hot(label, out_dim)
+        diff = paddle.multiply(paddle.subtract(margin_cos, cos), one_hot)
+        target_cos = paddle.add(cos, diff)
         logit = paddle.scale(target_cos, scale=scale)
 
-        loss, prob = paddle.softmax_with_cross_entropy(
-            logits=logit, label=label, return_softmax=True)
+        loss, prob = paddle.nn.functional.softmax_with_cross_entropy(
+            logits=logit,
+            label=paddle.reshape(label, (-1, 1)),
+            return_softmax=True)
         avg_loss = paddle.mean(x=loss)
 
         one_hot.stop_gradient = True
