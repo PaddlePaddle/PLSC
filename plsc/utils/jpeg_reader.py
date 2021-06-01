@@ -288,9 +288,9 @@ def arc_train(data_dir, class_dim):
     train_image_list = get_train_image_list(data_dir)
     return arc_iterator(
         train_image_list,
-        shuffle=True,
         class_dim=class_dim,
         data_dir=data_dir,
+        shuffle=True,
         color_jitter=False,
         rotate=False,
         rand_mirror=True,
@@ -308,3 +308,66 @@ def test(data_dir, datasets):
             test_name_list.append(name)
             print('test', name)
     return test_list, test_name_list
+
+
+class TrainDataset(paddle.io.Dataset):
+    def __init__(self,
+                 data_dir,
+                 class_dim,
+                 color_jitter=False,
+                 rotate=False,
+                 rand_mirror=False,
+                 normalize=False):
+        self.data_dir = data_dir
+        self.class_dim = class_dim
+        self.color_jitter = color_jitter
+        self.rotate = rotate
+        self.rand_mirror = rand_mirror
+        self.normalize = normalize
+        self.sample_list = get_train_image_list(data_dir)
+
+    def __getitem__(self, idx):
+        img_path, label = self.sample_list[idx]
+        img_path = os.path.join(self.data_dir, img_path)
+        img = Image.open(img_path)
+        if self.rotate:
+            img = rotate_image(img)
+            img = random_resized_crop(img, DATA_DIM)
+
+        if self.color_jitter:
+            img = distort_color(img)
+
+        if self.rand_mirror:
+            if random.randint(0, 1) == 1:
+                img = img.transpose(Image.FLIP_LEFT_RIGHT)
+
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+
+        img = np.array(img).astype('float32').transpose((2, 0, 1))
+
+        if self.normalize:
+            img -= img_mean
+            img /= img_std
+
+        assert label < self.class_dim, \
+            "label of train dataset should be less than the class_dim."
+
+        return img, label
+
+    def __len__(self):
+        return len(self.sample_list)
+
+
+class TestDataset(paddle.io.Dataset):
+    def __init__(self, data_dir, datasets):
+        self.data_dir = data_dir
+        self.datasets = datasets.split(',')
+        self.sample_list = []
+
+    def __getitem__(self, idx):
+        img_path, label = self.sample_list[idx]
+        return img, label
+
+    def __len__(self):
+        return len(self.sample_list)

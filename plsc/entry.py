@@ -29,10 +29,8 @@ import logging
 import numpy as np
 import paddle
 import sklearn
-import paddle
 import paddle.distributed.fleet as fleet
-
-from paddle.fluid.contrib.slim.quantization.quantize_program_pass import QuantizeProgramPass
+from paddle.optimizer import Optimizer
 
 paddle.enable_static()
 
@@ -41,7 +39,7 @@ from .models import DistributedClassificationOptimizer
 from .models import base_model
 from .models import resnet
 from .utils import jpeg_reader as reader
-from .utils.parameter_converter import ParameterConverter
+from .utils.parameter_converter import rearrange_weight
 from .utils.verification import evaluate
 from .utils.input_field import InputField
 
@@ -94,12 +92,11 @@ class Entry(object):
 
         self.optimizer = None
         self.model = None
-        self.train_reader = None
-        self.test_reader = None
-        self.predict_reader = None
+        self.train_dataset = None
+        self.test_dataset = None
 
-        self.train_program = paddle.static.Program()
         self.startup_program = paddle.static.Program()
+        self.train_program = paddle.static.Program()
         self.test_program = paddle.static.Program()
         self.predict_program = paddle.static.Program()
 
@@ -113,7 +110,7 @@ class Entry(object):
 
         self.has_run_train = False  # Whether has run training or not
         self.test_initialized = False
-        self.train_pass_id = -1
+        self.cur_epoch = -1
 
         self.use_fp16 = False
         self.fp16_user_dict = None
@@ -126,6 +123,7 @@ class Entry(object):
         self.scale = self.config.scale
         self.lr = self.config.lr
         self.lr_steps = self.config.lr_steps
+        self.lr_scheduler = None
         self.train_image_num = self.config.train_image_num
         self.model_name = self.config.model_name
         self.emb_dim = self.config.emb_dim
@@ -136,6 +134,7 @@ class Entry(object):
         self.warmup_epochs = self.config.warmup_epochs
         self.calc_train_acc = False
 
+        self.max_last_checkpoint_num = 5
         if self.checkpoint_dir:
             self.checkpoint_dir = os.path.abspath(self.checkpoint_dir)
         if self.model_save_dir:
@@ -147,6 +146,8 @@ class Entry(object):
 
         self.lr_decay_factor = 0.1
         self.log_period = 200
+        self.test_period = 0
+        self.cur_steps = 0
 
         self.input_info = [{
             'name': 'image',
@@ -154,7 +155,7 @@ class Entry(object):
             'dtype': 'float32'
         }, {
             'name': 'label',
-            'shape': [-1, 1],
+            'shape': [-1],
             'dtype': 'int64'
         }]
         self.input_field = None
@@ -167,6 +168,7 @@ class Entry(object):
                                                               num_trainers))
         logger.info('default lr_decay_factor: {}'.format(self.lr_decay_factor))
         logger.info('default log period: {}'.format(self.log_period))
+        logger.info('default test period: {}'.format(self.test_period))
         logger.info('=' * 30)
 
     def set_use_quant(self, quant):
@@ -216,6 +218,10 @@ class Entry(object):
     def set_log_period(self, period):
         self.log_period = period
         logger.info("Set log period to {}.".format(period))
+
+    def set_test_period(self, period):
+        self.test_period = period
+        logger.info("Set test period to {}.".format(period))
 
     def set_lr_decay_factor(self, factor):
         self.lr_decay_factor = factor
@@ -354,6 +360,13 @@ class Entry(object):
         self.checkpoint_dir = directory
         logger.info("Set checkpoint_dir to {}.".format(directory))
 
+    def set_max_last_checkpoint_num(self, num):
+        """
+        Set the max number of last checkpoint to keep.
+        """
+        self.max_last_checkpoint_num = num
+        logger.info("Set max_last_checkpoint_num to {}.".format(num))
+
     def set_warmup_epochs(self, num):
         self.warmup_epochs = num
         logger.info("Set warmup_epochs to {}.".format(num))
@@ -386,6 +399,16 @@ class Entry(object):
             logger.info("Set bias_attr for distfc to {}.".format(
                 self.bias_attr))
 
+    def _set_info(self, key, value):
+        if not hasattr(self, '_info'):
+            self._info = {}
+        self._info[key] = value
+
+    def _get_info(self, key):
+        if hasattr(self, '_info') and key in self._info:
+            return self._info[key]
+        return None
+
     def _get_optimizer(self):
         if not self.optimizer:
             bd = [step for step in self.lr_steps]
@@ -406,18 +429,18 @@ class Entry(object):
             logger.info("LR boundaries: {}".format(bd))
             logger.info("lr_step: {}".format(lr))
             if self.warmup_epochs:
-                lr_val = paddle.optimizer.lr.LinearWarmup(
+                self.lr_scheduler = paddle.optimizer.lr.LinearWarmup(
                     paddle.optimizer.lr.PiecewiseDecay(
                         boundaries=bd, values=lr),
                     warmup_steps,
                     start_lr,
                     base_lr)
             else:
-                lr_val = paddle.optimizer.lr.PiecewiseDecay(
+                self.lr_scheduler = paddle.optimizer.lr.PiecewiseDecay(
                     boundaries=bd, values=lr)
 
             optimizer = paddle.optimizer.Momentum(
-                learning_rate=lr_val,
+                learning_rate=self.lr_scheduler,
                 momentum=0.9,
                 weight_decay=paddle.regularizer.L2Decay(5e-4))
             self.optimizer = optimizer
@@ -430,7 +453,7 @@ class Entry(object):
                 loss_type=self.loss_type,
                 fp16_user_dict=self.fp16_user_dict)
         elif self.use_fp16:
-            self.optimizer = fluid.contrib.mixed_precision.decorate(
+            self.optimizer = paddle.static.amp.decorate(
                 optimizer=self.optimizer,
                 init_loss_scaling=self.fp16_user_dict['init_loss_scaling'],
                 incr_every_n_steps=self.fp16_user_dict['incr_every_n_steps'],
@@ -443,10 +466,7 @@ class Entry(object):
                 amp_lists=self.fp16_user_dict['amp_lists'])
         return self.optimizer
 
-    def build_program(self,
-                      is_train=True,
-                      use_parallel_test=False,
-                      dist_strategy=None):
+    def build_program(self, is_train=True, use_parallel_test=False):
         model_name = self.model_name
         assert not (is_train and use_parallel_test), \
             "is_train and use_parallel_test cannot be set simultaneously."
@@ -468,13 +488,13 @@ class Entry(object):
 
                 emb, loss, prob = model.get_output(
                     input=input_field,
+                    num_classes=self.num_classes,
                     num_ranks=num_trainers,
                     rank_id=trainer_id,
                     is_train=is_train,
-                    num_classes=self.num_classes,
-                    loss_type=self.loss_type,
                     param_attr=self.param_attr,
                     bias_attr=self.bias_attr,
+                    loss_type=self.loss_type,
                     margin=self.margin,
                     scale=self.scale)
 
@@ -485,49 +505,53 @@ class Entry(object):
                     if self.calc_train_acc:
                         shard_prob = loss._get_info("shard_prob")
 
-                        prob_all = fluid.layers.collective._c_allgather(
-                            shard_prob,
-                            nranks=num_trainers,
-                            use_calc_stream=True)
-                        prob_list = fluid.layers.split(
-                            prob_all, dim=0, num_or_sections=num_trainers)
-                        prob = fluid.layers.concat(prob_list, axis=1)
-                        label_all = fluid.layers.collective._c_allgather(
-                            input_field.label,
-                            nranks=num_trainers,
-                            use_calc_stream=True)
-                        acc1 = fluid.layers.accuracy(
-                            input=prob, label=label_all, k=1)
-                        acc5 = fluid.layers.accuracy(
-                            input=prob, label=label_all, k=5)
+                        prob_list = []
+                        paddle.distributed.all_gather(prob_list, shard_prob)
+                        prob = paddle.concat(prob_list, axis=1)
+                        label_list = []
+                        paddle.distributed.all_gather(label_list,
+                                                      input_field.label)
+                        label_all = paddle.concat(label_list, axis=0)
+                        acc1 = paddle.static.accuracy(
+                            input=prob,
+                            label=paddle.reshape(label_all, (-1, 1)),
+                            k=1)
+                        acc5 = paddle.static.accuracy(
+                            input=prob,
+                            label=paddle.reshape(label_all, (-1, 1)),
+                            k=5)
                 else:
                     if self.calc_train_acc:
-                        acc1 = fluid.layers.accuracy(
-                            input=prob, label=input_field.label, k=1)
-                        acc5 = fluid.layers.accuracy(
-                            input=prob, label=input_field.label, k=5)
+                        acc1 = paddle.static.accuracy(
+                            input=prob,
+                            label=paddle.reshape(input_field.label, (-1, 1)),
+                            k=1)
+                        acc5 = paddle.static.accuracy(
+                            input=prob,
+                            label=paddle.reshape(input_field.label, (-1, 1)),
+                            k=5)
 
                 optimizer = None
                 if is_train:
                     # initialize optimizer
                     optimizer = self._get_optimizer()
                     if self.num_trainers > 1:
-                        dist_optimizer = fleet.distributed_optimizer(
-                            optimizer, strategy=dist_strategy)
+                        dist_optimizer = fleet.distributed_optimizer(optimizer)
                         dist_optimizer.minimize(loss)
                     else:  # single card training
                         optimizer.minimize(loss)
                     if "dist" in self.loss_type or self.use_fp16:
                         optimizer = optimizer._optimizer
                 elif use_parallel_test:
-                    emb = fluid.layers.collective._c_allgather(
-                        emb, nranks=num_trainers, use_calc_stream=True)
+                    emb_list = []
+                    paddle.distributed.all_gather(emb_list, emb)
+                    emb = paddle.concat(emb_list, axis=0)
         return emb, loss, acc1, acc5, optimizer
 
     def get_files_from_hdfs(self):
         assert self.fs_checkpoint_dir, \
             logger.error("Please set the fs_checkpoint_dir paramerters for "
-                         "set_llllllhdfs_info to get models from hdfs.")
+                         "set_hdfs_info to get models from hdfs.")
         self.fs_checkpoint_dir = os.path.join(self.fs_checkpoint_dir, '*')
         cmd = "hadoop fs -D fs.default.name="
         cmd += self.fs_name + " "
@@ -557,24 +581,6 @@ class Entry(object):
             cmd, stdout=sys.stdout, stderr=subprocess.STDOUT)
         process.wait()
 
-    def process_distributed_params(self, local_dir):
-        local_dir = os.path.abspath(local_dir)
-        output_dir = tempfile.mkdtemp()
-        converter = ParameterConverter(local_dir, output_dir,
-                                       self.num_trainers)
-        converter.process()
-
-        for file in os.listdir(local_dir):
-            if "dist@" in file and "@rank@" in file:
-                file = os.path.join(local_dir, file)
-                os.remove(file)
-
-        for file in os.listdir(output_dir):
-            if "dist@" in file and "@rank@" in file:
-                file = os.path.join(output_dir, file)
-                shutil.move(file, local_dir)
-        shutil.rmtree(output_dir)
-
     def _append_broadcast_ops(self, program):
         """
         Before test, we broadcast bathnorm-related parameters to all
@@ -593,17 +599,66 @@ class Entry(object):
                 outputs={'Out': var},
                 attrs={'use_calc_stream': True})
 
-    def load_checkpoint(self,
-                        executor,
-                        main_program,
-                        use_per_trainer_checkpoint=False,
-                        load_for_train=True):
-        if use_per_trainer_checkpoint:
-            checkpoint_dir = os.path.join(self.checkpoint_dir,
-                                          str(self.trainer_id))
-        else:
-            checkpoint_dir = self.checkpoint_dir
+    def save(self, program, epoch=0, for_train=True):
+        if not self.model_save_dir:
+            return
 
+        trainer_id = self.trainer_id
+        model_save_dir = os.path.join(self.model_save_dir, str(epoch))
+        if not os.path.exists(model_save_dir):
+            # may be more than one processes trying
+            # to create the directory
+            try:
+                os.makedirs(model_save_dir)
+            except OSError as exc:
+                if exc.errno != errno.EEXIST:
+                    raise
+                pass
+
+        param_state_dict = program.state_dict(mode='param')
+        for name, param in param_state_dict.items():
+            # for non dist param, we only save their at trainer 0,
+            # but for dist param, we need to save their at all trainers
+            if 'dist@' in name and '@rank@' in name or trainer_id == 0:
+                paddle.save(param,
+                            os.path.join(model_save_dir, name + '.pdparam'))
+
+        if for_train:
+            opt_state_dict = program.state_dict(mode='opt')
+            for name, opt in opt_state_dict.items():
+                # for non opt var, we only save their at trainer 0,
+                # but for opt var, we need to save their at all trainers
+                if 'dist@' in name and '@rank@' in name or trainer_id == 0:
+                    paddle.save(opt,
+                                os.path.join(model_save_dir, name + '.pdopt'))
+
+            if trainer_id == 0:
+                # save some extra info for resume
+                # pretrain_nranks, emb_dim, num_classes are used for
+                # re-split fc weight when gpu setting changed.
+                # epoch use to restart.
+                config_file = os.path.join(model_save_dir, 'meta.json')
+                extra_info = dict()
+                extra_info["pretrain_nranks"] = self.num_trainers
+                extra_info["emb_dim"] = self.emb_dim
+                extra_info['num_classes'] = self.num_classes
+                extra_info['epoch'] = epoch
+                extra_info['lr_state'] = self.lr_scheduler.state_dict()
+                with open(config_file, 'w') as f:
+                    json.dump(extra_info, f)
+
+        logger.info("Save model to {}.".format(self.model_save_dir))
+        if trainer_id == 0 and self.max_last_checkpoint_num > 0:
+            for idx in range(-1, epoch - self.max_last_checkpoint_num + 1):
+                path = os.path.join(self.model_save_dir, str(idx))
+                if os.path.exists(path):
+                    logger.info("Remove checkpoint {}.".format(path))
+                    shutil.rmtree(path)
+
+    def load(self, program, for_train=True):
+        checkpoint_dir = os.path.abspath(self.checkpoint_dir)
+
+        logger.info("Load checkpoint from '{}'. ".format(checkpoint_dir))
         if self.fs_name is not None:
             if os.path.exists(checkpoint_dir):
                 logger.info("Local dir {} exists, we'll overwrite it.".format(
@@ -625,40 +680,99 @@ class Entry(object):
                     else:
                         break
 
-        # Preporcess distributed parameters.
-        file_name = os.path.join(checkpoint_dir, '.lock')
-        meta_file = os.path.join(checkpoint_dir, 'meta.json')
-        if not os.path.exists(meta_file):
-            logger.error("Please make sure the checkpoint dir {} exists, and "
-                         "parameters in that dir are validating.".format(
-                             checkpoint_dir))
-            exit()
+        state_dict = {}
+        dist_weight_state_dict = {}
+        dist_weight_velocity_state_dict = {}
+        dist_bias_state_dict = {}
+        dist_bias_velocity_state_dict = {}
+        for path in os.listdir(checkpoint_dir):
+            path = os.path.join(checkpoint_dir, path)
+            if not os.path.isfile(path):
+                continue
+
+            basename = os.path.basename(path)
+            name, ext = os.path.splitext(basename)
+
+            if ext not in ['.pdopt', '.pdparam']:
+                continue
+
+            if not for_train and ext == '.pdopt':
+                continue
+
+            tensor = paddle.load(path, return_numpy=True)
+
+            if 'dist@' in name and '@rank@' in name:
+                if '.w' in name and 'velocity' not in name:
+                    dist_weight_state_dict[name] = tensor
+                elif '.w' in name and 'velocity' in name:
+                    dist_weight_velocity_state_dict[name] = tensor
+                elif '.b' in name and 'velocity' not in name:
+                    dist_bias_state_dict[name] = tensor
+                elif '.b' in name and 'velocity' in name:
+                    dist_bias_velocity_state_dict[name] = tensor
+
+            else:
+                state_dict[name] = tensor
+
         distributed = self.loss_type in ["dist_softmax", "dist_arcface"]
-        if load_for_train and self.trainer_id == 0 and distributed:
-            self.process_distributed_params(checkpoint_dir)
-            with open(file_name, 'w') as f:
-                pass
-            time.sleep(10)
-            os.remove(file_name)
-        elif load_for_train and distributed:
-            # wait trainer_id (0) to complete
-            while True:
-                if not os.path.exists(file_name):
-                    time.sleep(1)
-                else:
-                    break
 
-        def if_exist(var):
-            has_var = os.path.exists(os.path.join(checkpoint_dir, var.name))
-            if has_var:
-                logger.info('var: %s found' % (var.name))
-            return has_var
+        if for_train or distributed:
+            meta_file = os.path.join(checkpoint_dir, 'meta.json')
+            if not os.path.exists(meta_file):
+                logger.error(
+                    "Please make sure the checkpoint dir {} exists, and "
+                    "parameters in that dir are validating.".format(
+                        checkpoint_dir))
+                exit()
 
-        fluid.io.load_vars(
-            executor,
-            checkpoint_dir,
-            predicate=if_exist,
-            main_program=main_program)
+            with open(meta_file, 'r') as handle:
+                config = json.load(handle)
+
+        # Preporcess distributed parameters.
+        if distributed:
+            pretrain_nranks = config['pretrain_nranks']
+            assert pretrain_nranks > 0
+            emb_dim = config['emb_dim']
+            assert emb_dim == self.emb_dim
+            num_classes = config['num_classes']
+            assert num_classes == self.num_classes
+
+            logger.info("Parameters for pre-training: pretrain_nranks ({}), "
+                        "emb_dim ({}), and num_classes ({}).".format(
+                            pretrain_nranks, emb_dim, num_classes))
+            logger.info("Parameters for inference or fine-tuning: "
+                        "nranks ({}).".format(self.num_trainers))
+
+            trainer_id_str = '%05d' % self.trainer_id
+
+            dist_weight_state_dict = rearrange_weight(
+                dist_weight_state_dict, pretrain_nranks, self.num_trainers)
+            dist_bias_state_dict = rearrange_weight(
+                dist_bias_state_dict, pretrain_nranks, self.num_trainers)
+            for name, value in dist_weight_state_dict.items():
+                if trainer_id_str in name:
+                    state_dict[name] = value
+            for name, value in dist_bias_state_dict.items():
+                if trainer_id_str in name:
+                    state_dict[name] = value
+
+            if for_train:
+                dist_weight_velocity_state_dict = rearrange_weight(
+                    dist_weight_velocity_state_dict, pretrain_nranks,
+                    self.num_trainers)
+                dist_bias_velocity_state_dict = rearrange_weight(
+                    dist_bias_velocity_state_dict, pretrain_nranks,
+                    self.num_trainers)
+                for name, value in dist_weight_velocity_state_dict.items():
+                    if trainer_id_str in name:
+                        state_dict[name] = value
+                for name, value in dist_bias_velocity_state_dict.items():
+                    if trainer_id_str in name:
+                        state_dict[name] = value
+        if for_train:
+            return {'state_dict': state_dict, 'extra_info': config}
+        else:
+            return {'state_dict': state_dict}
 
     def convert_for_prediction(self):
         model_name = self.model_name
@@ -669,21 +783,20 @@ class Entry(object):
             model = resnet.__dict__[model_name](emb_dim=self.emb_dim)
         main_program = self.predict_program
         startup_program = self.startup_program
-        with fluid.program_guard(main_program, startup_program):
-            with fluid.unique_name.guard():
+        with paddle.static.program_guard(main_program, startup_program):
+            with paddle.utils.unique_name.guard():
                 input_field = InputField(self.input_info)
                 input_field.build()
 
                 emb = model.build_network(input=input_field, is_train=False)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
-        place = fluid.CUDAPlace(gpu_id)
-        exe = fluid.Executor(place)
+        place = paddle.CUDAPlace(gpu_id)
+        exe = paddle.static.Executor(place)
         exe.run(startup_program)
 
         assert self.checkpoint_dir, "No checkpoint found for converting."
-        self.load_checkpoint(
-            executor=exe, main_program=main_program, load_for_train=False)
+        self.load(program=main_program, for_train=False)
 
         assert self.model_save_dir, \
             "Does not set model_save_dir for inference model converting."
@@ -695,64 +808,13 @@ class Entry(object):
         for name in input_field.feed_list_str:
             if name == "label": continue
             feed_var_names.append(name)
-        fluid.io.save_inference_model(
+        paddle.static.save_inference_model(
             self.model_save_dir,
-            feeded_var_names=feed_var_names,
-            target_vars=[emb],
-            executor=exe,
-            main_program=main_program)
+            feed_var_names, [emb],
+            exe,
+            program=main_program)
         if self.fs_name:
             self.put_files_to_hdfs(self.model_save_dir)
-
-    def _set_info(self, key, value):
-        if not hasattr(self, '_info'):
-            self._info = {}
-        self._info[key] = value
-
-    def _get_info(self, key):
-        if hasattr(self, '_info') and key in self._info:
-            return self._info[key]
-        return None
-
-    def predict(self):
-        model_name = self.model_name
-        # model definition
-        model = self.model
-        if model is None:
-            model = resnet.__dict__[model_name](emb_dim=self.emb_dim)
-        main_program = self.predict_program
-        startup_program = self.startup_program
-        with fluid.program_guard(main_program, startup_program):
-            with fluid.unique_name.guard():
-                input_field = InputField(self.input_holder)
-                input_field.build()
-
-                emb = model.build_network(input=input_field, is_train=False)
-
-        gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
-        place = paddle.CUDAPlace(gpu_id)
-        exe = paddle.static.Executor(place)
-        exe.run(startup_program)
-
-        assert self.checkpoint_dir, "No checkpoint found for predicting."
-        self.load_checkpoint(
-            executor=exe, main_program=main_program, load_for_train=False)
-
-        if self.predict_reader is None:
-            predict_reader = reader.arc_train(self.dataset_dir,
-                                              self.num_classes)
-        else:
-            predict_reader = self.predict_reader
-
-        input_field.loader.set_sample_generator(
-            predict_reader, batch_size=self.train_batch_size, places=place)
-
-        fetch_list = [emb.name]
-        for data in input_field.loader:
-            emb = exe.run(main_program,
-                          feed=data,
-                          fetch_list=fetch_list,
-                          use_program_cache=True)
 
     def _run_test(self, exe, test_list, test_name_list, feeder, fetch_list):
         trainer_id = self.trainer_id
@@ -760,6 +822,8 @@ class Entry(object):
         for i in range(len(test_list)):
             data_list, issame_list = test_list[i]
             embeddings_list = []
+            # data_list[0] for normalize
+            # data_list[1] for flip_left_right
             for j in range(len(data_list)):
                 data = data_list[j]
                 embeddings = None
@@ -821,11 +885,12 @@ class Entry(object):
                 embeddings, issame_list, nrof_folds=10)
             acc, std = np.mean(accuracy), np.std(accuracy)
 
-            if self.train_pass_id >= 0:
-                logger.info('[{}][{}]XNorm: {:.5f}'.format(test_name_list[
-                    i], self.train_pass_id, xnorm))
-                logger.info('[{}][{}]Accuracy-Flip: {:.5f}+-{:.5f}'.format(
-                    test_name_list[i], self.train_pass_id, acc, std))
+            if self.cur_epoch >= 0:
+                logger.info('[{}][{}][{}]XNorm: {:.5f}'.format(test_name_list[
+                    i], self.cur_epoch, self.cur_steps, xnorm))
+                logger.info('[{}][{}][{}]Accuracy-Flip: {:.5f}+-{:.5f}'.format(
+                    test_name_list[
+                        i], self.cur_epoch, self.cur_steps, acc, std))
             else:
                 logger.info('[{}]XNorm: {:.5f}'.format(test_name_list[i],
                                                        xnorm))
@@ -857,10 +922,11 @@ class Entry(object):
                 worker_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS")
                 current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT")
 
-                config = dist_transpiler.DistributeTranspilerConfig()
+                #TODO how to transpile
+                config = paddle.fluid.transpiler.DistributeTranspilerConfig()
                 config.mode = "collective"
                 config.collective_mode = "grad_allreduce"
-                t = dist_transpiler.DistributeTranspiler(config=config)
+                t = paddle.fluid.transpiler.DistributeTranspiler(config=config)
                 t.transpile(
                     trainer_id=trainer_id,
                     trainers=worker_endpoints,
@@ -876,7 +942,7 @@ class Entry(object):
         if not self.has_run_train:
             exe.run(self.startup_program)
 
-        if not self.test_reader:
+        if not self.test_dataset:
             test_reader = reader.test
         else:
             test_reader = self.test_reader
@@ -898,7 +964,8 @@ class Entry(object):
             self.load_checkpoint(
                 executor=exe, main_program=test_program, load_for_train=False)
 
-        feeder = fluid.DataFeeder(
+        #TODO paddle.fluid.DataFeeder
+        feeder = paddle.fluid.DataFeeder(
             place=place,
             feed_list=self.input_field.feed_list_str,
             program=test_program)
@@ -918,32 +985,44 @@ class Entry(object):
         trainer_id = self.trainer_id
         num_trainers = self.num_trainers
 
+        gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
+        place = paddle.CUDAPlace(gpu_id)
+
         strategy = None
         if num_trainers > 1:
-            fleet.init(is_collective=True)
             strategy = fleet.DistributedStrategy()
-            strategy.mode = "collective"
-            strategy.collective_mode = "grad_allreduce"
+            strategy.without_graph_optimization = True
+            fleet.init(is_collective=True, strategy=strategy)
 
-        emb, loss, acc1, acc5, optimizer = self.build_program(
-            True, False, dist_strategy=strategy)
+        emb, loss, acc1, acc5, optimizer = self.build_program(True, False)
+
+        # define dataset
+        if self.train_dataset is None:
+            train_dataset = reader.TrainDataset(
+                self.dataset_dir,
+                self.num_classes,
+                color_jitter=False,
+                rotate=False,
+                rand_mirror=True,
+                normalize=True)
+        else:
+            train_dataset = self.train_dataset
+
+        dataloader = paddle.io.DataLoader(
+            train_dataset,
+            feed_list=self.input_field.feed_list,
+            places=place,
+            return_list=False,
+            batch_size=self.train_batch_size,
+            shuffle=True,
+            drop_last=True,
+            num_workers=4)
 
         global_lr = optimizer._global_learning_rate(program=self.train_program)
 
         origin_prog = self.train_program
         train_prog = self.train_program
 
-        if self.use_quant:
-            qpp = QuantizeProgramPass(
-                activation_quantize_type='abs_max',
-                weight_quantize_type='abs_max',
-                quantizable_op_type=[
-                    'conv2d', 'depthwise_conv2d', 'mul', 'pool2d'
-                ])
-            qpp.apply(train_prog, self.startup_program)
-
-        gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
-        place = paddle.CUDAPlace(gpu_id)
         exe = paddle.static.Executor(place)
         exe.run(self.startup_program)
 
@@ -951,16 +1030,17 @@ class Entry(object):
             load_checkpoint = True
         else:
             load_checkpoint = False
+
+        start_epoch = 0
+        self.cur_steps = 0
         if load_checkpoint:
-            self.load_checkpoint(executor=exe, main_program=origin_prog)
-
-        if self.train_reader is None:
-            train_reader = reader.arc_train(self.dataset_dir, self.num_classes)
-        else:
-            train_reader = self.train_reader
-
-        self.input_field.loader.set_sample_generator(
-            train_reader, batch_size=self.train_batch_size, places=place)
+            checkpoint = self.load(program=origin_prog, for_train=True)
+            origin_prog.set_state_dict(checkpoint['state_dict'])
+            start_epoch = checkpoint['extra_info']['epoch'] + 1
+            lr_state = checkpoint['extra_info']['lr_state']
+            # there last_epoch means last_step in step style
+            self.cur_steps = lr_state['last_epoch']
+            self.lr_scheduler.set_state_dict(lr_state)
 
         if self.calc_train_acc:
             fetch_list = [loss.name, global_lr.name, acc1.name, acc5.name]
@@ -971,11 +1051,12 @@ class Entry(object):
         nsamples = 0
         inspect_steps = self.log_period
         global_batch_size = self.global_train_batch_size
-        for pass_id in range(self.train_epochs):
-            self.train_pass_id = pass_id
+        for epoch in range(start_epoch, self.train_epochs):
+            self.cur_epoch = epoch
             train_info = [[], [], [], []]
             local_train_info = [[], [], [], []]
-            for batch_id, data in enumerate(self.input_field.loader):
+            for batch_id, data in enumerate(dataloader):
+                self.cur_steps += 1
                 nsamples += global_batch_size
                 t1 = time.time()
                 acc1 = None
@@ -990,6 +1071,7 @@ class Entry(object):
                                        feed=data,
                                        fetch_list=fetch_list,
                                        use_program_cache=True)
+                self.lr_scheduler.step()
                 t2 = time.time()
                 period = t2 - t1
                 local_time += period
@@ -1004,60 +1086,28 @@ class Entry(object):
                     if self.calc_train_acc:
                         logger.info("Pass:{} batch:{} lr:{:.8f} loss:{:.6f} "
                                     "qps:{:.2f} acc1:{:.6f} acc5:{:.6f}".
-                                    format(pass_id, batch_id, avg_lr, avg_loss,
+                                    format(epoch, batch_id, avg_lr, avg_loss,
                                            speed, acc1[0], acc5[0]))
                     else:
                         logger.info(
                             "Pass:{} batch:{} lr:{:.8f} loss:{:.6f} "
-                            "qps:{:.2f}".format(pass_id, batch_id, avg_lr,
+                            "qps:{:.2f}".format(epoch, batch_id, avg_lr,
                                                 avg_loss, speed))
                     local_time = 0
                     nsamples = 0
                     local_train_info = [[], [], [], []]
 
+                if self.test_period > 0 and self.cur_steps % self.test_period == 0:
+                    if self.with_test:
+                        self.test()
+
             train_loss = np.array(train_info[0]).mean()
-            logger.info("End pass {}, train_loss {:.6f}".format(pass_id,
+            logger.info("End pass {}, train_loss {:.6f}".format(epoch,
                                                                 train_loss))
             sys.stdout.flush()
 
-            if self.with_test:
-                self.test()
-
             # save model
-            if self.model_save_dir:
-                model_save_dir = os.path.join(self.model_save_dir,
-                                              str(pass_id))
-                if not os.path.exists(model_save_dir):
-                    # may be more than one processes trying
-                    # to create the directory
-                    try:
-                        os.makedirs(model_save_dir)
-                    except OSError as exc:
-                        if exc.errno != errno.EEXIST:
-                            raise
-                        pass
-                if trainer_id == 0:
-                    fluid.io.save_persistables(exe, model_save_dir,
-                                               origin_prog)
-                else:
-
-                    def save_var(var):
-                        to_save = "dist@" in var.name and '@rank@' in var.name
-                        return to_save and var.persistable
-
-                    fluid.io.save_vars(
-                        exe, model_save_dir, origin_prog, predicate=save_var)
-
-            # save training info
-            if self.model_save_dir and trainer_id == 0:
-                config_file = os.path.join(self.model_save_dir,
-                                           str(pass_id), 'meta.json')
-                train_info = dict()
-                train_info["pretrain_nranks"] = self.num_trainers
-                train_info["emb_dim"] = self.emb_dim
-                train_info['num_classes'] = self.num_classes
-                with open(config_file, 'w') as f:
-                    json.dump(train_info, f)
+            self.save(origin_prog, epoch=epoch)
 
         # upload model
         if self.model_save_dir and self.fs_name and trainer_id == 0:

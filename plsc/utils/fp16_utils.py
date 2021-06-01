@@ -14,8 +14,8 @@
 
 from __future__ import print_function
 
-from paddle import core
-from paddle.fluid import layers
+from paddle.fluid import core
+from paddle.fluid.layer_helper import LayerHelper
 
 
 def _rename_arg(op, old_name, new_name):
@@ -350,10 +350,10 @@ def check_finite_and_unscale(x, scale, name=None):
         x(list|tuple): The input tensors of check_finite_and_unscale operator.
         scale: The scale of check_finite_and_unscale operator.
     """
-    check_type(x, 'x', (tuple, list), 'check_finite_and_unscale')
-    for e in x:
-        check_variable_and_dtype(e, "x", ['float16', 'float32', 'float64'],
-                                 'check_finite_and_unscale')
+    #check_type(x, 'x', (tuple, list), 'check_finite_and_unscale')
+    #for e in x:
+    #    check_variable_and_dtype(e, "x", ['float16', 'float32', 'float64'],
+    #                             'check_finite_and_unscale')
 
     helper = LayerHelper("check_finite_and_unscale", **locals())
     found_inf = helper.create_variable_for_type_inference(dtype='bool')
@@ -404,12 +404,12 @@ def update_loss_scaling(x,
                            loss scaling.
     """
 
-    check_variable_and_dtype(prev_loss_scaling, "prev_loss_scaling",
-                             ['float32', 'float64'], "update_loss_scaling")
-    check_type(x, 'x', (tuple, list), 'update_loss_scaling')
+    #check_variable_and_dtype(prev_loss_scaling, "prev_loss_scaling",
+    #                         ['float32', 'float64'], "update_loss_scaling")
+    #check_type(x, 'x', (tuple, list), 'update_loss_scaling')
     for e in x:
-        check_variable_and_dtype(e, "x", ['float16', 'float32', 'float64'],
-                                 'update_loss_scaling')
+        #check_variable_and_dtype(e, "x", ['float16', 'float32', 'float64'],
+        #                         'update_loss_scaling')
         if e.dtype == core.VarDesc.VarType.FP16:
             assert prev_loss_scaling.dtype == core.VarDesc.VarType.FP32, \
                 "The dtype of prev_loss_scaling should be float32 when the dtype of x is float16."

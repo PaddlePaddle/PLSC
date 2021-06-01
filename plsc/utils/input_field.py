@@ -17,7 +17,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import paddle.fluid as fluid
+import paddle
 
 
 class InputField(object):
@@ -74,7 +74,7 @@ class InputField(object):
 
         return self.input_slots[name]
 
-    def build(self, dataset, place, batch_size, num_workers=4):
+    def build(self):
 
         for _name, _shape, _dtype, _lod_level in zip(
                 self.names, self.shapes, self.dtypes, self.lod_levels):
@@ -83,11 +83,3 @@ class InputField(object):
 
         for name in self.feed_list_str:
             self.feed_list.append(self.input_slots[name])
-
-        self.loader = paddle.io.DataLoader(
-            dataset,
-            feed_list=self.feed_list,
-            places=place,
-            batch_size=batch_size,
-            num_workers=num_workers,
-            capacity=capacity)

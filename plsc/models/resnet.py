@@ -63,18 +63,14 @@ class ResNet(BaseModel):
             epsilon=2e-05,
             is_test=False if is_train else True)
         drop = paddle.nn.functional.dropout(
-            x=bn,
-            dropout_prob=0.4,
-            mode='upscale_in_train',
-            training=True if is_train else False)
+            x=bn, p=0.4, training=is_train, mode='upscale_in_train')
         fc = paddle.static.nn.fc(
-            input=drop,
+            x=drop,
             size=self.emb_dim,
-            param_attr=paddle.ParamAttr(
-                initializer=paddle.nn.initializer.Xavier(
-                    uniform=False, fan_in=0.0)),
+            weight_attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.XavierNormal(fan_in=0.0)),
             bias_attr=paddle.ParamAttr(
-                initializer=paddle.nn.initializer.ConstantInitializer()))
+                initializer=paddle.nn.initializer.Constant()))
         emb = paddle.static.nn.batch_norm(
             input=fc,
             act=None,
@@ -99,8 +95,7 @@ class ResNet(BaseModel):
             padding=pad,
             groups=groups,
             param_attr=paddle.ParamAttr(
-                initializer=paddle.nn.initializer.Xavier(
-                    uniform=False, fan_in=0.0)),
+                initializer=paddle.nn.initializer.XavierNormal(fan_in=0.0)),
             bias_attr=False)
         if act == 'prelu':
             bn = paddle.static.nn.batch_norm(
@@ -179,7 +174,7 @@ class ResNet(BaseModel):
                 is_train=is_train)
 
         short = self.shortcut(input, num_filters, stride, is_train=is_train)
-        return paddle.elementwise_add(x=short, y=conv2, act=None)
+        return paddle.add(short, conv2)
 
 
 def ResNet50(emb_dim=512):
