@@ -776,7 +776,7 @@ class Entry(object):
 
     def convert_for_prediction(self):
         model_name = self.model_name
-        image_shape = [int(m) for m in self.image_shape]
+        # image_shape = [int(m) for m in self.image_shape]
         # model definition
         model = self.model
         if model is None:
@@ -805,9 +805,9 @@ class Entry(object):
                         "we will overwrite it.".format(self.model_save_dir))
             shutil.rmtree(self.model_save_dir)
         feed_var_names = []
-        for name in input_field.feed_list_str:
+        for i, name in enumerate(input_field.feed_list_str):
             if name == "label": continue
-            feed_var_names.append(name)
+            feed_var_names.append(input_field.feed_list[i])
         paddle.static.save_inference_model(
             self.model_save_dir,
             feed_var_names, [emb],
