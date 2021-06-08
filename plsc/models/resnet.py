@@ -27,13 +27,15 @@ class ResNet(BaseModel):
 
     def build_network(self, input, is_train=True):
         layers = self.layers
-        supported_layers = [50, 101, 152]
+        supported_layers = [50, 100, 101, 152]
         assert layers in supported_layers, \
             "supported layers {}, but given {}".format(supported_layers, layers)
 
         depth = None
         if layers == 50:
             depth = [3, 4, 14, 3]
+        elif layers == 100:
+            depth = [3, 13, 30, 3]
         elif layers == 101:
             depth = [3, 4, 23, 3]
         elif layers == 152:
