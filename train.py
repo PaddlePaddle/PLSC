@@ -16,9 +16,13 @@ from plsc import Entry
 
 if __name__ == "__main__":
     ins = Entry()
-    ins.set_dataset_dir('/path/to/your/data/folder/')
-    ins.set_loss_type('dist_arcface')
+    #ins.set_dataset_dir('/path/to/your/data/folder/')
+    ins.set_step_boundaries((100000, 160000, 220000))
+    ins.set_loss_type('arcface')
+    ins.set_model_parallel(True)
+    ins.set_sample_ratio(0.1)
     #ins.set_mixed_precision(True)
+    #ins.set_train_steps(180000)
     ins.set_train_epochs(50)
     ins.set_test_period(2000)
     ins.set_calc_acc(True)

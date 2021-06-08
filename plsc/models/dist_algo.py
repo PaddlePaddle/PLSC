@@ -22,14 +22,14 @@ import paddle
 import paddle.nn as nn
 import paddle.utils.unique_name as unique_name
 from paddle.optimizer import Optimizer
+from paddle.distributed.fleet.utils.plsc_util import class_center_sample
 from ..utils.fp16_utils import rewrite_program, update_role_var_grad
 from ..utils.fp16_utils import update_loss_scaling, move_optimize_ops_back, check_finite_and_unscale
 from ..utils.fp16_lists import AutoMixedPrecisionLists
 from six.moves import reduce
 
 __all__ = [
-    'distributed_arcface_classify', 'distributed_softmax_classify',
-    'DistributedClassificationOptimizer'
+    'distributed_margin_softmax_classify', 'DistributedClassificationOptimizer'
 ]
 
 
@@ -43,7 +43,6 @@ class DistributedClassificationOptimizer(Optimizer):
                  optimizer,
                  batch_size,
                  use_fp16=False,
-                 loss_type='dist_arcface',
                  fp16_user_dict=None):
         super(DistributedClassificationOptimizer, self).__init__(
             learning_rate=optimizer._learning_rate)
@@ -52,9 +51,9 @@ class DistributedClassificationOptimizer(Optimizer):
         self._use_fp16 = use_fp16
 
         if self._use_fp16:
-            self.init_fp16_params(loss_type, fp16_user_dict)
+            self.init_fp16_params(fp16_user_dict)
 
-    def init_fp16_params(self, loss_type, fp16_user_dict):
+    def init_fp16_params(self, fp16_user_dict):
         # set default value for fp16_params_dict
         fp16_params_dict = dict()
         fp16_params_dict['init_loss_scaling'] = 1.0
@@ -81,7 +80,6 @@ class DistributedClassificationOptimizer(Optimizer):
         if self._amp_lists is None:
             self._amp_lists = AutoMixedPrecisionLists()
 
-        self._loss_type = loss_type
         self._init_loss_scaling = fp16_params_dict['init_loss_scaling']
         self._loss_scaling = paddle.static.create_global_var(
             name=paddle.utils.unique_name.generate("loss_scaling"),
@@ -159,12 +157,11 @@ class DistributedClassificationOptimizer(Optimizer):
 
         return self._params_grads
 
-    def insert_dist_arcface_backward_op(
+    def insert_dist_margin_softmax_backward_op(
             self, block, index, shard_logit, shard_prob, shard_label,
             shard_dim, op_role_key, backward_role, loss_backward_role):
         '''
         during mixed precision training(use_fp16=True), insert backward ops
-        when loss_type equals dist_arcface.
         '''
         shard_one_hot = block.create_var(
             name=paddle.utils.unique_name.generate('shard_one_hot'),
@@ -172,62 +169,23 @@ class DistributedClassificationOptimizer(Optimizer):
         # input var of elementwise_add_grad op after scale
         shard_logit_grad_fp32 = block.var(shard_logit.name + '@GRAD')
 
-        block._insert_op(
-            index - 2,
-            type='one_hot_v2',
-            inputs={'X': shard_label},
-            outputs={'Out': shard_one_hot},
-            attrs={
+        if isinstance(shard_dim, int):
+            inputs = {'X': shard_label}
+            attrs = {
                 'depth': shard_dim,
                 'allow_out_of_range': True,
                 op_role_key: backward_role
-            })
-        block._insert_op(
-            index - 1,
-            type='elementwise_sub',
-            inputs={'X': shard_prob,
-                    'Y': shard_one_hot},
-            outputs={'Out': shard_logit_grad_fp32},
-            attrs={op_role_key: backward_role})
-        block._insert_op(
-            index,
-            type='elementwise_mul',
-            inputs={'X': shard_logit_grad_fp32,
-                    'Y': self._loss_scaling},
-            outputs={'Out': shard_logit_grad_fp32},
-            attrs={op_role_key: backward_role})
-        block._insert_op(
-            index + 1,
-            type='scale',
-            inputs={'X': shard_logit_grad_fp32},
-            outputs={'Out': shard_logit_grad_fp32},
-            attrs={
-                'scale': 1.0 / self._batch_size,
-                op_role_key: loss_backward_role
-            })
-
-    def insert_dist_softmax_backward_op(
-            self, block, index, shard_logit, shard_prob, shard_label,
-            shard_dim, op_role_key, backward_role, loss_backward_role):
-        '''
-        during mixed precision training(use_fp16=True), insert backward ops
-        when loss_type equals dist_softmax.
-        '''
-        shard_one_hot = block.create_var(
-            name=paddle.utils.unique_name.generate('shard_one_hot'),
-            dtype=paddle.fluid.core.VarDesc.VarType.FP32)
-        shard_logit_grad_fp32 = block.var(shard_logit.name + "@GRAD")
-
+            }
+        else:
+            shard_dim.stop_gradient = True
+            inputs = {'X': shard_label, 'depth_tensor': shard_dim}
+            attrs = {'allow_out_of_range': True, op_role_key: backward_role}
         block._insert_op(
             index - 2,
             type='one_hot_v2',
-            inputs={'X': shard_label},
+            inputs=inputs,
             outputs={'Out': shard_one_hot},
-            attrs={
-                'depth': shard_dim,
-                'allow_out_of_range': True,
-                op_role_key: backward_role
-            })
+            attrs=attrs)
         block._insert_op(
             index - 1,
             type='elementwise_sub',
@@ -265,16 +223,24 @@ class DistributedClassificationOptimizer(Optimizer):
         shard_one_hot = block.create_var(
             name=paddle.utils.unique_name.generate('shard_one_hot'),
             dtype=dtype)
-        block._insert_op(
-            index - 1,
-            type='one_hot_v2',
-            inputs={'X': shard_label},
-            outputs={'Out': shard_one_hot},
-            attrs={
+
+        if isinstance(shard_dim, int):
+            inputs = {'X': shard_label}
+            attrs = {
                 'depth': shard_dim,
                 'allow_out_of_range': True,
                 op_role_key: backward_role
-            })
+            }
+        else:
+            shard_dim.stop_gradient = True
+            inputs = {'X': shard_label, 'depth_tensor': shard_dim}
+            attrs = {'allow_out_of_range': True, op_role_key: backward_role}
+        block._insert_op(
+            index - 1,
+            type='one_hot_v2',
+            inputs=inputs,
+            outputs={'Out': shard_one_hot},
+            attrs=attrs)
         shard_logit_grad = block.var(shard_logit.name + "@GRAD")
         block._insert_op(
             index,
@@ -348,42 +314,23 @@ class DistributedClassificationOptimizer(Optimizer):
                     index = i
                     break
 
-            if self._loss_type == 'dist_arcface':
-                assert block.ops[index - 2].type == 'reduce_sum'
-                assert block.ops[index - 1].type == 'elementwise_mul'
-                assert block.ops[index].type == 'fill_constant'
-                assert block.ops[index + 1].type == 'elementwise_mul_grad'
-                assert block.ops[index + 2].type == 'reduce_sum_grad'
-                assert block.ops[index + 3].type == 'scale'
-                assert block.ops[index + 4].type == 'elementwise_add_grad'
+            assert block.ops[index - 2].type == 'reduce_sum'
+            assert block.ops[index - 1].type == 'elementwise_mul'
+            assert block.ops[index].type == 'fill_constant'
+            assert block.ops[index + 1].type == 'elementwise_mul_grad'
+            assert block.ops[index + 2].type == 'reduce_sum_grad'
+            assert block.ops[index + 3].type == 'scale'
+            assert block.ops[index + 4].type == 'elementwise_add_grad'
 
-                block._remove_op(index + 2)
-                block._remove_op(index + 1)
-                block._remove_op(index)
-                block._remove_op(index - 1)
-                block._remove_op(index - 2)
+            block._remove_op(index + 2)
+            block._remove_op(index + 1)
+            block._remove_op(index)
+            block._remove_op(index - 1)
+            block._remove_op(index - 2)
 
-                self.insert_dist_arcface_backward_op(
-                    block, index, shard_logit, shard_prob, shard_label,
-                    shard_dim, op_role_key, backward_role, loss_backward_role)
-
-            elif self._loss_type == 'dist_softmax':
-                assert block.ops[index - 2].type == 'reduce_sum'
-                assert block.ops[index - 1].type == 'elementwise_mul'
-                assert block.ops[index].type == 'fill_constant'
-                assert block.ops[index + 1].type == 'elementwise_mul_grad'
-                assert block.ops[index + 2].type == 'reduce_sum_grad'
-                assert block.ops[index + 3].type == 'elementwise_add_grad'
-
-                block._remove_op(index + 2)
-                block._remove_op(index + 1)
-                block._remove_op(index)
-                block._remove_op(index - 1)
-                block._remove_op(index - 2)
-
-                self.insert_dist_softmax_backward_op(
-                    block, index, shard_logit, shard_prob, shard_label,
-                    shard_dim, op_role_key, backward_role, loss_backward_role)
+            self.insert_dist_margin_softmax_backward_op(
+                block, index, shard_logit, shard_prob, shard_label, shard_dim,
+                op_role_key, backward_role, loss_backward_role)
 
             optimize_ops = self._optimizer.apply_gradients(params_grads)
             ret = optimize_ops, params_grads
@@ -396,11 +343,12 @@ class DistributedClassifier(object):
     full-connected layer is distributed to all trainers
     """
 
-    def __init__(self, nclasses, nranks, rank_id, name):
+    def __init__(self, nclasses, nranks, rank_id, name, sample_ratio=1.0):
         self.nclasses = nclasses
         self.nranks = nranks
         self.rank_id = rank_id
         self.name = name
+        self.sample_ratio = sample_ratio
 
         self.shard_dim = (nclasses + nranks - 1) // nranks
         self.padding_dim = 0
@@ -452,7 +400,7 @@ class DistributedClassifier(object):
                 bias.name].is_distributed = True
         return weight, bias
 
-    def softmax_with_cross_entropy(self, shard_logit, shard_label):
+    def softmax_with_cross_entropy(self, shard_logit, shard_one_hot):
         shard_max = paddle.max(shard_logit, axis=1, keepdim=True)
         global_max = shard_max
         paddle.distributed.all_reduce(
@@ -469,8 +417,6 @@ class DistributedClassifier(object):
         shard_log_prob = shard_logit_new - global_log_demon
         shard_prob = paddle.exp(shard_log_prob)
 
-        shard_one_hot = paddle.nn.functional.one_hot(
-            shard_label, num_classes=self.shard_dim)
         target_log_prob = paddle.min(shard_log_prob * shard_one_hot,
                                      axis=1,
                                      keepdim=True)
@@ -480,60 +426,14 @@ class DistributedClassifier(object):
             shard_loss, nranks=self.nranks, use_calc_stream=True)
         return global_loss, shard_prob
 
-    def softmax_classify(self,
-                         x,
-                         label,
-                         param_attr=None,
-                         use_bias=True,
-                         bias_attr=None):
-        flatten_dim = reduce(lambda a, b: a * b, x.shape[1:], 1)
-        weight, bias = self.create_parameter(
-            dtype=x.dtype,
-            in_dim=flatten_dim,
-            param_attr=param_attr,
-            bias_attr=bias_attr,
-            use_bias=use_bias)
-
-        x_list = []
-        paddle.distributed.all_gather(x_list, x)
-        x_all = paddle.concat(x_list, axis=0)
-
-        label_list = []
-        paddle.distributed.all_gather(label_list, label)
-        label_all = paddle.concat(label_list, axis=0)
-        label_all.stop_gradient = True
-
-        shard_fc = paddle.matmul(x_all, weight)
-        if use_bias:
-            shard_fc = paddle.add(shard_fc, bias)
-
-        label_all = paddle.reshape(label_all, (-1, 1))
-        shard_label = paddle.shard_index(
-            label_all,
-            index_num=self.nclasses,
-            nshards=self.nranks,
-            shard_id=self.rank_id,
-            ignore_value=-1)
-        shard_label = paddle.reshape(shard_label, (-1, ))
-        shard_label.stop_gradient = True
-
-        global_loss, shard_prob = self.softmax_with_cross_entropy(shard_fc,
-                                                                  shard_label)
-        avg_loss = paddle.mean(global_loss)
-
-        avg_loss._set_info('shard_logit', shard_fc)
-        avg_loss._set_info('shard_prob', shard_prob)
-        avg_loss._set_info('shard_label', shard_label)
-        avg_loss._set_info('shard_dim', self.shard_dim)
-
-        return avg_loss
-
-    def arcface_classify(self,
-                         x,
-                         label,
-                         margin=0.5,
-                         logit_scale=64,
-                         param_attr=None):
+    def margin_softmax_classify(self,
+                                x,
+                                label,
+                                margin1=1.0,
+                                margin2=0.5,
+                                margin3=0.0,
+                                logit_scale=64,
+                                param_attr=None):
         '''
         reference: ArcFace. https://arxiv.org/abs/1801.07698
         '''
@@ -568,6 +468,19 @@ class DistributedClassifier(object):
         # TODO check necessary
         shard_label.stop_gradient = True
 
+        if self.sample_ratio < 1.0:
+            # partial fc sample process
+            shard_label, sampled_class_index = class_center_sample(
+                shard_label,
+                self.shard_dim,
+                ratio=self.sample_ratio,
+                ignore_label=-1)
+            sampled_class_index.stop_gradient = True
+            weight = paddle.gather(weight, sampled_class_index, axis=1)
+            shard_dim = paddle.shape(sampled_class_index)
+        else:
+            shard_dim = self.shard_dim
+
         # normalize weight
         weight_l2 = paddle.sqrt(
             paddle.sum(paddle.square(weight), axis=0, keepdim=True))
@@ -576,10 +489,16 @@ class DistributedClassifier(object):
         shard_cos = paddle.matmul(norm_x_all, norm_weight)
 
         theta = paddle.acos(shard_cos)
-        margin_cos = paddle.cos(theta + margin)
+        if margin1 != 1.0:
+            theta = margin1 * theta
+        if margin2 != 0.0:
+            theta = theta + margin2
+        margin_cos = paddle.cos(theta)
+        if margin3 != 0.0:
+            margin_cos = margin_cos - margin3
 
         shard_one_hot = paddle.nn.functional.one_hot(
-            shard_label, num_classes=self.shard_dim)
+            shard_label, num_classes=shard_dim)
         # TODO check necessary
         shard_one_hot.stop_gradient = True
 
@@ -588,84 +507,30 @@ class DistributedClassifier(object):
         shard_target_cos = paddle.add(shard_cos, diff)
         shard_logit = paddle.scale(shard_target_cos, scale=logit_scale)
 
-        global_loss, shard_prob = self.softmax_with_cross_entropy(shard_logit,
-                                                                  shard_label)
+        global_loss, shard_prob = self.softmax_with_cross_entropy(
+            shard_logit, shard_one_hot)
         avg_loss = paddle.mean(global_loss)
 
         avg_loss._set_info('shard_logit', shard_logit)
         avg_loss._set_info('shard_prob', shard_prob)
         avg_loss._set_info('shard_label', shard_label)
-        avg_loss._set_info('shard_dim', self.shard_dim)
+        avg_loss._set_info('shard_dim', shard_dim)
 
         return avg_loss
 
 
-def distributed_softmax_classify(x,
-                                 label,
-                                 class_num,
-                                 nranks,
-                                 rank_id,
-                                 param_attr=None,
-                                 use_bias=True,
-                                 bias_attr=None,
-                                 name=None):
-    """
-    Classification layer with FC, softmax and cross entropy calculation of
-    distibuted version in case of too large number of classes.
-
-    Args:
-        x (Variable): The feature representation of the input samples. This
-            feature will be flattened into 2-D tensor from dimension index
-            1. E.g. [32, 1024, 1, 1] will be flattened to [32, 1024].
-        label (Variable): The label corresponding to the input samples.
-        class_num (integer): The number of classes of the classification problem.
-        nranks (integer): The number of ranks of distributed trainers.
-        rank_id (integer): The rank index of the current trainer.
-        param_attr (ParamAttr, default None): The parameter attribute for
-            learnable distributed parameters/weights of this layer.
-        use_bias (float, default 64.0): The scale factor for logit value
-            of cosine range.
-        name (str, default None): The name of this layer.
-    Returns:
-        Variable: The ArcFace loss.
-
-
-    Examples:
-      .. code-block:: python
-
-        #TODO modify example
-        import paddle.fluid as fluid
-        input = fluid.layers.data(name="input",
-                                  shape=[32, 1024],
-                                  dtype='float32',
-                                  append_batch_size=False)
-        label = fluid.layers.data(name="label",
-                                  shape=[32, 1],
-                                  dtype='int64',
-                                  append_batch_size=False)
-        y = fluid.layers.collective.distributed_softmax_classify(x=input,
-                                                            label=label,
-                                                            class_num=1000,
-                                                            nranks=8,
-                                                            rank_id=0)
-    """
-
-    if name is None:
-        name = 'dist@softmax@rank@%05d' % rank_id
-    classifier = DistributedClassifier(class_num, nranks, rank_id, name)
-    return classifier.softmax_classify(x, label, param_attr, use_bias,
-                                       bias_attr)
-
-
-def distributed_arcface_classify(x,
-                                 label,
-                                 class_num,
-                                 nranks,
-                                 rank_id,
-                                 margin=0.5,
-                                 logit_scale=64.0,
-                                 param_attr=None,
-                                 name=None):
+def distributed_margin_softmax_classify(x,
+                                        label,
+                                        class_num,
+                                        nranks,
+                                        rank_id,
+                                        margin1=1.0,
+                                        margin2=0.5,
+                                        margin3=0.0,
+                                        logit_scale=64.0,
+                                        param_attr=None,
+                                        sample_ratio=1.0,
+                                        name=None):
     """
     Classification layer with ArcFace loss of distibuted version in case of
     too large number of classes. the equation is
@@ -717,11 +582,14 @@ def distributed_arcface_classify(x,
                                                                  rank_id=0)
     """
     if name is None:
-        name = 'dist@arcface@rank@%05d' % rank_id
-    classifier = DistributedClassifier(class_num, nranks, rank_id, name)
-    return classifier.arcface_classify(
+        name = 'dist@margin_softmax@rank@%05d' % rank_id
+    classifier = DistributedClassifier(class_num, nranks, rank_id, name,
+                                       sample_ratio)
+    return classifier.margin_softmax_classify(
         x=x,
         label=label,
-        margin=margin,
+        margin1=margin1,
+        margin2=margin2,
+        margin3=margin3,
         logit_scale=logit_scale,
         param_attr=param_attr)
