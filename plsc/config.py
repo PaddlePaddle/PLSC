@@ -13,8 +13,6 @@
 # limitations under the License.
 
 from easydict import EasyDict as edict
-
-
 """
 Default Parameters
 """
@@ -27,17 +25,22 @@ config.val_targets = 'lfw'
 config.dataset_dir = './train_data'
 config.train_image_num = 5822653
 config.model_name = 'ResNet50'
-config.train_epochs = 120
+config.train_epochs = None
+config.train_steps = 180000
 config.checkpoint_dir = ""
 config.with_test = True
 config.model_save_dir = "output"
 config.warmup_epochs = 0
+config.model_parallel = False
 
-config.loss_type = "dist_arcface"
+config.loss_type = "arcface"
 config.num_classes = 85742
+config.sample_ratio = 1.0
 config.image_shape = (3, 112, 112)
-config.margin = 0.5
+config.margin1 = 1.0
+config.margin2 = 0.5
+config.margin3 = 0.0
 config.scale = 64.0
 config.lr = 0.1
-config.lr_steps = (100000, 160000, 220000)
+config.lr_steps = (100000, 160000, 180000)
 config.emb_dim = 512
