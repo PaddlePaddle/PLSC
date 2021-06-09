@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python3 -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 train.py
+python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 train.py
