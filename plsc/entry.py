@@ -162,6 +162,13 @@ class Entry(object):
         logger.info('default test period: {}'.format(self.test_period))
         logger.info('=' * 30)
 
+    def set_model_name(self, model_name):
+        """
+        Set model name, eg. "ResNet50", "ResNet101"
+        """
+        self.model_name = model_name
+        logger.info("Set model_name to {}.".format(model_name))
+
     def set_use_quant(self, quant):
         """
         Whether to use quantization
@@ -203,8 +210,9 @@ class Entry(object):
     def set_train_batch_size(self, batch_size):
         self.train_batch_size = batch_size
         self.global_train_batch_size = batch_size * self.num_trainers
-        logger.info("Set train batch size per trainer to {}.".format(
-            batch_size))
+        logger.info("Set train batch size per trainer to {}, global "
+                    "train batch size to {}.".format(
+                        batch_size, self.global_train_batch_size))
 
     def set_log_period(self, period):
         self.log_period = period
@@ -219,8 +227,8 @@ class Entry(object):
         logger.info("Set lr decay factor to {}.".format(factor))
 
     def set_step_boundaries(self, boundaries):
-        if not isinstance(boundaries, list):
-            raise ValueError("The parameter must be of type list.")
+        if not isinstance(boundaries, (tuple, list)):
+            raise ValueError("The parameter must be of type tuple or list.")
         self.lr_steps = boundaries
         logger.info("Set step boundaries to {}.".format(boundaries))
 

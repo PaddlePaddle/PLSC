@@ -16,7 +16,7 @@ import math
 
 import paddle
 from paddle.utils import unique_name
-from paddle.distributed.fleet.utils.plsc_util import class_center_sample
+from paddle.distributed.fleet.utils import class_center_sample
 
 from . import dist_algo
 
