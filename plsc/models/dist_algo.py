@@ -22,7 +22,7 @@ import paddle
 import paddle.nn as nn
 import paddle.utils.unique_name as unique_name
 from paddle.optimizer import Optimizer
-from paddle.distributed.fleet.utils.plsc_util import class_center_sample
+from paddle.distributed.fleet.utils import class_center_sample
 from ..utils.fp16_utils import rewrite_program, update_role_var_grad
 from ..utils.fp16_utils import update_loss_scaling, move_optimize_ops_back, check_finite_and_unscale
 from ..utils.fp16_lists import AutoMixedPrecisionLists

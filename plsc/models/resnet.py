@@ -16,7 +16,7 @@ import paddle
 
 from .base_model import BaseModel
 
-__all__ = ["ResNet", "ResNet50", "ResNet101", "ResNet152"]
+__all__ = ["ResNet", "ResNet50", "ResNet100", "ResNet101", "ResNet152"]
 
 
 class ResNet(BaseModel):
@@ -181,6 +181,11 @@ class ResNet(BaseModel):
 
 def ResNet50(emb_dim=512):
     model = ResNet(layers=50, emb_dim=emb_dim)
+    return model
+
+
+def ResNet100(emb_dim=512):
+    model = ResNet(layers=100, emb_dim=emb_dim)
     return model
 
 
