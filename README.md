@@ -1,55 +1,203 @@
-# PLSC: 飞桨大规模分类库
+# Arcface-Paddle
 
-## 简介
-深度学习中用于解决多分类问题的深度神经网络的最后一层通常是全连接层和Softmax的组合层，并采用交叉熵(Cross-Entropy)算法计算神经网络的损失函数。由于全连接层的参数量随着分类类别数的增长线性增长，当分类类别数相当大时，神经网络的训练会面临下面两个主要挑战：
+## 1. Introduction
 
-1. 参数量过大，超出单个GPU卡的显存容量：假设分类网络最后一层隐层的输出维度为512，那么当分类类别数为一百万时，最后一层全连接层参数的大小约为2GB（假设以32比特浮点数表示参数）。当分类问题的类别数为一亿时（例如，对自然界中的生物进行分类），则最后一层全连接层参数的大小接近200GB，远远超过当前GPU的显存容量。
+`Arcface-Paddle` is an open source deep face detection and recognition toolkit, powered by PaddlePaddle. `Arcface-Paddle` provides three related pretrained models now, include `BlazeFace` for face detection, `ArcFace` and `MobileFace` for face recognition.
 
-2. 参数量较大，同步训练方式下通信开销较大：数据并行训练方式下，所有GPU卡之间需要同步参数的梯度信息，以完成参数值的同步更新。当参数数量较大时，参数的梯度信息数据量同样较大，从而导致参数梯度信息的通信开销较大，影响训练速度。
+- This tutorial is mainly about face recognition.
+- For face detection task, please refer to: [Face detection tuturial](../../detection/blazeface_paddle/README_en.md).
 
-考虑到全接连层的线性可分性，可以将全连接层参数切分到多张GPU卡，减少每张GPU卡的参数存储量。
+## 2. Environment preparation
 
-以下图为例，全连接层参数按行切分到不同的GPU卡上。每次训练迭代过程中，各张GPU卡分别以各自的训练数据计算隐层的输出特征，并通过集合通信操作AllGather得到汇聚后的特征。接着，各张GPU卡以汇聚后的特征和部分全连接层参数计算部分logit值(partial logit)，并基于此计算神经网络的损失值。
+Please refer to [Installation](./install_en.md) to setup environment at first.
 
-![overview](./images/plsc_overview.png)
 
-飞桨大规模分类(PLSC: **P**addlePaddle **L**arge **S**cale **C**lassification)库是基于[飞桨平台](https://github.com/PaddlePaddle/Paddle)构建的超大规模分类库，为用户提供从训练到部署的大规模分类问题全流程解决方案。
+## 3. Data preparation
 
-## PLSC特性
-* 支持超大规模分类：单机8张V100 GPU配置下支持的最大类别数扩大2.52倍，支持的类别数随GPU卡数的增加而增加；
-* 训练速度快：单机8张V100 GPU配置下，基于ResNet50模型的百万类别分类训练速度2,122.56 images/s, 并支持多机分布式训练和混合精度训练;
-* 支持训练卡数的调整：加载模型参数的热启动训练可以使用和预训练不同的GPU卡数，并自动进行参数转换；
-* base64格式图像数据预处理：提供base64格式图像数据的预处理，包括数据的全局shuffle，数据自动切分；
-* 支持自定义模型：PLSC内建ResNet50、ResNet101和ResNet152模型，并支持用户自定义模型；
-* 支持模型参数在HDFS文件系统的自动上传和下载；
-* 全流程解决方案：提供从训练到部署的大规模分类问题全流程解决方案。
+### 3.1 Enter recognition dir.
 
-## 快速开始
-请参考[快速开始](docs/source/md/quick_start.md)获取安装指南和快速使用示例。
+```
+cd /path/to/arcface_paddle/
+```
 
-## 预测部署
-请参考[预测部署指南](docs/source/md/serving.md)获取预测部署使用指南。
+### 3.2 Download
 
-## 高阶功能
-请参考[进阶指南](docs/source/md/advanced.md)获取更多高阶功能的使用指南，如HDFS文件系统的自动上传和下载等。
+Download the dataset from [https://github.com/deepinsight/insightface/tree/master/recognition/_datasets_](https://github.com/deepinsight/insightface/tree/master/recognition/_datasets_).
 
-## API参考
-请参考[API参考](docs/source/md/api_reference.md)获取API使用信息。
+### 3.3 Extract MXNet Dataset to images
 
-## 预训练模型和性能
-### 预训练模型
+```shell
+python tools/mx_recordio_2_images.py --root_dir ms1m-retinaface-t1/ --output_dir MS1M_v3/
+```
 
-我们提供了下面的预训练模型，以帮助用户对下游任务进行fine-tuning。
+After finishing unzipping the dataset, the folder structure is as follows.
 
-| 模型             | 描述           |
-| :--------------- | :------------- |
-| [resnet50_distarcface_ms1m_arcface](https://plsc.bj.bcebos.com/pretrained_model/resnet50_distarcface_ms1mv2.tar.gz) | 该模型使用ResNet50网络训练，数据集为MS1M-ArcFace，训练阶段使用的loss_type为'dist_arcface'，预训练模型在lfw验证集上的验证精度为0.99817。 | 
+```
+arcface_paddle/MS1M_v3
+|_ images
+|  |_ 00000001.jpg
+|  |_ ...
+|  |_ 05179510.jpg
+|_ label.txt
+|_ agedb_30.bin
+|_ cfp_ff.bin
+|_ cfp_fp.bin
+|_ lfw.bin
+```
 
-### 训练精度
+Label file format is as follows.
 
-| 模型       | 训练集        | lfw     | agendb\_30 | cfp\_ff | cfp\_fp | MegaFace (Id/Ver) |
-| :--------- | :------------ | :------ | :------    | :------ | :------ | :--------------   |
-| ResNet50   | MS1M-ArcFace  | 0.99817 | 0.99827    | 0.99857 | 0.96314 | 0.98000/0.99300   |
-| ResNet50   | CASIA         | 0.98950 | 0.90950    | 0.99057 | 0.91500 | N/A               |
+```
+# delimiter: "\t"
+# the following the content of label.txt
+images/00000001.jpg 0
+...
+```
 
-备注：上述模型训练使用的loss_type为'dist_arcface'。更多关于ArcFace的内容请参考[ArcFace: Additive Angular Margin Loss for Deep Face Recognition](https://arxiv.org/abs/1801.07698)
+If you want to use customed dataset, you can arrange your data according to the above format. 
+
+### 3.3 Transform between original image files and bin files
+
+If you want to convert original image files to `bin` files used directly for training process, you can use the following command to finish the conversion.
+
+```shell
+python tools/convert_image_bin.py --image_path="your/input/image/path" --bin_path="your/output/bin/path" --mode="image2bin"
+```
+
+If you want to convert `bin` files to original image files, you can use the following command to finish the conversion.
+
+```shell
+python tools/convert_image_bin.py --image_path="your/input/bin/path" --bin_path="your/output/image/path" --mode="bin2image"
+```
+
+## 4. How to Training
+
+### 4.1 Single node, 8 GPUs:
+
+#### Static Mode
+
+```bash
+sh scripts/train_static.sh
+```
+
+#### Dynamic Mode
+
+```bash
+sh scripts/train_dynamic.sh
+```
+
+
+During training, you can view loss changes in real time through `VisualDL`,  For more information, please refer to [VisualDL](https://github.com/PaddlePaddle/VisualDL/).
+
+
+## 5. Model evaluation
+
+The model evaluation process can be started as follows.
+
+#### Static Mode
+
+```bash
+sh scripts/validation_static.sh
+```
+
+#### Dynamic Mode
+
+```bash
+sh scripts/validation_dynamic.sh
+```
+
+## 6. Export model
+PaddlePaddle supports inference using prediction engines. Firstly, you should export inference model.
+
+#### Static Mode
+
+```bash
+sh scripts/export_static.sh
+```
+
+#### Dynamic Mode
+
+```bash
+sh scripts/export_dynamic.sh
+```
+
+We also support export to onnx model, you only need to set `--export_type onnx`.
+
+## 7. Model inference
+
+The model inference process supports paddle save inference model and onnx model.
+
+```bash
+sh scripts/inference.sh
+```
+
+## 8. Model performance
+
+### 8.1 Performance on IJB-C and Verification Datasets
+
+**Configuration：**
+  * GPU: 8 NVIDIA Tesla V100 32G
+  * Precison: AMP
+  * BatchSize: 128/1024
+
+| Mode    | Datasets | backbone | Ratio | IJBC(1e-05) | IJBC(1e-04) | agedb30 | cfp_fp | lfw  | log  |
+| ------- | :------: | :------- | ----- | :---------- | :---------- | :------ | :----- | :--- | :--- |
+| Static  |  MS1MV3  | r50      | 0.1   |             |             |         |        |      |      |
+| Static  |  MS1MV3  | r50      | 1.0   |             |             |         |        |      |      |
+| Dynamic |  MS1MV3  | r50      | 0.1   |             |             |         |        |      |      |
+| Dynamic |  MS1MV3  | r50      | 1.0   |             |             |         |        |      |      |
+
+  
+### 8.2 Maximum Number of Identities 
+
+**Configuration：**
+  * GPU: 8 NVIDIA Tesla V100 32G
+  * Precison: AMP
+  * BatchSize: 64/512
+  * SampleRatio: 0.1
+
+| Mode                      | Res50                        | Res100                       |
+| ------------------------- | ---------------------------- | ---------------------------- |
+| Oneflow                   |                              |                              |
+| PyTorch                   |                              |                              |
+| Paddle (static)           |                              |                              |
+| Paddle (dynamic)          |                              |                              |
+
+
+## 9. Demo
+
+Combined with face detection model, we can complete the face recognition process.
+
+Firstly, use the following commands to download the index gallery, demo image and font file for visualization.
+
+
+```bash
+# Index library for the recognition process
+wget https://raw.githubusercontent.com/littletomatodonkey/insight-face-paddle/main/demo/friends/index.bin
+# Demo image
+wget https://raw.githubusercontent.com/littletomatodonkey/insight-face-paddle/main/demo/friends/query/friends2.jpg
+# Font file for visualization
+wget https://raw.githubusercontent.com/littletomatodonkey/insight-face-paddle/main/SourceHanSansCN-Medium.otf
+```
+
+The demo image is shown as follows.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/littletomatodonkey/insight-face-paddle/main/demo/friends/query/friends2.jpg"  width = "800" />
+</div>
+
+
+Use the following command to run the whole face recognition demo.
+
+```shell
+# detection + recogniotion process
+python tools/test_recognition.py --det --rec --index=index.bin --input=friends2.jpg --output="./output"
+```
+
+The final result is save in folder `output/`, which is shown as follows.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/littletomatodonkey/insight-face-paddle/main/demo/friends/output/friends2.jpg"  width = "800" />
+</div>
+
+For more details about parameter explanations, index gallery construction and whl package inference, please refer to [Whl package inference tutorial](https://github.com/littletomatodonkey/insight-face-paddle).

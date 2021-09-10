@@ -1,4 +1,0 @@
-services {
-  name: "FaceClassifyService"
-  workflows: "workflow10"
-}

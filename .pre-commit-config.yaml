@@ -23,7 +23,7 @@ repos:
     -   id: clang-format-with-version-check
         name: clang-format
         description: Format files with ClangFormat.
-        entry: bash ./tools/codestyle/clang_format.hook -i
+        entry: bash ./codestyle/clang_format.hook -i
         language: system
         files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto)$
 -   repo: local
@@ -31,7 +31,7 @@ repos:
     -   id: cpplint-cpp-source
         name: cpplint
         description: Check C++ code style using cpplint.py.
-        entry: bash ./tools/codestyle/cpplint_pre_commit.hook
+        entry: bash ./codestyle/cpplint_pre_commit.hook
         language: system
         files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx)$
 -   repo: local
@@ -39,14 +39,14 @@ repos:
     -   id: pylint-doc-string
         name: pylint
         description: Check python docstring style using docstring_checker.
-        entry: bash ./tools/codestyle/pylint_pre_commit.hook
+        entry: bash ./codestyle/pylint_pre_commit.hook
         language: system
         files: \.(py)$
 -   repo: local
     hooks:
     -   id: copyright_checker
         name: copyright_checker
-        entry: python ./tools/codestyle/copyright.hook
+        entry: python ./codestyle/copyright.hook
         language: system
         files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto|py|sh)$
         exclude: (?!.*third_party)^.*$ | (?!.*book)^.*$
