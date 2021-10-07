@@ -23,7 +23,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Conv2D, BatchNorm, Linear, Dropout, PReLU
 from paddle.nn import AdaptiveAvgPool2D, MaxPool2D, AvgPool2D
-from paddle.nn.initializer import Uniform
+from paddle.nn.initializer import XavierNormal, Constant
 
 import math
 
@@ -101,8 +101,7 @@ class BasicBlock(nn.Layer):
             act=None,
             name=name + "_branch2a",
             data_format=data_format)
-        self.prelu = PReLU(
-            num_parameters=num_filters, name=name + "_branch2a_prelu")
+        self.prelu = PReLU(num_parameters=1, name=name + "_branch2a_prelu")
         self.conv1 = ConvBNLayer(
             num_channels=num_filters,
             num_filters=num_filters,
@@ -140,6 +139,7 @@ class BasicBlock(nn.Layer):
 
 class FC(nn.Layer):
     def __init__(self,
+                 bn_channels,
                  num_channels,
                  num_classes,
                  fc_type,
@@ -149,24 +149,25 @@ class FC(nn.Layer):
         super(FC, self).__init__()
         self.p = dropout
         self.fc_type = fc_type
+        self.num_channels = num_channels
 
         bn_name = "bn_" + name
         if fc_type == "Z":
+            self._batch_norm_1 = BatchNorm(
+                bn_channels,
+                act=None,
+                epsilon=1e-05,
+                param_attr=ParamAttr(name=bn_name + "_1_scale"),
+                bias_attr=ParamAttr(bn_name + "_1_offset"),
+                moving_mean_name=bn_name + "_1_mean",
+                moving_variance_name=bn_name + "_1_variance",
+                data_layout=data_format)
             if self.p > 0:
                 self.dropout = Dropout(p=self.p, name=name + '_dropout')
 
         elif fc_type == "E":
-            if self.p > 0:
-                self.dropout = Dropout(p=self.p, name=name + '_dropout')
-            stdv = 1.0 / math.sqrt(num_channels * 1.0)
-            self.fc = Linear(
-                num_channels,
-                num_classes,
-                weight_attr=ParamAttr(
-                    initializer=Uniform(-stdv, stdv), name=name + ".w_0"),
-                bias_attr=ParamAttr(name=name + ".b_0"))
             self._batch_norm_1 = BatchNorm(
-                num_classes,
+                bn_channels,
                 act=None,
                 epsilon=1e-05,
                 param_attr=ParamAttr(name=bn_name + "_1_scale"),
@@ -174,45 +175,74 @@ class FC(nn.Layer):
                 moving_mean_name=bn_name + "_1_mean",
                 moving_variance_name=bn_name + "_1_variance",
                 data_layout=data_format)
-
-        elif fc_type == "FC":
-            stdv = 1.0 / math.sqrt(num_channels * 1.0)
+            if self.p > 0:
+                self.dropout = Dropout(p=self.p, name=name + '_dropout')
             self.fc = Linear(
                 num_channels,
                 num_classes,
                 weight_attr=ParamAttr(
-                    initializer=Uniform(-stdv, stdv), name=name + ".w_0"),
-                bias_attr=ParamAttr(name=name + ".b_0"))
-            self._batch_norm_1 = BatchNorm(
+                    initializer=XavierNormal(fan_in=0.0), name=name + ".w_0"),
+                bias_attr=ParamAttr(
+                    initializer=Constant(), name=name + ".b_0"))
+            self._batch_norm_2 = BatchNorm(
                 num_classes,
+                act=None,
+                epsilon=1e-05,
+                param_attr=ParamAttr(name=bn_name + "_2_scale"),
+                bias_attr=ParamAttr(bn_name + "_2_offset"),
+                moving_mean_name=bn_name + "_2_mean",
+                moving_variance_name=bn_name + "_2_variance",
+                data_layout=data_format)
+
+        elif fc_type == "FC":
+            self._batch_norm_1 = BatchNorm(
+                bn_channels,
                 act=None,
                 epsilon=1e-05,
                 param_attr=ParamAttr(name=bn_name + "_1_scale"),
                 bias_attr=ParamAttr(bn_name + "_1_offset"),
                 moving_mean_name=bn_name + "_1_mean",
                 moving_variance_name=bn_name + "_1_variance",
+                data_layout=data_format)
+            self.fc = Linear(
+                num_channels,
+                num_classes,
+                weight_attr=ParamAttr(
+                    initializer=XavierNormal(fan_in=0.0), name=name + ".w_0"),
+                bias_attr=ParamAttr(
+                    initializer=Constant(), name=name + ".b_0"))
+            self._batch_norm_2 = BatchNorm(
+                num_classes,
+                act=None,
+                epsilon=1e-05,
+                param_attr=ParamAttr(name=bn_name + "_2_scale"),
+                bias_attr=ParamAttr(bn_name + "_2_offset"),
+                moving_mean_name=bn_name + "_2_mean",
+                moving_variance_name=bn_name + "_2_variance",
                 data_layout=data_format)
 
     def forward(self, inputs):
         if self.fc_type == "Z":
+            y = self._batch_norm_1(inputs)
+            y = paddle.reshape(y, shape=[-1, self.num_channels])
             if self.p > 0:
-                fc1 = self.dropout(inputs)
-            else:
-                fc1 = inputs
+                y = self.dropout(y)
 
         elif self.fc_type == "E":
+            y = self._batch_norm_1(inputs)
+            y = paddle.reshape(y, shape=[-1, self.num_channels])
             if self.p > 0:
-                y = self.dropout(inputs)
-            else:
-                y = inputs
+                y = self.dropout(y)
             y = self.fc(y)
-            fc1 = self._batch_norm_1(y)
+            y = self._batch_norm_2(y)
 
         elif self.fc_type == "FC":
-            y = self.fc(inputs)
-            fc1 = self._batch_norm_1(y)
+            y = self._batch_norm_1(inputs)
+            y = paddle.reshape(y, shape=[-1, self.num_channels])
+            y = self.fc(y)
+            y = self._batch_norm_2(y)
 
-        return fc1
+        return y
 
 
 class FresResNet(nn.Layer):
@@ -253,9 +283,9 @@ class FresResNet(nn.Layer):
             act=None,
             name="conv1",
             data_format=self.data_format)
-        self.prelu = PReLU(num_parameters=64, name="prelu1")
+        self.prelu = PReLU(num_parameters=1, name="prelu1")
 
-        self.block_list = []
+        self.block_list = paddle.nn.LayerList()
         for block in range(len(units)):
             shortcut = True
             for i in range(units[block]):
@@ -273,22 +303,13 @@ class FresResNet(nn.Layer):
                 self.block_list.append(basic_block)
                 shortcut = False
 
-        self._batch_norm = BatchNorm(
-            num_filters[-1],
-            act=None,
-            epsilon=1e-05,
-            param_attr=ParamAttr(name="bn_scale"),
-            bias_attr=ParamAttr("bn_offset"),
-            moving_mean_name="bn_mean",
-            moving_variance_name="bn_variance",
-            data_layout=data_format)
-
         assert input_image_width % 16 == 0
         assert input_image_height % 16 == 0
         feat_w = input_image_width // 16
         feat_h = input_image_height // 16
         self.fc_channels = num_filters[-1] * feat_w * feat_h
-        self.fc = FC(self.fc_channels,
+        self.fc = FC(num_filters[-1],
+                     self.fc_channels,
                      num_features,
                      fc_type,
                      dropout,
@@ -302,8 +323,6 @@ class FresResNet(nn.Layer):
         y = self.prelu(y)
         for block in self.block_list:
             y = block(y)
-        y = self._batch_norm(y)
-        y = paddle.reshape(y, shape=[-1, self.fc_channels])
         y = self.fc(y)
         return y
 

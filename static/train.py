@@ -36,6 +36,7 @@ RELATED_FLAGS_SETTING = {
     'FLAGS_cudnn_exhaustive_search': 1,
     'FLAGS_cudnn_batchnorm_spatial_persistent': 1,
     'FLAGS_max_inplace_grad_add': 8,
+    'FLAGS_fraction_of_gpu_memory_to_use': 0.9999,
 }
 paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
 
@@ -189,9 +190,11 @@ def train(args):
             shuffle=True,
             drop_last=True))
 
+    max_loss_scaling = np.array([args.max_loss_scaling]).astype(np.float32)
     for epoch in range(start_epoch, total_epoch):
         for step, data in enumerate(train_loader):
             global_step += 1
+
             loss_v = exe.run(
                 train_program,
                 feed=data,

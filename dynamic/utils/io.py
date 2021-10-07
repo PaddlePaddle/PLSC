@@ -61,19 +61,21 @@ class Checkpoint(object):
         if self.rank == 0:
             # for non dist param, we only save their at rank 0.
             for name, param in backbone.state_dict().items():
-                paddle.save(param,
-                            os.path.join(model_save_dir, name + '.pdparam'))
+                paddle.save(
+                    param,
+                    os.path.join(model_save_dir, param.name + '.pdparam'))
 
         if classifier is not None:
             # for dist param, we need to save their at all ranks.
             for name, param in classifier.state_dict().items():
-                paddle.save(param,
-                            os.path.join(model_save_dir, name + '.pdparam'))
+                paddle.save(
+                    param,
+                    os.path.join(model_save_dir, param.name + '.pdparam'))
 
         if for_train:
             assert optimizer is not None
             opt_state_dict = optimizer.state_dict()
-            lr_state_dict = opt_state_dict.pop('LR_Scheduler')
+            lr_state_dict = opt_state_dict['LR_Scheduler']
             for name, opt in opt_state_dict.items():
                 if '@GRAD' in name:
                     continue
@@ -210,9 +212,18 @@ class Checkpoint(object):
                     if rank_str in name:
                         opt_state_dict[name] = value
 
+        def map_actual_param_name(state_dict, load_state_dict):
+            for name, param in state_dict.items():
+                state_dict[name] = load_state_dict[param.name]
+            return state_dict
+
         logging.info("Load checkpoint from '{}'. ".format(checkpoint_dir))
+        param_state_dict = map_actual_param_name(backbone.state_dict(),
+                                                 param_state_dict)
         backbone.set_state_dict(param_state_dict)
         if classifier is not None:
+            dist_param_state_dict = map_actual_param_name(
+                classifier.state_dict(), dist_param_state_dict)
             classifier.set_state_dict(dist_param_state_dict)
         if for_train:
             assert optimizer is not None

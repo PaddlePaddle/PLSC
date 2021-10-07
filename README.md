@@ -133,36 +133,45 @@ sh scripts/inference.sh
 
 ## 8. Model performance
 
-### 8.1 Performance on IJB-C and Verification Datasets
+### 8.1 Performance on Verification Datasets
 
 **Configuration：**
   * GPU: 8 NVIDIA Tesla V100 32G
-  * Precison: AMP
+  * Precison: Pure FP16
   * BatchSize: 128/1024
 
-| Mode    | Datasets | backbone | Ratio | IJBC(1e-05) | IJBC(1e-04) | agedb30 | cfp_fp | lfw  | log  |
-| ------- | :------: | :------- | ----- | :---------- | :---------- | :------ | :----- | :--- | :--- |
-| Static  |  MS1MV3  | r50      | 0.1   |             |             |         |        |      |      |
-| Static  |  MS1MV3  | r50      | 1.0   |             |             |         |        |      |      |
-| Dynamic |  MS1MV3  | r50      | 0.1   |             |             |         |        |      |      |
-| Dynamic |  MS1MV3  | r50      | 1.0   |             |             |         |        |      |      |
+| Mode    | Datasets | backbone | Ratio | agedb30 | cfp_fp | lfw  | log  |
+| ------- | :------: | :------- | ----- | :------ | :----- | :--- | :--- |
+| Static  |  MS1MV3  | r50      | 0.1   | 0.98317 | 0.98943| 0.99850 | [log](https://raw.githubusercontent.com/GuoxiaWang/plsc_log/master/static/ms1mv3_r50_static_128_fp16_0.1/training.log)     |
+| Static  |  MS1MV3  | r50      | 1.0   | 0.98283 | 0.98843| 0.99850 | [log](https://raw.githubusercontent.com/GuoxiaWang/plsc_log/master/static/ms1mv3_r50_static_128_fp16_1.0/training.log) |
+| Dynamic |  MS1MV3  | r50      | 0.1   | 0.98333 | 0.98900| 0.99833 | [log](https://raw.githubusercontent.com/GuoxiaWang/plsc_log/master/dynamic/ms1mv3_r50_dynamic_128_fp16_0.1/training.log) |
+| Dynamic |  MS1MV3  | r50      | 1.0   | 0.98317 | 0.98900| 0.99833 | [log](https://raw.githubusercontent.com/GuoxiaWang/plsc_log/master/dynamic/ms1mv3_r50_dynamic_128_fp16_1.0/training.log) |
 
   
 ### 8.2 Maximum Number of Identities 
 
 **Configuration：**
   * GPU: 8 NVIDIA Tesla V100 32G
-  * Precison: AMP
   * BatchSize: 64/512
   * SampleRatio: 0.1
 
-| Mode                      | Res50                        | Res100                       |
-| ------------------------- | ---------------------------- | ---------------------------- |
-| Oneflow                   |                              |                              |
-| PyTorch                   |                              |                              |
-| Paddle (static)           |                              |                              |
-| Paddle (dynamic)          |                              |                              |
+| Mode                      | Precison  | Res50                        | Res100                       |
+| ------------------------- | --------- | ---------------------------- | ---------------------------- |
+| Oneflow                   | AMP       | 42000000 (31792MiB/32510MiB) | 39000000 (31938MiB/32510MiB) |
+| PyTorch                   | AMP       | 30000000 (31702MiB/32510MiB) | 29000000 (32286MiB/32510MiB) |
+| Paddle (static)           | Pure FP16 | 60000000 (32018MiB/32510MiB) | 60000000 (32018MiB/32510MiB) |
+| Paddle (dynamic)          | Pure FP16 | 59000000 (31970MiB/32510MiB) | 59000000 (31970MiB/32510MiB) |
 
+**Note:** config environment variable ``export FLAGS_allocator_strategy=naive_best_fit``
+
+### 8.3 Throughtput
+
+**Configuration：**
+  * BatchSize: 128/1024
+  * SampleRatio: 0.1
+  * Datasets: MS1MV3
+  
+![insightface_throughtput](https://github.com/GuoxiaWang/plsc_log/blob/master/insightface_throughtput.png)
 
 ## 9. Demo
 
