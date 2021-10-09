@@ -6,20 +6,36 @@
 
 ## 2. Environment preparation
 
-Please refer to [Installation](./install.md) to setup environment at first.
+### 2.1 Install from source code
+
+```shell
+
+git clone https://github.com/PaddlePaddle/Paddle.git
+
+cd /path/to/Paddle/
+
+mkdir build && cd build
+
+cmake .. -DWITH_TESTING=ON -DWITH_GPU=ON -DWITH_GOLANG=OFF -DWITH_STYLE_CHECK=ON -DCMAKE_INSTALL_PREFIX=$PWD/output -DWITH_DISTRIBUTE=ON -DCMAKE_BUILD_TYPE=Release -DPY_VERSION=3.7 -DCUDA_ARCH_NAME=All -DPADDLE_VERSION=2.2.0
+
+make -j20 && make install -j20
+
+pip install output/opt/paddle/share/wheels/paddlepaddle_gpu-2.2.0-cp37-cp37m-linux_x86_64.whl
+
+```
+
+### Download PLSC
+
+```shell
+git clone https://github.com/PaddlePaddle/PLSC.git
+
+cd /path/to/PLSC/
+```
 
 
 ## 3. Data preparation
 
-### 3.1 Enter recognition dir.
-
-```
-cd /path/to/arcface_paddle/
-```
-
-### 3.2 Download
-
-Download the dataset from [https://github.com/deepinsight/insightface/tree/master/recognition/_datasets_](https://github.com/deepinsight/insightface/tree/master/recognition/_datasets_).
+Download the dataset from [insightface datasets](https://github.com/deepinsight/insightface/tree/master/recognition/_datasets_).
 
 ### 3.3 Extract MXNet Dataset to images
 
