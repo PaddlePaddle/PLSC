@@ -6,7 +6,7 @@
 
 ## 2. Environment preparation
 
-### 2.1 Install from source code
+### 2.1 Install Paddle from source code
 
 ```shell
 
