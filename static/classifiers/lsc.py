@@ -106,14 +106,9 @@ class LargeScaleClassifier(object):
             sampled_class_index.stop_gradient = True
             weight = paddle.gather(weight, sampled_class_index, axis=1)
 
-        if weight.dtype == paddle.float16:
-            weight = paddle.cast(weight, dtype='float32')
+        norm_feature = paddle.fluid.layers.l2_normalize(total_feature, axis=1)
+        norm_weight = paddle.fluid.layers.l2_normalize(weight, axis=0)
 
-        if total_feature.dtype == paddle.float16:
-            total_feature = paddle.cast(total_feature, dtype='float32')
-
-        norm_feature = paddle.nn.functional.normalize(total_feature, axis=1)
-        norm_weight = paddle.nn.functional.normalize(weight, axis=0)
         local_logit = paddle.matmul(norm_feature, norm_weight)
 
         loss = paddle.nn.functional.margin_cross_entropy(
@@ -123,6 +118,10 @@ class LargeScaleClassifier(object):
             margin2=self.margin2,
             margin3=self.margin3,
             scale=self.logit_scale,
-            return_softmax=False)
+            return_softmax=False,
+            reduction=None, )
+
+        loss.desc.set_dtype(paddle.fluid.core.VarDesc.VarType.FP32)
+        loss = paddle.mean(loss)
 
         self.output_dict['loss'] = loss

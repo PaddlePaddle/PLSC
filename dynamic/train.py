@@ -36,6 +36,7 @@ RELATED_FLAGS_SETTING = {
     'FLAGS_cudnn_exhaustive_search': 1,
     'FLAGS_cudnn_batchnorm_spatial_persistent': 1,
     'FLAGS_max_inplace_grad_add': 8,
+    'FLAGS_fraction_of_gpu_memory_to_use': 0.9999,
 }
 paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
 
@@ -51,7 +52,7 @@ def train(args):
 
     if world_size > 1:
         import paddle.distributed.fleet as fleet
-        from .utils.data_parallel import sync_gradients
+        from .utils.data_parallel import sync_gradients, sync_params
 
         strategy = fleet.DistributedStrategy()
         strategy.without_graph_optimization = True
@@ -134,7 +135,8 @@ def train(args):
         optimizer._dtype = 'float32'
 
     if world_size > 1:
-        optimizer = fleet.distributed_optimizer(optimizer)
+        # sync backbone params for data parallel
+        sync_params(backbone.parameters())
 
     if args.do_validation_while_train:
         callback_verification = CallBackVerification(
@@ -196,14 +198,15 @@ def train(args):
 
             with paddle.amp.auto_cast(enable=args.fp16):
                 features = backbone(img)
-            loss_v = classifier(features, label)
+                loss_v = classifier(features, label)
 
             scaler.scale(loss_v).backward()
             if world_size > 1:
                 # data parallel sync backbone gradients
                 sync_gradients(backbone.parameters())
 
-            scaler.step(optimizer, classifier)
+            scaler.step(optimizer)
+            classifier.step(optimizer)
             optimizer.clear_grad()
             classifier.clear_grad()
 

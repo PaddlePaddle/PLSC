@@ -119,6 +119,11 @@ def parse_args():
         default=cfg.init_loss_scaling,
         help='The initial loss scaling factor.')
     parser.add_argument(
+        '--max_loss_scaling',
+        type=float,
+        default=cfg.max_loss_scaling,
+        help='The maximum loss scaling factor.')
+    parser.add_argument(
         '--incr_every_n_steps',
         type=int,
         default=cfg.incr_every_n_steps,

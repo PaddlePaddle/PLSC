@@ -15,6 +15,7 @@
 from collections import defaultdict
 from paddle.amp import GradScaler
 from paddle import _C_ops
+import paddle
 
 
 class LSCGradScaler(GradScaler):
@@ -25,11 +26,13 @@ class LSCGradScaler(GradScaler):
                  decr_ratio=0.5,
                  incr_every_n_steps=1000,
                  decr_every_n_nan_or_inf=2,
-                 use_dynamic_loss_scaling=True):
+                 use_dynamic_loss_scaling=True,
+                 max_loss_scaling=32768.0):
         super(LSCGradScaler, self).__init__(
             enable, init_loss_scaling, incr_ratio, decr_ratio,
             incr_every_n_steps, decr_every_n_nan_or_inf,
             use_dynamic_loss_scaling)
+        self.max_loss_scaling = max_loss_scaling
 
     def step(self, optimizer, classifier=None):
         if not self._enable:
@@ -37,20 +40,11 @@ class LSCGradScaler(GradScaler):
                 classifier.step(optimizer)
             return optimizer.step()
 
-        #  unscale the grad
+#         if self._scale >= self.max_loss_scaling:
+#             self._scale = paddle.to_tensor([self.max_loss_scaling], dtype='float32')
+
+#  unscale the grad
         self._unscale(optimizer)
-
-        if not self._found_inf and classifier is not None and len(
-                classifier._parameter_list) > 0:
-            param_grads = [
-                param._grad_ivar() for param in classifier._parameter_list
-                if param._grad_ivar() is not None
-            ]
-
-            _C_ops.check_finite_and_unscale(param_grads, self._scale,
-                                            param_grads, self._found_inf)
-            if self._found_inf:
-                print('found_inf in classifier')
 
         if self._found_inf:
             self._cache_founf_inf = True
@@ -70,24 +64,40 @@ class LSCGradScaler(GradScaler):
             return
 
         param_grads_dict = defaultdict(list)
+        dist_param_grads_dict = defaultdict(list)
         if getattr(optimizer, '_param_groups', None) and isinstance(
                 optimizer._param_groups[0], dict):
             for group in optimizer._param_groups:
                 for param in group['params']:
+                    if not param.is_distributed:
+                        if param._grad_ivar() is not None:
+                            param_grads_dict[param._grad_ivar().dtype].append(
+                                param._grad_ivar())
+                    else:
+                        if param._grad_ivar() is not None:
+                            dist_param_grads_dict[param._grad_ivar(
+                            ).dtype].append(param._grad_ivar())
+        else:
+            for param in optimizer._parameter_list:
+                if not param.is_distributed:
                     if param._grad_ivar() is not None:
                         param_grads_dict[param._grad_ivar().dtype].append(
                             param._grad_ivar())
-        else:
-            for param in optimizer._parameter_list:
-                if param._grad_ivar() is not None:
-                    param_grads_dict[param._grad_ivar().dtype].append(
-                        param._grad_ivar())
+                else:
+                    if param._grad_ivar() is not None:
+                        dist_param_grads_dict[param._grad_ivar().dtype].append(
+                            param._grad_ivar())
+        for dtype in dist_param_grads_dict:
+            for grad in dist_param_grads_dict[dtype]:
+                self._found_inf = paddle.logical_not(
+                    paddle.all(paddle.isfinite(grad)))
+                if self._found_inf:
+                    return
 
         for dtype in param_grads_dict:
             param_grads = param_grads_dict[dtype]
             _C_ops.check_finite_and_unscale(param_grads, self._scale,
                                             param_grads, self._found_inf)
             if self._found_inf:
-                if self._found_inf:
-                    print('found_inf in backbone dtype', dtype)
+                print('Found inf or nan in backbone, dtype is', dtype)
                 break

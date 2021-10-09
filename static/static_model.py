@@ -23,7 +23,7 @@ from visualdl import LogWriter
 from utils.logging import AverageMeter, init_logging, CallBackLogging
 from utils import losses
 
-from .utils.optimization_pass import gather_optimization_pass
+from .utils.optimization_pass import gather_optimization_pass, amp_pass
 
 from . import classifiers
 from . import backbones
@@ -139,6 +139,8 @@ class StaticModel(object):
                     if self.sample_ratio < 1.0:
                         gather_optimization_pass(self.main_program,
                                                  'dist@fc@rank')
+                    if self.fp16:
+                        amp_pass(self.main_program, 'dist@fc@rank')
 
         elif self.mode == 'test':
             with paddle.static.program_guard(self.main_program,

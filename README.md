@@ -1,30 +1,45 @@
-# Arcface-Paddle
+# PLSC
 
 ## 1. Introduction
 
-`Arcface-Paddle` is an open source deep face detection and recognition toolkit, powered by PaddlePaddle. `Arcface-Paddle` provides three related pretrained models now, include `BlazeFace` for face detection, `ArcFace` and `MobileFace` for face recognition.
-
-- This tutorial is mainly about face recognition.
-- For face detection task, please refer to: [Face detection tuturial](../../detection/blazeface_paddle/README_en.md).
+**PLSC** is an open source Paddle Large Scale Classification Tools, which supports 60 million classes on 8 NVIDIA V100 (32G).
 
 ## 2. Environment preparation
 
-Please refer to [Installation](./install_en.md) to setup environment at first.
+### 2.1 Install Paddle from source code
+
+```shell
+
+git clone https://github.com/PaddlePaddle/Paddle.git
+
+cd /path/to/Paddle/
+
+mkdir build && cd build
+
+cmake .. -DWITH_TESTING=ON -DWITH_GPU=ON -DWITH_GOLANG=OFF -DWITH_STYLE_CHECK=ON -DCMAKE_INSTALL_PREFIX=$PWD/output -DWITH_DISTRIBUTE=ON -DCMAKE_BUILD_TYPE=Release -DPY_VERSION=3.7 -DCUDA_ARCH_NAME=All -DPADDLE_VERSION=2.2.0
+
+make -j20 && make install -j20
+
+pip install output/opt/paddle/share/wheels/paddlepaddle_gpu-2.2.0-cp37-cp37m-linux_x86_64.whl
+
+```
+
+### 2.2 Download PLSC
+
+```shell
+git clone https://github.com/PaddlePaddle/PLSC.git
+
+cd /path/to/PLSC/
+```
 
 
 ## 3. Data preparation
 
-### 3.1 Enter recognition dir.
+### 3.1 Download dataset
 
-```
-cd /path/to/arcface_paddle/
-```
+Download the dataset from [insightface datasets](https://github.com/deepinsight/insightface/tree/master/recognition/_datasets_).
 
-### 3.2 Download
-
-Download the dataset from [https://github.com/deepinsight/insightface/tree/master/recognition/_datasets_](https://github.com/deepinsight/insightface/tree/master/recognition/_datasets_).
-
-### 3.3 Extract MXNet Dataset to images
+### 3.2 Extract MXNet Dataset to images
 
 ```shell
 python tools/mx_recordio_2_images.py --root_dir ms1m-retinaface-t1/ --output_dir MS1M_v3/
@@ -133,71 +148,113 @@ sh scripts/inference.sh
 
 ## 8. Model performance
 
-### 8.1 Performance on IJB-C and Verification Datasets
+### 8.1 Accuracy on Verification Datasets
 
 **Configuration：**
   * GPU: 8 NVIDIA Tesla V100 32G
-  * Precison: AMP
+  * Precison: Pure FP16
   * BatchSize: 128/1024
 
-| Mode    | Datasets | backbone | Ratio | IJBC(1e-05) | IJBC(1e-04) | agedb30 | cfp_fp | lfw  | log  |
-| ------- | :------: | :------- | ----- | :---------- | :---------- | :------ | :----- | :--- | :--- |
-| Static  |  MS1MV3  | r50      | 0.1   |             |             |         |        |      |      |
-| Static  |  MS1MV3  | r50      | 1.0   |             |             |         |        |      |      |
-| Dynamic |  MS1MV3  | r50      | 0.1   |             |             |         |        |      |      |
-| Dynamic |  MS1MV3  | r50      | 1.0   |             |             |         |        |      |      |
+| Mode    | Datasets | backbone | Ratio | agedb30 | cfp_fp | lfw  | log  | checkpoint |
+| ------- | :------: | :------- | ----- | :------ | :----- | :--- | :--- |  :--- |
+| Static  |  MS1MV3  | r50      | 0.1   | 0.98317 | 0.98943| 0.99850 | [log](https://raw.githubusercontent.com/GuoxiaWang/plsc_log/master/static/ms1mv3_r50_static_128_fp16_0.1/training.log) | [checkpoint](https://paddle-model-ecology.bj.bcebos.com/model/insight-face/distributed/ms1mv3_r50_static_128_fp16_0.1_epoch_24.tgz) |
+| Static  |  MS1MV3  | r50      | 1.0   | 0.98283 | 0.98843| 0.99850 | [log](https://raw.githubusercontent.com/GuoxiaWang/plsc_log/master/static/ms1mv3_r50_static_128_fp16_1.0/training.log) | [checkpoint](https://paddle-model-ecology.bj.bcebos.com/model/insight-face/distributed/ms1mv3_r50_static_128_fp16_1.0_epoch_24.tgz) |
+| Dynamic |  MS1MV3  | r50      | 0.1   | 0.98333 | 0.98900| 0.99833 | [log](https://raw.githubusercontent.com/GuoxiaWang/plsc_log/master/dynamic/ms1mv3_r50_dynamic_128_fp16_0.1/training.log) | [checkpoint](https://paddle-model-ecology.bj.bcebos.com/model/insight-face/distributed/ms1mv3_r50_dynamic_128_fp16_0.1_eopch_24.tgz) |
+| Dynamic |  MS1MV3  | r50      | 1.0   | 0.98317 | 0.98900| 0.99833 | [log](https://raw.githubusercontent.com/GuoxiaWang/plsc_log/master/dynamic/ms1mv3_r50_dynamic_128_fp16_1.0/training.log) | [checkpoint](https://paddle-model-ecology.bj.bcebos.com/model/insight-face/distributed/ms1mv3_r50_dynamic_128_fp16_1.0_eopch_24.tgz) |
 
   
 ### 8.2 Maximum Number of Identities 
 
 **Configuration：**
   * GPU: 8 NVIDIA Tesla V100 32G
-  * Precison: AMP
   * BatchSize: 64/512
   * SampleRatio: 0.1
 
-| Mode                      | Res50                        | Res100                       |
-| ------------------------- | ---------------------------- | ---------------------------- |
-| Oneflow                   |                              |                              |
-| PyTorch                   |                              |                              |
-| Paddle (static)           |                              |                              |
-| Paddle (dynamic)          |                              |                              |
+| Mode                      | Precision  | Res50    | Res100   |
+| ------------------------- | --------- | -------- | -------- |
+| Framework1 (static)       | AMP       | 42000000 | 39000000 |
+| Framework2 (dynamic)      | AMP       | 30000000 | 29000000 |
+| Paddle (static)           | Pure FP16 | 60000000 | 60000000 |
+| Paddle (dynamic)          | Pure FP16 | 59000000 | 59000000 |
 
+**Note:** config environment variable ``export FLAGS_allocator_strategy=naive_best_fit``
+
+### 8.3 Throughtput
+
+**Configuration：**
+  * BatchSize: 128/1024
+  * SampleRatio: 0.1
+  * Datasets: MS1MV3
+  
+![insightface_throughtput](https://github.com/GuoxiaWang/plsc_log/blob/master/insightface_throughtput.png)
 
 ## 9. Demo
 
 Combined with face detection model, we can complete the face recognition process.
 
-Firstly, use the following commands to download the index gallery, demo image and font file for visualization.
-
+Firstly, use the fllowing commands to download the models.
 
 ```bash
-# Index library for the recognition process
-wget https://raw.githubusercontent.com/littletomatodonkey/insight-face-paddle/main/demo/friends/index.bin
-# Demo image
-wget https://raw.githubusercontent.com/littletomatodonkey/insight-face-paddle/main/demo/friends/query/friends2.jpg
-# Font file for visualization
-wget https://raw.githubusercontent.com/littletomatodonkey/insight-face-paddle/main/SourceHanSansCN-Medium.otf
+# Create models directory
+mkdir -p models
+
+# Download blazeface face detection model and extract it
+wget https://paddle-model-ecology.bj.bcebos.com/model/insight-face/blazeface_fpn_ssh_1000e_v1.0_infer.tar -P models/
+tar -xzf models/blazeface_fpn_ssh_1000e_v1.0_infer.tar -C models/
+rm -rf models/blazeface_fpn_ssh_1000e_v1.0_infer.tar
+
+# Download static ResNet50 PartialFC 0.1 model and extract it
+wget https://paddle-model-ecology.bj.bcebos.com/model/insight-face/distributed/ms1mv3_r50_static_128_fp16_0.1_epoch_24.tgz -P models/
+tar -xf models/ms1mv3_r50_static_128_fp16_0.1_epoch_24.tgz -C models/
+rm -rf models/ms1mv3_r50_static_128_fp16_0.1_epoch_24.tgz
+
+# Export static save inference model
+python tools/export.py --is_static True --export_type paddle --backbone FresResNet50 --embedding_size 512 --checkpoint_dir models/ms1mv3_r50_static_128_fp16_0.1_epoch_24 --output_dir models/ms1mv3_r50_static_128_fp16_0.1_epoch_24_infer
+rm -rf models/ms1mv3_r50_static_128_fp16_0.1_epoch_24
 ```
 
-The demo image is shown as follows.
+Then, use the following commands to download the gallery, demo image and font file for visualization. And we generate gallery features.
 
-<div align="center">
-<img src="https://raw.githubusercontent.com/littletomatodonkey/insight-face-paddle/main/demo/friends/query/friends2.jpg"  width = "800" />
-</div>
+```bash
+# Download gallery, query and font file
+mkdir -p images/
+git clone https://github.com/littletomatodonkey/insight-face-paddle /tmp/insight-face-paddle
+cp -r /tmp/insight-face-paddle/demo/friends/gallery/ images/
+cp -r /tmp/insight-face-paddle/demo/friends/query/ images/
+mkdir -p assets
+cp /tmp/insight-face-paddle/SourceHanSansCN-Medium.otf assets/
+rm -rf /tmp/insight-face-paddle
 
+# Build index file
+python tools/test_recognition.py \
+    --rec \
+    --rec_model_file_path models/ms1mv3_r50_static_128_fp16_0.1_epoch_24_infer/FresResNet50.pdmodel \
+    --rec_params_file_path models/ms1mv3_r50_static_128_fp16_0.1_epoch_24_infer/FresResNet50.pdiparams \
+    --build_index=images/gallery/index.bin \
+    --img_dir=images/gallery \
+    --label=images/gallery/label.txt
+```
 
 Use the following command to run the whole face recognition demo.
 
-```shell
+```bash
 # detection + recogniotion process
-python tools/test_recognition.py --det --rec --index=index.bin --input=friends2.jpg --output="./output"
+python tools/test_recognition.py \
+    --det \
+    --det_model_file_path models/blazeface_fpn_ssh_1000e_v1.0_infer/inference.pdmodel \
+    --det_params_file_path models/blazeface_fpn_ssh_1000e_v1.0_infer/inference.pdiparams \
+    --rec \
+    --rec_model_file_path models/ms1mv3_r50_static_128_fp16_0.1_epoch_24_infer/FresResNet50.pdmodel \
+    --rec_params_file_path models/ms1mv3_r50_static_128_fp16_0.1_epoch_24_infer/FresResNet50.pdiparams \
+    --index=images/gallery/index.bin \
+    --input=images/query/friends2.jpg \
+    --cdd_num 10 \
+    --rec_thresh 0.4 \
+    --output="./output"
 ```
 
 The final result is save in folder `output/`, which is shown as follows.
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/littletomatodonkey/insight-face-paddle/main/demo/friends/output/friends2.jpg"  width = "800" />
+<img src="https://github.com/GuoxiaWang/plsc_log/blob/master/friends2.jpg"  width = "800" />
 </div>
-
-For more details about parameter explanations, index gallery construction and whl package inference, please refer to [Whl package inference tutorial](https://github.com/littletomatodonkey/insight-face-paddle).
