@@ -100,7 +100,7 @@ def parser(add_help=True):
     parser.add_argument(
         "--cdd_num",
         type=int,
-        default=5,
+        default=10,
         help="The number of candidates in the recognition retrieval. Default by 10."
     )
     parser.add_argument(

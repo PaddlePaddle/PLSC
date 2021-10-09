@@ -230,6 +230,8 @@ python tools/test_recognition.py \
     --rec_params_file_path models/ms1mv3_r50_static_128_fp16_0.1_epoch_24_infer/FresResNet50.pdiparams \
     --index=images/gallery/index.bin \
     --input=images/query/friends2.jpg \
+    --cdd_num 10 \
+    --rec_thresh 0.4 \
     --output="./output"
 ```
 
