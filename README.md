@@ -24,7 +24,7 @@ pip install output/opt/paddle/share/wheels/paddlepaddle_gpu-2.2.0-cp37-cp37m-lin
 
 ```
 
-### Download PLSC
+### 2.2 Download PLSC
 
 ```shell
 git clone https://github.com/PaddlePaddle/PLSC.git
@@ -35,9 +35,11 @@ cd /path/to/PLSC/
 
 ## 3. Data preparation
 
+### 3.1 Download dataset
+
 Download the dataset from [insightface datasets](https://github.com/deepinsight/insightface/tree/master/recognition/_datasets_).
 
-### 3.3 Extract MXNet Dataset to images
+### 3.2 Extract MXNet Dataset to images
 
 ```shell
 python tools/mx_recordio_2_images.py --root_dir ms1m-retinaface-t1/ --output_dir MS1M_v3/
