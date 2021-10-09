@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-`PLSC` is an open source Paddle Large Scale Classification Tools, which supports 60 million classes on single NVIDIA V100 (32G).
+**PLSC** is an open source Paddle Large Scale Classification Tools, which supports 60 million classes on 8 NVIDIA V100 (32G).
 
 ## 2. Environment preparation
 
@@ -130,7 +130,7 @@ sh scripts/inference.sh
 
 ## 8. Model performance
 
-### 8.1 Performance on Verification Datasets
+### 8.1 Accuracy on Verification Datasets
 
 **Configuration：**
   * GPU: 8 NVIDIA Tesla V100 32G
@@ -152,12 +152,12 @@ sh scripts/inference.sh
   * BatchSize: 64/512
   * SampleRatio: 0.1
 
-| Mode                      | Precison  | Res50                        | Res100                       |
-| ------------------------- | --------- | ---------------------------- | ---------------------------- |
-| Framework1 (static)       | AMP       | 42000000 (31792MiB/32510MiB) | 39000000 (31938MiB/32510MiB) |
-| Framework2 (dynamic)      | AMP       | 30000000 (31702MiB/32510MiB) | 29000000 (32286MiB/32510MiB) |
-| Paddle (static)           | Pure FP16 | 60000000 (32018MiB/32510MiB) | 60000000 (32018MiB/32510MiB) |
-| Paddle (dynamic)          | Pure FP16 | 59000000 (31970MiB/32510MiB) | 59000000 (31970MiB/32510MiB) |
+| Mode                      | Precison  | Res50    | Res100   |
+| ------------------------- | --------- | -------- | -------- |
+| Framework1 (static)       | AMP       | 42000000 | 39000000 |
+| Framework2 (dynamic)      | AMP       | 30000000 | 29000000 |
+| Paddle (static)           | Pure FP16 | 60000000 | 60000000 |
+| Paddle (dynamic)          | Pure FP16 | 59000000 | 59000000 |
 
 **Note:** config environment variable ``export FLAGS_allocator_strategy=naive_best_fit``
 
