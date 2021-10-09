@@ -149,14 +149,15 @@ sh scripts/inference.sh
 
 **Configuration：**
   * GPU: 8 NVIDIA Tesla V100 32G
-  * Precison: Pure FP16
   * BatchSize: 64/512
   * SampleRatio: 0.1
 
-| Mode                      | Res50                        | Res100                       |
-| ------------------------- | ---------------------------- | ---------------------------- |
-| Paddle (static)           | 60000000 (32018MiB/32510MiB) | 60000000 (32018MiB/32510MiB) |
-| Paddle (dynamic)          | 59000000 (31970MiB/32510MiB) | 59000000 (31970MiB/32510MiB) |
+| Mode                      | Precison  | Res50                        | Res100                       |
+| ------------------------- | --------- | ---------------------------- | ---------------------------- |
+| Framework1 (static)       | AMP       | 42000000 (31792MiB/32510MiB) | 39000000 (31938MiB/32510MiB) |
+| Framework2 (dynamic)      | AMP       | 30000000 (31702MiB/32510MiB) | 29000000 (32286MiB/32510MiB) |
+| Paddle (static)           | Pure FP16 | 60000000 (32018MiB/32510MiB) | 60000000 (32018MiB/32510MiB) |
+| Paddle (dynamic)          | Pure FP16 | 59000000 (31970MiB/32510MiB) | 59000000 (31970MiB/32510MiB) |
 
 **Note:** config environment variable ``export FLAGS_allocator_strategy=naive_best_fit``
 
