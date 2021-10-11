@@ -48,7 +48,7 @@ python tools/mx_recordio_2_images.py --root_dir ms1m-retinaface-t1/ --output_dir
 After finishing unzipping the dataset, the folder structure is as follows.
 
 ```
-arcface_paddle/MS1M_v3
+MS1M_v3
 |_ images
 |  |_ 00000001.jpg
 |  |_ ...
