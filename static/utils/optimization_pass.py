@@ -13,13 +13,14 @@
 # limitations under the License.
 
 
-def gather_optimization_pass(program, weight_name):
-    def check_contains(name, name_list):
-        for n in name_list:
-            if name in n:
-                return True
-        return False
+def check_contains(name, name_list):
+    for n in name_list:
+        if name in n:
+            return True
+    return False
 
+
+def gather_optimization_pass(program, weight_name):
     op_idxs = []
     gather_grad_op = None
     momentum_op = None
@@ -34,40 +35,6 @@ def gather_optimization_pass(program, weight_name):
                 gather_grad_op = op
 
     if gather_grad_op is not None and momentum_op is not None:
-        for idx, op in enumerate(program.global_block().ops):
-            if (op.type == 'update_loss_scaling' or
-                    op.type == 'check_finite_and_unscale'):
-                input_idxs = []
-                input_arg_names = op.input("X")
-                for i, name in enumerate(input_arg_names):
-                    if '@GRAD' in name and weight_name in name:
-                        input_idxs.append(i)
-                if len(input_idxs) > 0:
-                    for i in reversed(input_idxs):
-                        input_arg_names.pop(i)
-                    op.desc.set_input("X", input_arg_names)
-
-                output_idxs = []
-                output_arg_names = op.output("Out")
-                for i, name in enumerate(output_arg_names):
-                    if '@GRAD' in name and weight_name in name:
-                        output_idxs.append(i)
-                if len(output_idxs) > 0:
-                    for i in reversed(output_idxs):
-                        output_arg_names.pop(i)
-                    op.desc.set_output("Out", output_arg_names)
-
-                if op.type == 'check_finite_and_unscale':
-                    op_role_idxs = []
-                    op_role_var = op.attr("op_role_var")
-                    for i, name in enumerate(op_role_var):
-                        if '@GRAD' in name and weight_name in name:
-                            op_role_idxs.append(i)
-                    if len(op_role_idxs) > 0:
-                        for i in reversed(op_role_idxs):
-                            op_role_var.pop(i)
-                        op.desc._set_attr("op_role_var", op_role_var)
-
         inputs = {
             'Param': momentum_op.input('Param'),
             'Velocity': momentum_op.input('Velocity'),
@@ -117,3 +84,41 @@ def gather_optimization_pass(program, weight_name):
         for name in var_names:
             program.global_block()._remove_var(name, sync=False)
         program.global_block()._sync_with_cpp()
+
+
+def amp_pass(program, weight_name):
+    for idx, op in enumerate(program.global_block().ops):
+        if (op.type == 'update_loss_scaling' or
+                op.type == 'check_finite_and_unscale'):
+            input_idxs = []
+            input_arg_names = op.input("X")
+            # input_arg_names.append(gather_grad_op.input('Out@GRAD')[0])
+            for i, name in enumerate(input_arg_names):
+                if '@GRAD' in name and weight_name in name:
+                    input_idxs.append(i)
+            if len(input_idxs) > 0:
+                for i in reversed(input_idxs):
+                    input_arg_names.pop(i)
+                op.desc.set_input("X", input_arg_names)
+
+            output_idxs = []
+            output_arg_names = op.output("Out")
+            # output_arg_names.append(gather_grad_op.input('Out@GRAD')[0])
+            for i, name in enumerate(output_arg_names):
+                if '@GRAD' in name and weight_name in name:
+                    output_idxs.append(i)
+            if len(output_idxs) > 0:
+                for i in reversed(output_idxs):
+                    output_arg_names.pop(i)
+                op.desc.set_output("Out", output_arg_names)
+
+            if op.type == 'check_finite_and_unscale':
+                op_role_idxs = []
+                op_role_var = op.attr("op_role_var")
+                for i, name in enumerate(op_role_var):
+                    if '@GRAD' in name and weight_name in name:
+                        op_role_idxs.append(i)
+                if len(op_role_idxs) > 0:
+                    for i in reversed(op_role_idxs):
+                        op_role_var.pop(i)
+                    op.desc._set_attr("op_role_var", op_role_var)

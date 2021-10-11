@@ -78,7 +78,7 @@ def export(args):
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
 
-    checkpoint.load(program=test_program, for_train=False)
+    checkpoint.load(program=test_program, for_train=False, dtype='float32')
     print("Load checkpoint from '{}'.".format(args.checkpoint_dir))
 
     path = os.path.join(args.output_dir, args.backbone)

@@ -94,7 +94,7 @@ class Checkpoint(object):
                     logging.info("Remove checkpoint {}.".format(path))
                     shutil.rmtree(path)
 
-    def load(self, program, for_train=True):
+    def load(self, program, for_train=True, dtype=None):
         assert os.path.exists(self.checkpoint_dir)
         checkpoint_dir = os.path.abspath(self.checkpoint_dir)
 
@@ -118,6 +118,9 @@ class Checkpoint(object):
                 continue
 
             tensor = paddle.load(path, return_numpy=True)
+            if dtype:
+                assert dtype in ['float32', 'float16']
+                tensor = tensor.astype('float32')
 
             if 'dist@' in name and '@rank@' in name:
                 if '.w' in name and 'velocity' not in name:

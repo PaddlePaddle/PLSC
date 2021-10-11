@@ -16,6 +16,13 @@ import paddle
 
 
 @paddle.no_grad()
+def sync_params(parameters):
+    for param in parameters:
+        paddle.distributed.broadcast(
+            param.detach(), src=0, group=None, use_calc_stream=True)
+
+
+@paddle.no_grad()
 def sync_gradients(parameters):
     grad_var_set = set()
     grad_vars = []
