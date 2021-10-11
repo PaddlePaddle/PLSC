@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-**PLSC** is an open source Paddle Large Scale Classification Tools, which supports 60 million classes on 8 NVIDIA V100 (32G).
+[PLSC](https://github.com/PaddlePaddle/PLSC) is an open source Paddle Large Scale Classification Tools, which supports 60 million classes on 8 NVIDIA V100 (32G).
 
 ## 2. Environment preparation
 
