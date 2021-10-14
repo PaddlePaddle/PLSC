@@ -46,6 +46,9 @@ cd /path/to/PLSC/
 
 Download the dataset from [insightface datasets](https://github.com/deepinsight/insightface/tree/master/recognition/_datasets_).
 
+* MS1M_v2: MS1M-ArcFace
+* MS1M_v3: MS1M-RetinaFace
+
 ### 3.2 Extract MXNet Dataset to images
 
 ```shell
@@ -173,16 +176,16 @@ sh scripts/inference.sh
 ### 8.2 Maximum Number of Identities 
 
 **Configuration：**
-  * GPU: 8 NVIDIA Tesla V100 32G
+  * GPU: 8 NVIDIA Tesla V100 32G (32510MiB)
   * BatchSize: 64/512
   * SampleRatio: 0.1
 
-| Mode                      | Precision  | Res50    | Res100   |
+| Mode                      | Precision | Res50    | Res100   |
 | ------------------------- | --------- | -------- | -------- |
-| Framework1 (static)       | AMP       | 42000000 | 39000000 |
-| Framework2 (dynamic)      | AMP       | 30000000 | 29000000 |
-| Paddle (static)           | Pure FP16 | 60000000 | 60000000 |
-| Paddle (dynamic)          | Pure FP16 | 59000000 | 59000000 |
+| Framework1 (static)       | AMP       | 42000000 (31792MiB)| 39000000 (31938MiB)|
+| Framework2 (dynamic)      | AMP       | 30000000 (31702MiB)| 29000000 (32286MiB)|
+| Paddle (static)           | Pure FP16 | 60000000 (32018MiB)| 60000000 (32018MiB)|
+| Paddle (dynamic)          | Pure FP16 | 59000000 (31970MiB)| 59000000 (31970MiB)|
 
 **Note:** config environment variable ``export FLAGS_allocator_strategy=naive_best_fit``
 
