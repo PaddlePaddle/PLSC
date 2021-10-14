@@ -24,7 +24,14 @@ pip install output/opt/paddle/share/wheels/paddlepaddle_gpu-2.2.0-cp37-cp37m-lin
 
 ```
 
-### 2.2 Download PLSC
+### 2.2 Install Paddle from PyPI
+
+```shell
+# paddlepaddle required 2.2.0rc0 or later
+pip install paddlepaddle-gpu==2.2.0rc0
+```
+
+### 2.3 Download PLSC
 
 ```shell
 git clone https://github.com/PaddlePaddle/PLSC.git
