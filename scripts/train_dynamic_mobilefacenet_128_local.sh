@@ -13,29 +13,24 @@
 # limitations under the License.
 
 python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
-    --config_file configs/ms1mv3_r50.py \
-    --is_static True \
-    --backbone FresResNet50 \
+    --config_file configs/ms1mv2_mobileface.py \
+    --is_static False \
+    --backbone MobileFaceNet_128 \
     --classifier LargeScaleClassifier \
-    --embedding_size 512 \
+    --embedding_size 128 \
     --model_parallel True \
     --dropout 0.0 \
-    --sample_ratio 0.1 \
+    --sample_ratio 1.0 \
     --loss ArcFace \
     --batch_size 128 \
-    --dataset MS1M_v3 \
-    --num_classes 93431 \
-    --data_dir MS1M_v3/ \
-    --label_file MS1M_v3/label.txt \
+    --dataset MS1M_v2 \
+    --num_classes 85742 \
+    --data_dir MS1M_v2/ \
+    --label_file MS1M_v2/label.txt \
     --is_bin False \
     --log_interval_step 100 \
     --validation_interval_step 2000 \
-    --fp16 True \
+    --fp16 False \
     --use_dynamic_loss_scaling True \
-    --init_loss_scaling 27648.0 \
-    --num_workers 8 \
     --train_unit 'epoch' \
-    --warmup_num 0 \
-    --train_num 25 \
-    --decay_boundaries "10,16,22" \
-    --output MS1M_v3_arcface_static_0.1
+    --output ./MS1M_v2_arcface_MobileFaceNet_128

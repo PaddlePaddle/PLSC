@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-**PLSC** is an open source Paddle Large Scale Classification Tools, which supports 60 million classes on 8 NVIDIA V100 (32G).
+[PLSC](https://github.com/PaddlePaddle/PLSC) is an open source Paddle Large Scale Classification Tools, which supports 60 million classes on 8 NVIDIA V100 (32G).
 
 ## 2. Environment preparation
 
@@ -24,7 +24,14 @@ pip install output/opt/paddle/share/wheels/paddlepaddle_gpu-2.2.0-cp37-cp37m-lin
 
 ```
 
-### 2.2 Download PLSC
+### 2.2 Install Paddle from PyPI
+
+```shell
+# paddlepaddle required 2.2.0rc0 or later
+pip install paddlepaddle-gpu==2.2.0rc0
+```
+
+### 2.3 Download PLSC
 
 ```shell
 git clone https://github.com/PaddlePaddle/PLSC.git
@@ -39,6 +46,9 @@ cd /path/to/PLSC/
 
 Download the dataset from [insightface datasets](https://github.com/deepinsight/insightface/tree/master/recognition/_datasets_).
 
+* MS1M_v2: MS1M-ArcFace
+* MS1M_v3: MS1M-RetinaFace
+
 ### 3.2 Extract MXNet Dataset to images
 
 ```shell
@@ -48,7 +58,7 @@ python tools/mx_recordio_2_images.py --root_dir ms1m-retinaface-t1/ --output_dir
 After finishing unzipping the dataset, the folder structure is as follows.
 
 ```
-arcface_paddle/MS1M_v3
+MS1M_v3
 |_ images
 |  |_ 00000001.jpg
 |  |_ ...
@@ -166,16 +176,16 @@ sh scripts/inference.sh
 ### 8.2 Maximum Number of Identities 
 
 **Configuration：**
-  * GPU: 8 NVIDIA Tesla V100 32G
+  * GPU: 8 NVIDIA Tesla V100 32G (32510MiB)
   * BatchSize: 64/512
   * SampleRatio: 0.1
 
-| Mode                      | Precision  | Res50    | Res100   |
+| Mode                      | Precision | Res50    | Res100   |
 | ------------------------- | --------- | -------- | -------- |
-| Framework1 (static)       | AMP       | 42000000 | 39000000 |
-| Framework2 (dynamic)      | AMP       | 30000000 | 29000000 |
-| Paddle (static)           | Pure FP16 | 60000000 | 60000000 |
-| Paddle (dynamic)          | Pure FP16 | 59000000 | 59000000 |
+| Framework1 (static)       | AMP       | 42000000 (31792MiB)| 39000000 (31938MiB)|
+| Framework2 (dynamic)      | AMP       | 30000000 (31702MiB)| 29000000 (32286MiB)|
+| Paddle (static)           | Pure FP16 | 60000000 (32018MiB)| 60000000 (32018MiB)|
+| Paddle (dynamic)          | Pure FP16 | 59000000 (31970MiB)| 59000000 (31970MiB)|
 
 **Note:** config environment variable ``export FLAGS_allocator_strategy=naive_best_fit``
 
