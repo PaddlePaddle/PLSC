@@ -188,7 +188,7 @@ sh scripts/inference.sh
 | Paddle (static)           | Pure FP16 | 60000000 (32018MiB)| 60000000 (32018MiB)|
 | Paddle (dynamic)          | Pure FP16 | 59000000 (31970MiB)| 59000000 (31970MiB)|
 
-**Note:** config environment variable ``export FLAGS_allocator_strategy=naive_best_fit``
+**Note:** config environment variable by ``export FLAGS_allocator_strategy=naive_best_fit``
 
 ### 8.3 Throughtput
 
