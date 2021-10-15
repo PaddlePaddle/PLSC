@@ -4,9 +4,9 @@
 
 [PLSC](https://github.com/PaddlePaddle/PLSC) is an open source Paddle Large Scale Classification Tools, which supports 60 million classes on single node 8 NVIDIA V100 (32G).
 
-## 2. Environment preparation
+## 2. Environment Preparation
 
-### 2.1 Install Paddle from source code
+### 2.1 Install Paddle from Source Code
 
 ```shell
 
@@ -41,16 +41,16 @@ cd /path/to/PLSC/
 ```
 
 
-## 3. Data preparation
+## 3. Data Preparation
 
-### 3.1 Download dataset
+### 3.1 Download Dataset
 
 Download the dataset from [insightface datasets](https://github.com/deepinsight/insightface/tree/master/recognition/_datasets_).
 
 * MS1M_v2: MS1M-ArcFace
 * MS1M_v3: MS1M-RetinaFace
 
-### 3.2 Extract MXNet Dataset to images
+### 3.2 Extract MXNet Dataset to Images
 
 ```shell
 python tools/mx_recordio_2_images.py --root_dir ms1m-retinaface-t1/ --output_dir MS1M_v3/
@@ -82,7 +82,7 @@ images/00000001.jpg 0
 
 If you want to use customed dataset, you can arrange your data according to the above format. 
 
-### 3.3 Transform between original image files and bin files
+### 3.3 Transform Between Original Image Files and Bin Files
 
 If you want to convert original image files to `bin` files used directly for training process, you can use the following command to finish the conversion.
 
@@ -98,7 +98,7 @@ python tools/convert_image_bin.py --image_path="your/input/bin/path" --bin_path=
 
 ## 4. How to Training
 
-### 4.1 Single node, 8 GPUs:
+### 4.1 Single Node, 8 GPUs:
 
 #### Static Mode
 
@@ -116,7 +116,7 @@ sh scripts/train_dynamic.sh
 During training, you can view loss changes in real time through `VisualDL`,  For more information, please refer to [VisualDL](https://github.com/PaddlePaddle/VisualDL/).
 
 
-## 5. Model evaluation
+## 5. Model Evaluation
 
 The model evaluation process can be started as follows.
 
@@ -132,7 +132,7 @@ sh scripts/validation_static.sh
 sh scripts/validation_dynamic.sh
 ```
 
-## 6. Export model
+## 6. Export Model
 PaddlePaddle supports inference using prediction engines. Firstly, you should export inference model.
 
 #### Static Mode
@@ -149,7 +149,7 @@ sh scripts/export_dynamic.sh
 
 We also support export to onnx model, you only need to set `--export_type onnx`.
 
-## 7. Model inference
+## 7. Model Inference
 
 The model inference process supports paddle save inference model and onnx model.
 
@@ -157,7 +157,7 @@ The model inference process supports paddle save inference model and onnx model.
 sh scripts/inference.sh
 ```
 
-## 8. Model performance
+## 8. Model Performance
 
 ### 8.1 Accuracy on Verification Datasets
 
