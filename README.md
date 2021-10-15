@@ -183,8 +183,8 @@ sh scripts/inference.sh
 
 | Mode                      | Precision | Res50    | Res100   |
 | ------------------------- | --------- | -------- | -------- |
-| Framework1 (static)       | AMP       | 42000000 (31792MiB)| 39000000 (31938MiB)|
-| Framework2 (dynamic)      | AMP       | 30000000 (31702MiB)| 29000000 (32286MiB)|
+| Oneflow (static)       | AMP       | 42000000 (31792MiB)| 39000000 (31938MiB)|
+| PyTorch (dynamic)      | AMP       | 30000000 (31702MiB)| 29000000 (32286MiB)|
 | Paddle (static)           | Pure FP16 | 60000000 (32018MiB)| 60000000 (32018MiB)|
 | Paddle (dynamic)          | Pure FP16 | 59000000 (31970MiB)| 59000000 (31970MiB)|
 
