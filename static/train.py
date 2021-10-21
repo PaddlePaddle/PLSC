@@ -190,7 +190,6 @@ def train(args):
             shuffle=True,
             drop_last=True))
 
-    max_loss_scaling = np.array([args.max_loss_scaling]).astype(np.float32)
     for epoch in range(start_epoch, total_epoch):
         for step, data in enumerate(train_loader):
             global_step += 1

@@ -161,7 +161,7 @@ class Checkpoint(object):
                 else:
                     opt_state_dict[name] = tensor
 
-        if for_train:
+        if classifier is not None and for_train:
             meta_file = os.path.join(checkpoint_dir, 'meta.json')
             if not os.path.exists(meta_file):
                 logging.error(
@@ -173,8 +173,7 @@ class Checkpoint(object):
             with open(meta_file, 'r') as handle:
                 extra_info = json.load(handle)
 
-        # Preporcess distributed parameters.
-        if self.world_size > 1:
+            # Preporcess distributed parameters.
             pretrain_world_size = extra_info['pretrain_world_size']
             assert pretrain_world_size > 0
             embedding_size = extra_info['embedding_size']
@@ -233,7 +232,7 @@ class Checkpoint(object):
             assert optimizer is not None
             optimizer.set_state_dict(opt_state_dict)
 
-        if for_train:
+        if classifier is not None and for_train:
             return extra_info
         else:
             return {}

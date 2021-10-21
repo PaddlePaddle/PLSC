@@ -25,8 +25,7 @@ config.loss = 'ArcFace'
 config.dropout = 0.0
 
 config.fp16 = True
-config.init_loss_scaling = 128.0
-config.max_loss_scaling = 128.0
+config.init_loss_scaling = 27648.0
 config.incr_every_n_steps = 2000
 config.decr_every_n_nan_or_inf = 1
 config.incr_ratio = 2.0
