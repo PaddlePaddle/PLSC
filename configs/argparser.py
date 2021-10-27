@@ -200,6 +200,10 @@ def parse_args():
         default=cfg.use_synthetic_dataset,
         help='whether to use synthetic dataset')
     parser.add_argument(
+        '--dataset_type', type=str, default=cfg.dataset_type, help='dataset type')
+    parser.add_argument(
+        '--batch_sampler', type=str, default=cfg.batch_sampler, help='batch sampler type, DistributedBatchSampler or BatchSampler')
+    parser.add_argument(
         '--dataset', type=str, default=cfg.dataset, help='train dataset name')
     parser.add_argument(
         '--data_dir',

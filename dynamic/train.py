@@ -22,7 +22,7 @@ import paddle
 from visualdl import LogWriter
 
 from utils.logging import AverageMeter, init_logging, CallBackLogging
-from datasets import CommonDataset, SyntheticDataset
+import datasets
 from utils import losses
 
 from .utils.verification import CallBackVerification
@@ -59,15 +59,17 @@ def train(args):
         fleet.init(is_collective=True, strategy=strategy)
 
     if args.use_synthetic_dataset:
-        trainset = SyntheticDataset(args.num_classes, fp16=args.fp16)
+        trainset = datasets.SyntheticDataset(args.num_classes, fp16=args.fp16)
     else:
-        trainset = CommonDataset(
+        trainset = eval("datasets.{}".format(args.dataset_type))(
             root_dir=args.data_dir,
             label_file=args.label_file,
+            rank=rank,
+            world_size=world_size,
             fp16=args.fp16,
             is_bin=args.is_bin)
 
-    num_image = len(trainset)
+    num_image = trainset.total_num_samples
     total_batch_size = args.batch_size * world_size
     steps_per_epoch = num_image // total_batch_size
     if args.train_unit == 'epoch':
@@ -156,7 +158,7 @@ def train(args):
         world_size=world_size,
         embedding_size=args.embedding_size,
         num_classes=args.num_classes,
-        model_save_dir=os.path.join(args.output, args.backbone),
+        model_save_dir=os.path.join(args.output, args.backbone, 'rank_{}'.format(rank)),
         checkpoint_dir=args.checkpoint_dir,
         max_num_last_checkpoint=args.max_num_last_checkpoint)
 
@@ -173,15 +175,17 @@ def train(args):
         global_step = lr_state['last_epoch']
         lr_scheduler.set_state_dict(lr_state)
 
+    batch_sampler = eval("paddle.io.{}".format(args.batch_sampler))(
+        dataset=trainset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=True)
+     
     train_loader = paddle.io.DataLoader(
         trainset,
         places=place,
         num_workers=args.num_workers,
-        batch_sampler=paddle.io.DistributedBatchSampler(
-            dataset=trainset,
-            batch_size=args.batch_size,
-            shuffle=True,
-            drop_last=True))
+        batch_sampler=batch_sampler)
 
     scaler = LSCGradScaler(
         enable=args.fp16,
@@ -200,7 +204,7 @@ def train(args):
                 features = backbone(img)
                 loss_v = classifier(features, label)
 
-            scaler.scale(loss_v).backward()
+            (scaler.scale(loss_v) * (1.0 / world_size)).backward()
             if world_size > 1:
                 # data parallel sync backbone gradients
                 sync_gradients(backbone.parameters())

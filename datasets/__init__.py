@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .common_dataset import CommonDataset, SyntheticDataset, load_bin
+from .common_dataset import CommonDataset, SplitDataset, SyntheticDataset, load_bin

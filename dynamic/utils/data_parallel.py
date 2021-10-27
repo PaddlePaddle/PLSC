@@ -24,33 +24,39 @@ def sync_params(parameters):
 
 @paddle.no_grad()
 def sync_gradients(parameters):
-    grad_var_set = set()
-    grad_vars = []
-    sparse_grad_vars = []
+    grad_var_set_fp32 = set()
+    grad_vars_fp32 = []
+    grad_var_set_fp16 = set()
+    grad_vars_fp16 = []
 
+    p_size_fp32 = 0
+    p_size_fp16 = 0
     for param in parameters:
         if param.trainable and (param._grad_ivar() is not None):
             g_var = param._grad_ivar()
             assert not g_var._is_sparse(
             ), "Now, it doesn't support sparse parameters"
-            grad_vars.append(g_var)
-            assert g_var not in grad_var_set
-            grad_var_set.add(g_var)
+            assert g_var.dtype in [paddle.float32, paddle.float16]
+            if g_var.dtype == paddle.float32:
+                grad_vars_fp32.append(g_var)
+                assert g_var not in grad_var_set_fp32
+                grad_var_set_fp32.add(g_var)
 
-    coalesced_grads_and_vars = \
-        paddle.fluid.dygraph.parallel.build_groups(grad_vars, 128 * 1024 * 1024)
+            else:
+                grad_vars_fp16.append(g_var)
+                assert g_var not in grad_var_set_fp16
+                grad_var_set_fp16.add(g_var)
 
-    nranks = paddle.distributed.get_world_size()
-    for coalesced_grad, _, _ in coalesced_grads_and_vars:
-        # need to div nranks
-        div_factor = paddle.to_tensor(nranks, dtype=coalesced_grad.dtype)
-        paddle.fluid.framework._dygraph_tracer().trace_op(
-            type="elementwise_div",
-            inputs={'X': coalesced_grad,
-                    'Y': div_factor},
-            outputs={'Out': coalesced_grad},
-            attrs={'axis': -1})
+    if len(grad_vars_fp32) > 0:
+        coalesced_grads_and_vars_fp32 = \
+            paddle.fluid.dygraph.parallel.build_groups(grad_vars_fp32, 128 * 1024 * 1024)
+        for coalesced_grad, _, _ in coalesced_grads_and_vars_fp32:
+            paddle.distributed.all_reduce(coalesced_grad)
+        paddle.fluid.dygraph.parallel._split_tensors(coalesced_grads_and_vars_fp32)
 
-        paddle.distributed.all_reduce(coalesced_grad)
-
-    paddle.fluid.dygraph.parallel._split_tensors(coalesced_grads_and_vars)
+    if len(grad_vars_fp16) > 0:
+        coalesced_grads_and_vars_fp16 = \
+            paddle.fluid.dygraph.parallel.build_groups(grad_vars_fp16, 128 * 1024 * 1024)
+        for coalesced_grad, _, _ in coalesced_grads_and_vars_fp16:
+            paddle.distributed.all_reduce(coalesced_grad)
+        paddle.fluid.dygraph.parallel._split_tensors(coalesced_grads_and_vars_fp16)
