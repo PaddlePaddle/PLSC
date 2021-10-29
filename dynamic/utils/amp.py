@@ -17,6 +17,24 @@ from paddle.amp import GradScaler
 from paddle import _C_ops
 import paddle
 
+@paddle.no_grad()
+def clip_grad_norm_(grads_fp32, grads_fp16, grad_norm_clip=5.0):
+    
+    norm_fp32 = paddle.sum(paddle.stack([paddle.sum(g.detach() ** 2) for g in grads_fp32]))
+    if len(grads_fp16) > 0:
+        norm_fp16 = paddle.sum(paddle.stack([paddle.sum(paddle.cast(g.detach(), 'float32') ** 2) for g in grads_fp16]))
+        global_norm = paddle.sqrt(norm_fp32 + paddle.cast(norm_fp16, 'float32'))
+    else:
+        global_norm = paddle.sqrt(norm_fp32)
+    
+    clip_coef_fp32 = paddle.clip(grad_norm_clip / (global_norm + 1e-6), max=1.0)
+    grads_fp32 = [g.scale_(clip_coef_fp32) for g in grads_fp32]
+    
+    if len(grads_fp16) > 0:
+        clip_coef_fp16 = paddle.cast(clip_coef_fp32, 'float16')
+        grads_fp16 = [g.scale_(clip_coef_fp16) for g in grads_fp16]
+    
+    return global_norm
 
 class LSCGradScaler(GradScaler):
     def __init__(self,
@@ -53,7 +71,8 @@ class LSCGradScaler(GradScaler):
         if self._use_dynamic_loss_scaling:
             # update the scale
             self._update()
-
+            
+    @paddle.no_grad()
     def _unscale(self, optimizer):
         if not self._enable:
             return
@@ -89,11 +108,37 @@ class LSCGradScaler(GradScaler):
                 if self._found_inf:
                     print('Found inf or nan in classifier, dtype is', dtype)
                     return
+                
+        grads_fp32 = []
+        grads_fp16 = []
+        if len(param_grads_dict[paddle.float32]) > 0:
+            coalesced_grads_and_vars_fp32 = \
+                paddle.fluid.dygraph.parallel.build_groups(param_grads_dict[paddle.float32], 128 * 1024 * 1024)
+            for coalesced_grad, _, _ in coalesced_grads_and_vars_fp32: 
+                paddle.distributed.all_reduce(coalesced_grad)
+                grads_fp32.append(coalesced_grad)
 
-        for dtype in param_grads_dict:
-            param_grads = param_grads_dict[dtype]
-            _C_ops.check_finite_and_unscale(param_grads, self._scale,
-                                            param_grads, self._found_inf)
+            _C_ops.check_finite_and_unscale(grads_fp32, self._scale,
+                                            grads_fp32, self._found_inf)
             if self._found_inf:
-                print('Found inf or nan in backbone, dtype is', dtype)
-                break
+                print('Found inf or nan in backbone, dtype is', paddle.float32)
+                return
+
+        if len(param_grads_dict[paddle.float16]) > 0:
+            coalesced_grads_and_vars_fp16 = \
+                paddle.fluid.dygraph.parallel.build_groups(param_grads_dict[paddle.float16], 128 * 1024 * 1024)
+            for coalesced_grad, _, _ in coalesced_grads_and_vars_fp16:
+                paddle.distributed.all_reduce(coalesced_grad)
+                grads_fp16.append(coalesced_grad)
+
+            _C_ops.check_finite_and_unscale(grads_fp16, self._scale,
+                                            grads_fp16, self._found_inf)
+            if self._found_inf:
+                print('Found inf or nan in backbone, dtype is', paddle.float16)
+                return
+
+        clip_grad_norm_(grads_fp32, grads_fp16)
+        if len(param_grads_dict[paddle.float16]) > 0:
+            paddle.fluid.dygraph.parallel._split_tensors(coalesced_grads_and_vars_fp16)
+        if len(param_grads_dict[paddle.float32]) > 0:
+            paddle.fluid.dygraph.parallel._split_tensors(coalesced_grads_and_vars_fp32)
