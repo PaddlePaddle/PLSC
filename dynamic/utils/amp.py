@@ -18,7 +18,7 @@ from paddle import _C_ops
 import paddle
 
 @paddle.no_grad()
-def clip_grad_norm_(grads_fp32, grads_fp16, grad_norm_clip=5.0):
+def clip_grad_norm_(grads_fp32, grads_fp16, grad_norm_clip=2.0):
     
     norm_fp32 = paddle.sum(paddle.stack([paddle.sum(g.detach() ** 2) for g in grads_fp32]))
     if len(grads_fp16) > 0:
@@ -27,7 +27,7 @@ def clip_grad_norm_(grads_fp32, grads_fp16, grad_norm_clip=5.0):
     else:
         global_norm = paddle.sqrt(norm_fp32)
     
-    clip_coef_fp32 = paddle.clip(grad_norm_clip / (global_norm + 1e-6), max=1.0)
+    clip_coef_fp32 = paddle.clip(grad_norm_clip / (global_norm + 1e-6), max=2.0)
     grads_fp32 = [g.scale_(clip_coef_fp32) for g in grads_fp32]
     
     if len(grads_fp16) > 0:

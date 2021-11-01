@@ -205,9 +205,6 @@ def train(args):
                 loss_v = classifier(features, label)
 
             (scaler.scale(loss_v) * (1.0 / world_size)).backward()
-#             if world_size > 1:
-#                 # data parallel sync backbone gradients
-#                 sync_gradients(backbone.parameters())
 
             scaler.step(optimizer)
             classifier.step(optimizer)
