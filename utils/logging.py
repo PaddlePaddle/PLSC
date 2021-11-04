@@ -18,6 +18,7 @@ import sys
 import time
 
 
+# Ref: https://github.com/deepinsight/insightface/blob/master/recognition/arcface_torch/utils/utils_logging.py
 class AverageMeter(object):
     """Computes and stores the average and current value
     """
@@ -42,21 +43,22 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
+# Ref: https://github.com/deepinsight/insightface/blob/master/recognition/arcface_torch/utils/utils_logging.py
 def init_logging(rank, models_root):
-    if rank is 0:
-        log_root = logging.getLogger()
-        log_root.setLevel(logging.INFO)
-        formatter = logging.Formatter("Training: %(asctime)s - %(message)s")
-        handler_file = logging.FileHandler(
-            os.path.join(models_root, "training.log"))
-        handler_stream = logging.StreamHandler(sys.stdout)
-        handler_file.setFormatter(formatter)
-        handler_stream.setFormatter(formatter)
-        log_root.addHandler(handler_file)
-        log_root.addHandler(handler_stream)
-        log_root.info('rank: %d' % rank)
+    log_root = logging.getLogger()
+    log_root.setLevel(logging.INFO)
+    formatter = logging.Formatter("Training: %(asctime)s - %(message)s")
+    handler_file = logging.FileHandler(
+        os.path.join(models_root, "training.log.{}".format(rank)))
+    handler_stream = logging.StreamHandler(sys.stdout)
+    handler_file.setFormatter(formatter)
+    handler_stream.setFormatter(formatter)
+    log_root.addHandler(handler_file)
+    log_root.addHandler(handler_stream)
+    log_root.info('rank: %d' % rank)
 
 
+# Ref: https://github.com/deepinsight/insightface/blob/master/recognition/arcface_torch/utils/utils_callbacks.py
 class CallBackLogging(object):
     def __init__(self,
                  frequent,
@@ -77,7 +79,7 @@ class CallBackLogging(object):
 
     def __call__(self, global_step, loss: AverageMeter, epoch: int, lr_value):
 
-        if self.rank is 0 and global_step > 0 and global_step % self.frequent == 0:
+        if global_step > 0 and global_step % self.frequent == 0:
             try:
                 speed: float = self.frequent * self.batch_size / (
                     time.time() - self.tic)

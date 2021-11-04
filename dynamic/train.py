@@ -27,7 +27,8 @@ from utils import losses
 
 from .utils.verification import CallBackVerification
 from .utils.io import Checkpoint
-from .utils.amp import LSCGradScaler
+from .utils.parallel_grad_scaler import HybridParallelGradScaler
+from .utils.hybrid_optimizer import HybridOptimizer
 
 from . import classifiers
 from . import backbones
@@ -52,7 +53,6 @@ def train(args):
 
     if world_size > 1:
         import paddle.distributed.fleet as fleet
-        from .utils.data_parallel import sync_gradients, sync_params
 
         strategy = fleet.DistributedStrategy()
         strategy.without_graph_optimization = True
@@ -83,14 +83,13 @@ def train(args):
         decay_steps = [x for x in args.decay_boundaries]
         total_epoch = (total_steps + steps_per_epoch - 1) // steps_per_epoch
 
-    if rank == 0:
-        logging.info('world_size: {}'.format(world_size))
-        logging.info('total_batch_size: {}'.format(total_batch_size))
-        logging.info('warmup_steps: {}'.format(warmup_steps))
-        logging.info('steps_per_epoch: {}'.format(steps_per_epoch))
-        logging.info('total_steps: {}'.format(total_steps))
-        logging.info('total_epoch: {}'.format(total_epoch))
-        logging.info('decay_steps: {}'.format(decay_steps))
+    logging.info('world_size: {}'.format(world_size))
+    logging.info('total_batch_size: {}'.format(total_batch_size))
+    logging.info('warmup_steps: {}'.format(warmup_steps))
+    logging.info('steps_per_epoch: {}'.format(steps_per_epoch))
+    logging.info('total_steps: {}'.format(total_steps))
+    logging.info('total_epoch: {}'.format(total_epoch))
+    logging.info('decay_steps: {}'.format(decay_steps))
 
     base_lr = total_batch_size * args.lr / 512
     lr_scheduler = paddle.optimizer.lr.PiecewiseDecay(
@@ -123,7 +122,7 @@ def train(args):
     backbone.train()
     classifier.train()
 
-    optimizer = paddle.optimizer.Momentum(
+    optimizer = HybridOptimizer(
         parameters=[{
             'params': backbone.parameters(),
         }, {
@@ -132,13 +131,6 @@ def train(args):
         learning_rate=lr_scheduler,
         momentum=args.momentum,
         weight_decay=args.weight_decay)
-
-    if args.fp16:
-        optimizer._dtype = 'float32'
-
-    if world_size > 1:
-        # sync backbone params for data parallel
-        sync_params(backbone.parameters())
 
     if args.do_validation_while_train:
         callback_verification = CallBackVerification(
@@ -158,7 +150,7 @@ def train(args):
         world_size=world_size,
         embedding_size=args.embedding_size,
         num_classes=args.num_classes,
-        model_save_dir=os.path.join(args.output, args.backbone, 'rank_{}'.format(rank)),
+        model_save_dir=os.path.join(args.output, args.backbone),
         checkpoint_dir=args.checkpoint_dir,
         max_num_last_checkpoint=args.max_num_last_checkpoint)
 
@@ -180,21 +172,25 @@ def train(args):
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=True)
-     
+
     train_loader = paddle.io.DataLoader(
         trainset,
         places=place,
         num_workers=args.num_workers,
         batch_sampler=batch_sampler)
 
-    scaler = LSCGradScaler(
+    scaler = HybridParallelGradScaler(
         enable=args.fp16,
         init_loss_scaling=args.init_loss_scaling,
         incr_ratio=args.incr_ratio,
         decr_ratio=args.decr_ratio,
         incr_every_n_steps=args.incr_every_n_steps,
         decr_every_n_nan_or_inf=args.decr_every_n_nan_or_inf,
-        use_dynamic_loss_scaling=args.use_dynamic_loss_scaling)
+        use_dynamic_loss_scaling=args.use_dynamic_loss_scaling,
+        grad_norm_clip=2.0,
+        grad_norm_clip_max=2.0,
+        world_size=world_size, )
+    scaler.sync_params_buffers(backbone)
 
     for epoch in range(start_epoch, total_epoch):
         for step, (img, label) in enumerate(train_loader):
@@ -204,12 +200,11 @@ def train(args):
                 features = backbone(img)
                 loss_v = classifier(features, label)
 
-            (scaler.scale(loss_v) * (1.0 / world_size)).backward()
-
+            scaler.scale(loss_v).backward()
+            classifier.set_attr_for_sparse_momentum()
+            scaler.sync_gradient_and_unscale(optimizer)
             scaler.step(optimizer)
-            classifier.step(optimizer)
             optimizer.clear_grad()
-            classifier.clear_grad()
 
             lr_value = optimizer.get_lr()
             loss_avg.update(loss_v.item(), 1)

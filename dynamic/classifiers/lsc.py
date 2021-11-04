@@ -18,6 +18,7 @@ import os
 import paddle
 import paddle.nn as nn
 
+
 class LargeScaleClassifier(nn.Layer):
     """
     Author: {Xiang An, Yang Xiao, XuHan Zhu} in DeepGlint,
@@ -62,12 +63,19 @@ class LargeScaleClassifier(nn.Layer):
 
         import numpy as np
         stddev = math.sqrt(2.0 / (self.embedding_size + self.num_local))
-        init_total = np.random.RandomState(2021).normal(0.0, stddev, (self.embedding_size, num_classes))
+        init_total = np.random.RandomState(2021).normal(0.0, stddev, (
+            self.embedding_size, num_classes))
         start_index = rank * ((num_classes + world_size - 1) // world_size)
         end_index = start_index + self.num_local
         init_local = init_total[:, start_index:end_index]
         param_attr = paddle.ParamAttr(
-            name=name, initializer=paddle.fluid.initializer.NumpyArrayInitializer(init_local))
+            name=name,
+            initializer=paddle.fluid.initializer.NumpyArrayInitializer(
+                init_local))
+
+        #         stddev = math.sqrt(2.0 / (self.embedding_size + self.num_local))
+        #         param_attr = paddle.ParamAttr(
+        #             name=name, initializer=paddle.nn.initializer.Normal(std=stddev))
 
         self.index = None
         self.weight = self.create_parameter(
@@ -75,51 +83,21 @@ class LargeScaleClassifier(nn.Layer):
             attr=param_attr,
             is_bias=False,
             dtype='float16' if self.fp16 else 'float32')
+
+        # NOTE(GuoxiaWang): stop full gradient and set is_sparse_grad attr
+        # is_sparse_grad be used fo sparse_momentum
         self.weight.is_distributed = True
-
-        if int(self.sample_ratio) < 1:
+        if self.sample_ratio < 1.0:
+            setattr(self.weight, 'is_sparse_grad', True)
             self.weight.stop_gradient = True
+        self.sub_weight = None
 
-    def step(self, optimizer):
-        if int(self.sample_ratio) < 1:
-            warnings.warn(
-                "Explicitly call the function paddle._C_ops.sparse_momentum is a temporary manner. "
-                "We will merge it to optimizer in the future, please don't follow.")
-            
-            found_inf = paddle.logical_not(
-                paddle.all(paddle.isfinite(self._parameter_list[0].grad)))
-            if found_inf:
-                print('Found inf or nan in classifier')
-            else:
-                if self.weight.name not in optimizer._accumulators[
-                        optimizer._velocity_acc_str]:
-                    optimizer._add_accumulator(optimizer._velocity_acc_str,
-                                               self.weight)
-
-                velocity = optimizer._accumulators[
-                    optimizer._velocity_acc_str][self.weight.name]
-                _, _ = paddle._C_ops.sparse_momentum(
-                    self.weight,
-                    self._parameter_list[0].grad,
-                    velocity,
-                    self.index,
-                    paddle.to_tensor(
-                        optimizer.get_lr(), dtype='float32'),
-                    self.weight,
-                    velocity,
-                    'mu',
-                    optimizer._momentum,
-                    'use_nesterov',
-                    optimizer._use_nesterov,
-                    'regularization_method',
-                    optimizer._regularization_method,
-                    'regularization_coeff',
-                    optimizer._regularization_coeff,
-                    'axis',
-                    1)
-
-    def clear_grad(self):
-        self._parameter_list = []
+    def set_attr_for_sparse_momentum(self):
+        # The attribute are used for sparse_momentum
+        if getattr(self.weight, 'is_sparse_grad', None):
+            setattr(self.weight, 'sparse_grad', self.sub_weight.grad)
+            setattr(self.weight, 'index', self.index)
+            setattr(self.weight, 'axis', 1)
 
     def forward(self, feature, label):
 
@@ -143,8 +121,11 @@ class LargeScaleClassifier(nn.Layer):
             total_label.stop_gradient = True
             self.index.stop_gradient = True
             self.sub_weight = paddle.gather(self.weight, self.index, axis=1)
+
+            # NOTE(GuoxiaWang): stop generate the full gradient when use partial fc,
+            # but it need sub gradient.
             self.sub_weight.stop_gradient = False
-            self._parameter_list.append(self.sub_weight)
+
         else:
             self.sub_weight = self.weight
 

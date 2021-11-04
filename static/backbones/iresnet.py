@@ -19,6 +19,9 @@ __all__ = [
     "FresResNet", "FresResNet50", "FresResNet100", "FresResNet101",
     "FresResNet152"
 ]
+'''
+Ref: https://github.com/deepinsight/insightface/blob/master/recognition/arcface_oneflow/backbones/ir_resnet.py
+'''
 
 
 class FresResNet(object):

@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+'''
+Origin author: wujiyang
+Modify from: https://github.com/wujiyang/Face_Pytorch/blob/master/backbone/mobilefacenet.py
+'''
 
 import paddle
 from paddle import nn
@@ -113,7 +117,7 @@ class MobileFaceNet(nn.Layer):
                     dtype=m.weight.dtype,
                     default_initializer=nn.initializer.Normal(
                         mean=0.0, std=math.sqrt(2.0 / n)))
-                
+
             elif isinstance(m, (nn.BatchNorm, nn.BatchNorm2D, nn.GroupNorm)):
                 m.weight = paddle.create_parameter(
                     shape=m.weight.shape,
@@ -150,13 +154,3 @@ class MobileFaceNet(nn.Layer):
 def MobileFaceNet_128(num_features=128, **args):
     model = MobileFaceNet(feature_dim=num_features, **args)
     return model
-
-
-# if __name__ == "__main__":
-#     paddle.set_device("cpu")
-#     x = paddle.rand([2, 3, 112, 112])
-#     net = MobileFaceNet()
-#     print(net)
-
-#     x = net(x)
-#     print(x.shape)
