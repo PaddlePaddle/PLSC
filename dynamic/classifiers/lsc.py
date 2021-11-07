@@ -56,8 +56,6 @@ class LargeScaleClassifier(nn.Layer):
         self.margin3 = margin3
         self.logit_scale = scale
 
-        self._parameter_list = []
-
         if name is None:
             name = 'dist@fc@rank@%05d.w' % rank
 

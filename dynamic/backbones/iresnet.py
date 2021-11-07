@@ -313,7 +313,8 @@ class FresResNet(nn.Layer):
                      num_features,
                      fc_type,
                      dropout,
-                     name='fc')
+                     name='fc',
+                     data_format=self.data_format)
 
     def forward(self, inputs):
         if self.data_format == "NHWC":
