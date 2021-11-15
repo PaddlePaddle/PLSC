@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+'''
+@author: GuoxiaWang, LongLi
+'''
 
 
 def rearrange_weight(weight_dict, init_num_rank, new_num_rank):

@@ -147,8 +147,7 @@ class Checkpoint(object):
             with open(meta_file, 'r') as handle:
                 extra_info = json.load(handle)
 
-        # Preporcess distributed parameters.
-        if self.world_size > 1:
+            # Preporcess distributed parameters.
             pretrain_world_size = extra_info['pretrain_world_size']
             assert pretrain_world_size > 0
             embedding_size = extra_info['embedding_size']

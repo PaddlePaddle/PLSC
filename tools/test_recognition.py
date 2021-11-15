@@ -33,6 +33,8 @@ from paddle.inference import create_predictor
 
 __all__ = ["InsightFace", "parser"]
 
+# Ref: https://github.com/littletomatodonkey/insight-face-paddle/blob/main/insightface_paddle.py
+
 
 def parser(add_help=True):
     def str2bool(v):

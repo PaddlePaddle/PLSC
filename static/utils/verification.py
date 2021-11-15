@@ -126,5 +126,5 @@ class CallBackVerification(object):
                 self.ver_name_list.append(name)
 
     def __call__(self, num_update):
-        if self.rank == 0 and num_update > 0 and num_update % self.frequent == 0:
+        if num_update > 0 and num_update % self.frequent == 0:
             self.ver_test(num_update)

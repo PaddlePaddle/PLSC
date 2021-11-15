@@ -101,7 +101,7 @@ class BasicBlock(nn.Layer):
             act=None,
             name=name + "_branch2a",
             data_format=data_format)
-        self.prelu = PReLU(num_parameters=1, name=name + "_branch2a_prelu")
+        self.prelu = PReLU(num_parameters=num_filters, name=name + "_branch2a_prelu")
         self.conv1 = ConvBNLayer(
             num_channels=num_filters,
             num_filters=num_filters,
@@ -283,7 +283,7 @@ class FresResNet(nn.Layer):
             act=None,
             name="conv1",
             data_format=self.data_format)
-        self.prelu = PReLU(num_parameters=1, name="prelu1")
+        self.prelu = PReLU(num_parameters=64, name="prelu1")
 
         self.block_list = paddle.nn.LayerList()
         for block in range(len(units)):
@@ -313,7 +313,8 @@ class FresResNet(nn.Layer):
                      num_features,
                      fc_type,
                      dropout,
-                     name='fc')
+                     name='fc',
+                     data_format=self.data_format)
 
     def forward(self, inputs):
         if self.data_format == "NHWC":

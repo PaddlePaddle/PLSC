@@ -75,6 +75,7 @@ def test(data_set, backbone, batch_size, fp16=False, nfolds=10):
     return acc1, std1, acc2, std2, _xnorm, embeddings_list
 
 
+# Ref: https://github.com/deepinsight/insightface/blob/master/recognition/arcface_torch/utils/utils_callbacks.py
 class CallBackVerification(object):
     def __init__(self,
                  frequent,
@@ -91,11 +92,10 @@ class CallBackVerification(object):
         self.highest_acc_list: List[float] = [0.0] * len(val_targets)
         self.ver_list: List[object] = []
         self.ver_name_list: List[str] = []
-        if self.rank == 0:
-            self.init_dataset(
-                val_targets=val_targets,
-                data_dir=rec_prefix,
-                image_size=image_size)
+        self.init_dataset(
+            val_targets=val_targets,
+            data_dir=rec_prefix,
+            image_size=image_size)
 
     def ver_test(self, backbone: paddle.nn.Layer, global_step: int):
         for i in range(len(self.ver_list)):
@@ -126,7 +126,7 @@ class CallBackVerification(object):
                 self.ver_name_list.append(name)
 
     def __call__(self, num_update, backbone: paddle.nn.Layer):
-        if self.rank == 0 and num_update > 0 and num_update % self.frequent == 0:
+        if num_update > 0 and num_update % self.frequent == 0:
             backbone.eval()
             with paddle.no_grad():
                 self.ver_test(backbone, num_update)

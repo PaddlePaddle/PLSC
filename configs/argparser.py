@@ -78,6 +78,11 @@ def parse_args():
         default=cfg.is_static,
         help='whether to use static mode')
     parser.add_argument(
+        '--data_format',
+        type=str,
+        default=cfg.data_format,
+        help='model data layout, "NCHW" or "NHWC"')
+    parser.add_argument(
         '--backbone', type=str, default=cfg.backbone, help='backbone network')
     parser.add_argument(
         '--classifier',
@@ -106,6 +111,11 @@ def parse_args():
         type=float,
         default=cfg.dropout,
         help='probability of dropout')
+    parser.add_argument(
+        '--lsc_init_from_numpy',
+        type=str2bool,
+        default=cfg.lsc_init_from_numpy,
+        help='init classifier param from numpy')
 
     # AMP setting
     parser.add_argument(
@@ -118,11 +128,6 @@ def parse_args():
         type=float,
         default=cfg.init_loss_scaling,
         help='The initial loss scaling factor.')
-    parser.add_argument(
-        '--max_loss_scaling',
-        type=float,
-        default=cfg.max_loss_scaling,
-        help='The maximum loss scaling factor.')
     parser.add_argument(
         '--incr_every_n_steps',
         type=int,
@@ -197,6 +202,16 @@ def parse_args():
         type=tointlist,
         default=cfg.decay_boundaries,
         help='piecewise decay boundaries')
+    parser.add_argument(
+        '--grad_norm_clip',
+        type=float,
+        default=cfg.grad_norm_clip,
+        help='global norm clip value')
+    parser.add_argument(
+        '--grad_norm_clip_max',
+        type=float,
+        default=cfg.grad_norm_clip_max,
+        help='global norm clip max value')
 
     # Train dataset setting
     parser.add_argument(
@@ -204,6 +219,16 @@ def parse_args():
         type=str2bool,
         default=cfg.use_synthetic_dataset,
         help='whether to use synthetic dataset')
+    parser.add_argument(
+        '--dataset_type',
+        type=str,
+        default=cfg.dataset_type,
+        help='dataset type')
+    parser.add_argument(
+        '--batch_sampler',
+        type=str,
+        default=cfg.batch_sampler,
+        help='batch sampler type, DistributedBatchSampler or BatchSampler')
     parser.add_argument(
         '--dataset', type=str, default=cfg.dataset, help='train dataset name')
     parser.add_argument(
@@ -265,12 +290,15 @@ def parse_args():
     parser.add_argument(
         '--output', type=str, default=cfg.output, help='output dir')
     parser.add_argument(
-        '--resume', type=str2bool, default=cfg.resume, help='model resuming')
+        '--resume',
+        type=str2bool,
+        default=cfg.resume,
+        help='whether to using resume training')
     parser.add_argument(
         '--checkpoint_dir',
         type=str,
         default=cfg.checkpoint_dir,
-        help='checkpoint direcotry')
+        help='set checkpoint direcotry when resume training')
     parser.add_argument(
         '--max_num_last_checkpoint',
         type=int,
