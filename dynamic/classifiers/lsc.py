@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import warnings
 import math
+import numpy as np
 import os
 import paddle
 import paddle.nn as nn
@@ -39,6 +39,7 @@ class LargeScaleClassifier(nn.Layer):
                  sample_ratio=1.0,
                  embedding_size=512,
                  fp16=False,
+                 numpy_init=True,
                  name=None):
         super(LargeScaleClassifier, self).__init__()
         self.num_classes: int = num_classes
@@ -59,21 +60,21 @@ class LargeScaleClassifier(nn.Layer):
         if name is None:
             name = 'dist@fc@rank@%05d.w' % rank
 
-        import numpy as np
-        stddev = math.sqrt(2.0 / (self.embedding_size + self.num_local))
-        init_total = np.random.RandomState(2021).normal(0.0, stddev, (
-            self.embedding_size, num_classes))
-        start_index = rank * ((num_classes + world_size - 1) // world_size)
-        end_index = start_index + self.num_local
-        init_local = init_total[:, start_index:end_index]
-        param_attr = paddle.ParamAttr(
-            name=name,
-            initializer=paddle.fluid.initializer.NumpyArrayInitializer(
-                init_local))
-
-        #         stddev = math.sqrt(2.0 / (self.embedding_size + self.num_local))
-        #         param_attr = paddle.ParamAttr(
-        #             name=name, initializer=paddle.nn.initializer.Normal(std=stddev))
+        if numpy_init:
+            stddev = math.sqrt(2.0 / (self.embedding_size + self.num_local))
+            init_total = np.random.RandomState(2021).normal(0.0, stddev, (
+                self.embedding_size, num_classes))
+            start_index = rank * ((num_classes + world_size - 1) // world_size)
+            end_index = start_index + self.num_local
+            init_local = init_total[:, start_index:end_index]
+            param_attr = paddle.ParamAttr(
+                name=name,
+                initializer=paddle.fluid.initializer.NumpyArrayInitializer(
+                    init_local))
+        else:
+            stddev = math.sqrt(2.0 / (self.embedding_size + self.num_local))
+            param_attr = paddle.ParamAttr(
+                name=name, initializer=paddle.nn.initializer.Normal(std=stddev))
 
         self.index = None
         self.weight = self.create_parameter(

@@ -22,7 +22,7 @@ import paddle
 from visualdl import LogWriter
 
 from utils.logging import AverageMeter, CallBackLogging
-from datasets import CommonDataset, SyntheticDataset
+import datasets
 from utils import losses
 
 from .utils.verification import CallBackVerification
@@ -56,17 +56,19 @@ def train(args):
         strategy = fleet.DistributedStrategy()
         strategy.without_graph_optimization = True
         fleet.init(is_collective=True, strategy=strategy)
-
+        
     if args.use_synthetic_dataset:
-        trainset = SyntheticDataset(args.num_classes, fp16=args.fp16)
+        trainset = datasets.SyntheticDataset(args.num_classes, fp16=args.fp16)
     else:
-        trainset = CommonDataset(
+        trainset = eval("datasets.{}".format(args.dataset_type))(
             root_dir=args.data_dir,
             label_file=args.label_file,
+            rank=rank,
+            world_size=world_size,
             fp16=args.fp16,
             is_bin=args.is_bin)
 
-    num_image = len(trainset)
+    num_image = trainset.total_num_samples
     total_batch_size = args.batch_size * world_size
     steps_per_epoch = num_image // total_batch_size
     if args.train_unit == 'epoch':
@@ -80,14 +82,13 @@ def train(args):
         decay_steps = [x for x in args.decay_boundaries]
         total_epoch = (total_steps + steps_per_epoch - 1) // steps_per_epoch
 
-    if rank == 0:
-        logging.info('world_size: {}'.format(world_size))
-        logging.info('total_batch_size: {}'.format(total_batch_size))
-        logging.info('warmup_steps: {}'.format(warmup_steps))
-        logging.info('steps_per_epoch: {}'.format(steps_per_epoch))
-        logging.info('total_steps: {}'.format(total_steps))
-        logging.info('total_epoch: {}'.format(total_epoch))
-        logging.info('decay_steps: {}'.format(decay_steps))
+    logging.info('world_size: {}'.format(world_size))
+    logging.info('total_batch_size: {}'.format(total_batch_size))
+    logging.info('warmup_steps: {}'.format(warmup_steps))
+    logging.info('steps_per_epoch: {}'.format(steps_per_epoch))
+    logging.info('total_steps: {}'.format(total_steps))
+    logging.info('total_epoch: {}'.format(total_epoch))
+    logging.info('decay_steps: {}'.format(decay_steps))
 
     base_lr = total_batch_size * args.lr / 512
     lr_scheduler = paddle.optimizer.lr.PiecewiseDecay(
@@ -129,13 +130,15 @@ def train(args):
             'custom_white_list': args.custom_white_list,
             'custom_black_list': args.custom_black_list,
         },
-        margin_loss_params=margin_loss_params, )
-
+        margin_loss_params=margin_loss_params,
+        data_format=args.data_format, 
+        lsc_init_from_numpy=args.lsc_init_from_numpy, )
+    
     if rank == 0:
         with open(os.path.join(args.output, 'main_program.txt'), 'w') as f:
             f.write(str(train_program))
 
-    if rank == 0 and args.do_validation_while_train:
+    if args.do_validation_while_train:
         test_model = StaticModel(
             main_program=test_program,
             startup_program=startup_program,
@@ -143,7 +146,8 @@ def train(args):
             embedding_size=args.embedding_size,
             dropout=args.dropout,
             mode='test',
-            fp16=args.fp16, )
+            fp16=args.fp16,
+            data_format=args.data_format, )
 
         callback_verification = CallBackVerification(
             args.validation_interval_step, rank, args.batch_size, test_program,
@@ -177,6 +181,12 @@ def train(args):
         # since we always use step style for lr_scheduler
         global_step = lr_state['last_epoch']
         train_model.lr_scheduler.set_state_dict(lr_state)
+    
+    batch_sampler = eval("paddle.io.{}".format(args.batch_sampler))(
+        dataset=trainset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=True)
 
     train_loader = paddle.io.DataLoader(
         trainset,
@@ -184,11 +194,7 @@ def train(args):
         places=place,
         return_list=False,
         num_workers=args.num_workers,
-        batch_sampler=paddle.io.DistributedBatchSampler(
-            dataset=trainset,
-            batch_size=args.batch_size,
-            shuffle=True,
-            drop_last=True))
+        batch_sampler=batch_sampler)
 
     for epoch in range(start_epoch, total_epoch):
         for step, data in enumerate(train_loader):
@@ -203,7 +209,7 @@ def train(args):
             loss_avg.update(np.array(loss_v)[0], 1)
             lr_value = train_model.optimizer.get_lr()
             callback_logging(global_step, loss_avg, epoch, lr_value)
-            if rank == 0 and args.do_validation_while_train:
+            if args.do_validation_while_train:
                 callback_verification(global_step)
             train_model.lr_scheduler.step()
 

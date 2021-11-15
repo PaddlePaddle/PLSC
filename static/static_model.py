@@ -28,7 +28,6 @@ from .utils.optimization_pass import gather_optimization_pass, amp_pass
 from . import classifiers
 from . import backbones
 
-
 class StaticModel(object):
     def __init__(self,
                  main_program,
@@ -45,7 +44,9 @@ class StaticModel(object):
                  mode='train',
                  fp16=False,
                  fp16_configs=None,
-                 margin_loss_params=None):
+                 margin_loss_params=None,
+                 lsc_init_from_numpy=True,
+                 data_format="NCHW"):
 
         rank = int(os.getenv("PADDLE_TRAINER_ID", 0))
         world_size = int(os.getenv("PADDLE_TRAINERS_NUM", 1))
@@ -66,6 +67,8 @@ class StaticModel(object):
         self.fp16 = fp16
         self.fp16_configs = fp16_configs
         self.margin_loss_params = margin_loss_params
+        self.lsc_init_from_numpy = lsc_init_from_numpy
+        self.data_format = data_format
 
         if self.mode == 'train':
             assert self.classifier_class_name is not None
@@ -80,7 +83,8 @@ class StaticModel(object):
                             num_features=self.embedding_size,
                             is_train=True,
                             fp16=self.fp16,
-                            dropout=dropout)
+                            dropout=dropout,
+                            data_format=self.data_format)
                     assert 'label' in self.backbone.input_dict
                     assert 'feature' in self.backbone.output_dict
                     self.classifier = eval("classifiers.{}".format(
@@ -95,7 +99,8 @@ class StaticModel(object):
                             margin3=self.margin_loss_params.margin3,
                             scale=self.margin_loss_params.scale,
                             sample_ratio=self.sample_ratio,
-                            embedding_size=self.embedding_size)
+                            embedding_size=self.embedding_size,
+                            numpy_init=self.lsc_init_from_numpy)
                     assert 'loss' in self.classifier.output_dict
 
                     self.optimizer = paddle.optimizer.Momentum(
@@ -151,7 +156,8 @@ class StaticModel(object):
                             num_features=self.embedding_size,
                             is_train=False,
                             fp16=self.fp16,
-                            dropout=dropout)
+                            dropout=dropout,
+                            data_format=self.data_format)
                     assert 'feature' in self.backbone.output_dict
 
         else:

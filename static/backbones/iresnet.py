@@ -31,11 +31,13 @@ class FresResNet(object):
                  is_train=True,
                  fp16=False,
                  fc_type='E',
-                 dropout=0.4):
+                 dropout=0.4,
+                 data_format="NCHW"):
         super(FresResNet, self).__init__()
         self.layers = layers
         self.num_features = num_features
         self.fc_type = fc_type
+        self.data_format = data_format
 
         self.input_dict = OrderedDict()
         self.output_dict = OrderedDict()
@@ -63,6 +65,9 @@ class FresResNet(object):
             units = [3, 8, 36, 3]
         filter_list = [64, 64, 128, 256, 512]
         num_stages = 4
+        
+        if data_format == 'NHWC':
+            image = paddle.tensor.transpose(image, [0, 2, 3, 1])
 
         input_blob = paddle.static.nn.conv2d(
             input=image,
@@ -72,17 +77,18 @@ class FresResNet(object):
             padding=1,
             groups=1,
             param_attr=paddle.ParamAttr(),
+            data_format=data_format,
             bias_attr=False)
         input_blob = paddle.static.nn.batch_norm(
             input=input_blob,
             act=None,
             epsilon=1e-05,
             momentum=0.9,
+            data_layout=data_format,
             is_test=False if is_train else True)
-        # input_blob = paddle.nn.functional.relu6(input_blob)
         input_blob = paddle.static.nn.prelu(
             input_blob,
-            mode="all",
+            mode="channel",
             param_attr=paddle.ParamAttr(
                 initializer=paddle.nn.initializer.Constant(0.25)))
 
@@ -94,19 +100,20 @@ class FresResNet(object):
                     3,
                     2 if j == 0 else 1,
                     1,
-                    is_train, )
-        fc1 = self.get_fc1(input_blob, is_train, dropout)
+                    is_train, data_format)
+        fc1 = self.get_fc1(input_blob, is_train, dropout, data_format)
 
         self.output_dict['feature'] = fc1
 
     def residual_unit_v3(self, in_data, num_filter, filter_size, stride, pad,
-                         is_train):
+                         is_train, data_format="NCHW"):
 
         bn1 = paddle.static.nn.batch_norm(
             input=in_data,
             act=None,
             epsilon=1e-05,
             momentum=0.9,
+            data_layout=data_format,
             is_test=False if is_train else True)
         conv1 = paddle.static.nn.conv2d(
             input=bn1,
@@ -116,17 +123,19 @@ class FresResNet(object):
             padding=1,
             groups=1,
             param_attr=paddle.ParamAttr(),
+            data_format=data_format,
             bias_attr=False)
         bn2 = paddle.static.nn.batch_norm(
             input=conv1,
             act=None,
             epsilon=1e-05,
             momentum=0.9,
+            data_layout=data_format,
             is_test=False if is_train else True)
         # prelu = paddle.nn.functional.relu6(bn2)
         prelu = paddle.static.nn.prelu(
             bn2,
-            mode="all",
+            mode="channel",
             param_attr=paddle.ParamAttr(
                 initializer=paddle.nn.initializer.Constant(0.25)))
         conv2 = paddle.static.nn.conv2d(
@@ -137,12 +146,14 @@ class FresResNet(object):
             padding=pad,
             groups=1,
             param_attr=paddle.ParamAttr(),
+            data_format=data_format,
             bias_attr=False)
         bn3 = paddle.static.nn.batch_norm(
             input=conv2,
             act=None,
             epsilon=1e-05,
             momentum=0.9,
+            data_layout=data_format,
             is_test=False if is_train else True)
 
         if stride == 1:
@@ -156,6 +167,7 @@ class FresResNet(object):
                 padding=0,
                 groups=1,
                 param_attr=paddle.ParamAttr(),
+                data_format=data_format,
                 bias_attr=False)
 
             input_blob = paddle.static.nn.batch_norm(
@@ -163,18 +175,20 @@ class FresResNet(object):
                 act=None,
                 epsilon=1e-05,
                 momentum=0.9,
+                data_layout=data_format,
                 is_test=False if is_train else True)
 
         identity = paddle.add(bn3, input_blob)
         return identity
 
-    def get_fc1(self, last_conv, is_train, dropout=0.4):
+    def get_fc1(self, last_conv, is_train, dropout=0.4, data_format="NCHW"):
         body = last_conv
         if self.fc_type == "Z":
             body = paddle.static.nn.batch_norm(
                 input=body,
                 act=None,
                 epsilon=1e-05,
+                data_layout=data_format,
                 is_test=False if is_train else True)
             if dropout > 0:
                 body = paddle.nn.functional.dropout(
@@ -188,6 +202,7 @@ class FresResNet(object):
                 input=body,
                 act=None,
                 epsilon=1e-05,
+                data_layout=data_format,
                 is_test=False if is_train else True)
             if dropout > 0:
                 body = paddle.nn.functional.dropout(
@@ -207,6 +222,7 @@ class FresResNet(object):
                 input=fc1,
                 act=None,
                 epsilon=1e-05,
+                data_layout=data_format,
                 is_test=False if is_train else True)
 
         elif self.fc_type == "FC":
@@ -214,6 +230,7 @@ class FresResNet(object):
                 input=body,
                 act=None,
                 epsilon=1e-05,
+                data_layout=data_format,
                 is_test=False if is_train else True)
             fc1 = paddle.static.nn.fc(
                 x=body,
@@ -227,6 +244,7 @@ class FresResNet(object):
                 input=fc1,
                 act=None,
                 epsilon=1e-05,
+                data_layout=data_format,
                 is_test=False if is_train else True)
 
         return fc1

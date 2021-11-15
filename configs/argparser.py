@@ -111,6 +111,11 @@ def parse_args():
         type=float,
         default=cfg.dropout,
         help='probability of dropout')
+    parser.add_argument(
+        '--lsc_init_from_numpy',
+        type=str2bool,
+        default=cfg.lsc_init_from_numpy,
+        help='init classifier param from numpy')
 
     # AMP setting
     parser.add_argument(
@@ -197,6 +202,16 @@ def parse_args():
         type=tointlist,
         default=cfg.decay_boundaries,
         help='piecewise decay boundaries')
+    parser.add_argument(
+        '--grad_norm_clip',
+        type=float,
+        default=cfg.grad_norm_clip,
+        help='global norm clip value')
+    parser.add_argument(
+        '--grad_norm_clip_max',
+        type=float,
+        default=cfg.grad_norm_clip_max,
+        help='global norm clip max value')
 
     # Train dataset setting
     parser.add_argument(

@@ -21,7 +21,7 @@ import logging
 import paddle
 from visualdl import LogWriter
 
-from utils.logging import AverageMeter, init_logging, CallBackLogging
+from utils.logging import AverageMeter, CallBackLogging
 import datasets
 from utils import losses
 
@@ -119,7 +119,8 @@ def train(args):
         scale=margin_loss_params.scale,
         sample_ratio=args.sample_ratio,
         embedding_size=args.embedding_size,
-        fp16=args.fp16)
+        fp16=args.fp16,
+        numpy_init=args.lsc_init_from_numpy, )
 
     backbone.train()
     classifier.train()
@@ -189,8 +190,8 @@ def train(args):
         incr_every_n_steps=args.incr_every_n_steps,
         decr_every_n_nan_or_inf=args.decr_every_n_nan_or_inf,
         use_dynamic_loss_scaling=args.use_dynamic_loss_scaling,
-        grad_norm_clip=2.0,
-        grad_norm_clip_max=2.0,
+        grad_norm_clip=args.grad_norm_clip,
+        grad_norm_clip_max=args.grad_norm_clip_max,
         world_size=world_size, )
     scaler.sync_params_buffers(backbone)
 

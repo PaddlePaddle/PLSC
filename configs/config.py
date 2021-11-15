@@ -24,6 +24,7 @@ config.model_parallel = True
 config.sample_ratio = 0.1
 config.loss = 'ArcFace'
 config.dropout = 0.0
+config.lsc_init_from_numpy = True
 
 config.fp16 = True
 config.init_loss_scaling = 27648.0
@@ -43,6 +44,8 @@ config.train_unit = 'step'  # 'step' or 'epoch'
 config.warmup_num = 1000
 config.train_num = 180000
 config.decay_boundaries = [100000, 140000, 160000]
+config.grad_norm_clip = 2.0
+config.grad_norm_clip_max = 2.0
 
 config.use_synthetic_dataset = False
 config.dataset_type = 'CommonDataset'

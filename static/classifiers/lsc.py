@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+import numpy as np
 from six.moves import reduce
 from collections import OrderedDict
 
@@ -41,6 +42,7 @@ class LargeScaleClassifier(object):
                  scale=64.0,
                  sample_ratio=1.0,
                  embedding_size=512,
+                 numpy_init=True,
                  name=None):
         super(LargeScaleClassifier, self).__init__()
         self.num_classes: int = num_classes
@@ -65,10 +67,22 @@ class LargeScaleClassifier(object):
 
         if name is None:
             name = 'dist@fc@rank@%05d.w' % rank
-
-        stddev = math.sqrt(2.0 / (self.embedding_size + self.num_local))
-        param_attr = paddle.ParamAttr(
-            initializer=paddle.nn.initializer.Normal(std=stddev))
+            
+        if numpy_init:
+            stddev = math.sqrt(2.0 / (self.embedding_size + self.num_local))
+            init_total = np.random.RandomState(2021).normal(0.0, stddev, (
+                self.embedding_size, num_classes))
+            start_index = rank * ((num_classes + world_size - 1) // world_size)
+            end_index = start_index + self.num_local
+            init_local = init_total[:, start_index:end_index]
+            param_attr = paddle.ParamAttr(
+                name=name,
+                initializer=paddle.fluid.initializer.NumpyArrayInitializer(
+                    init_local))
+        else:
+            stddev = math.sqrt(2.0 / (self.embedding_size + self.num_local))
+            param_attr = paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Normal(std=stddev))
 
         weight_dtype = 'float16' if feature.dtype == paddle.float16 else 'float32'
         weight = paddle.static.create_parameter(
