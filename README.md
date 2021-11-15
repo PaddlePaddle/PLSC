@@ -170,8 +170,8 @@ sh scripts/inference.sh
 | ------- | :------: | :------- | ----- | :------ | :----- | :--- | :--- |  :--- |
 | Static  |  MS1MV3  | r50      | 0.1   | 0.98317 | 0.98943| 0.99850 | [log](experiments/logs/static/ms1mv3_r50_static_128_fp16_0.1/training.log) | [checkpoint](https://paddle-model-ecology.bj.bcebos.com/model/insight-face/distributed/ms1mv3_r50_static_128_fp16_0.1_epoch_24.tgz) |
 | Static  |  MS1MV3  | r50      | 1.0   | 0.98283 | 0.98843| 0.99850 | [log](experiments/logs/static/ms1mv3_r50_static_128_fp16_1.0/training.log) | [checkpoint](https://paddle-model-ecology.bj.bcebos.com/model/insight-face/distributed/ms1mv3_r50_static_128_fp16_1.0_epoch_24.tgz) |
-| Dynamic |  MS1MV3  | r50      | 0.1   | 0.98367 | 0.98971| 0.99850 | [log](experiments/logs/dynamic/ms1mv3_r50_dynamic_128_fp16_0.1/training.log) | [checkpoint](https://paddle-model-ecology.bj.bcebos.com/model/insight-face/distributed/ms1mv3_r50_dynamic_128_fp16_0.1_eopch_24.tgz) |
-| Dynamic |  MS1MV3  | r50      | 1.0   | 0.98333 | 0.99043| 0.99850 | [log](experiments/logs/dynamic/ms1mv3_r50_dynamic_128_fp16_1.0/training.log) | [checkpoint](https://paddle-model-ecology.bj.bcebos.com/model/insight-face/distributed/ms1mv3_r50_dynamic_128_fp16_1.0_eopch_24.tgz) |
+| Dynamic |  MS1MV3  | r50      | 0.1   | 0.98367 | 0.98971| 0.99850 | [log](experiments/logs/dynamic/ms1mv3_r50_dynamic_128_fp16_0.1/training.log) | [checkpoint](https://plsc.bj.bcebos.com/pretrained_model/ms1mv3_r50_dynamic_128_fp16_0.1_eopch_24.tgz) |
+| Dynamic |  MS1MV3  | r50      | 1.0   | 0.98333 | 0.99043| 0.99850 | [log](experiments/logs/dynamic/ms1mv3_r50_dynamic_128_fp16_1.0/training.log) | [checkpoint](https://plsc.bj.bcebos.com/pretrained_model/ms1mv3_r50_dynamic_128_fp16_1.0_eopch_24.tgz) |
 
   
 ### 8.2 Maximum Number of Identities 
