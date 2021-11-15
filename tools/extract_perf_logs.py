@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+'''
+Ref: https://github.com/Oneflow-Inc/DLPerf/blob/7e236cf41d9ec4c662d73cb8997049c8dc9470fb/PaddlePaddle/PLSC/extract_paddle_logs.py
+Thanks for oneflow
+'''
 
 import os
 import re

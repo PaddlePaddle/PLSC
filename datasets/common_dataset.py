@@ -40,7 +40,7 @@ def transform(img):
 
 
 class CommonDataset(paddle.io.Dataset):
-    def __init__(self, root_dir, label_file, fp16=False, is_bin=True):
+    def __init__(self, root_dir, label_file, rank=0, world_size=1, fp16=False, is_bin=True):
         super(CommonDataset, self).__init__()
         self.root_dir = root_dir
         self.label_file = label_file
@@ -51,6 +51,7 @@ class CommonDataset(paddle.io.Dataset):
         self.delimiter = "\t"
         self.is_bin = is_bin
 
+        self.total_num_samples = len(self.full_lines)
         self.num_samples = len(self.full_lines)
         logging.info("read label file finished, total num: {}"
                      .format(self.num_samples))
@@ -75,7 +76,53 @@ class CommonDataset(paddle.io.Dataset):
 
     def __len__(self):
         return self.num_samples
+    
+class SplitDataset(paddle.io.Dataset):
+    def __init__(self, root_dir, label_file, rank=0, world_size=1, fp16=False, is_bin=True):
+        super(SplitDataset, self).__init__()
+        self.root_dir = root_dir
+        self.label_file = label_file
+        self.rank = rank
+        self.world_size = world_size
+        self.fp16 = fp16
+        with open(label_file, "r") as fin:
+            self.full_lines = fin.readlines()
+            
+        self.total_num_samples = len(self.full_lines)
+        random.shuffle(self.full_lines)
+        
+        num_samples_per_rank = (self.total_num_samples + self.world_size - 1) // self.world_size
+        self.full_lines += self.full_lines[0:num_samples_per_rank * self.world_size - self.total_num_samples]
+        self.partial_lines = self.full_lines[rank * num_samples_per_rank:(rank + 1) * num_samples_per_rank]
 
+        self.delimiter = "\t"
+        self.is_bin = is_bin
+
+        self.total_num_samples = len(self.full_lines)
+        self.num_samples = len(self.partial_lines)
+        logging.info("read label file finished, total num: {}, cur rank num: {}"
+                     .format(self.total_num_samples, self.num_samples))
+
+    def __getitem__(self, idx):
+
+        line = self.partial_lines[idx]
+
+        img_path, label = line.strip().split(self.delimiter)
+        img_path = os.path.join(self.root_dir, img_path)
+        if self.is_bin:
+            img = read_img_from_bin(img_path)
+        else:
+            img = cv2.imread(img_path)
+
+        img = transform(img)
+
+        img = img.astype('float16' if self.fp16 else 'float32')
+        label = np.int32(label)
+
+        return img, label
+    
+    def __len__(self):
+        return self.num_samples
 
 class SyntheticDataset(paddle.io.Dataset):
     def __init__(self, num_classes, fp16=False):
@@ -84,6 +131,8 @@ class SyntheticDataset(paddle.io.Dataset):
         self.fp16 = fp16
         self.label_list = np.random.randint(
             0, num_classes, (5179510, ), dtype=np.int32)
+        
+        self.total_num_samples = len(self.label_list)
         self.num_samples = len(self.label_list)
 
     def __getitem__(self, idx):

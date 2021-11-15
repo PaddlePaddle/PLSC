@@ -32,8 +32,10 @@ fi
 
 if [ $dtype = "fp16" ]; then
     fp16=True
+    data_format=NHWC
 else
     fp16=False
+    data_format=NCHW
 fi
 
 if [[ $config_file =~ r50 ]]; then
@@ -57,4 +59,5 @@ python -m paddle.distributed.launch --gpus=${gpus} --log_dir=${log_dir} tools/tr
     --train_num 200 \
     --warmup_num 0 \
     --use_synthetic_dataset True \
-    --do_validation_while_train False
+    --do_validation_while_train False \
+    --data_format=${data_format}

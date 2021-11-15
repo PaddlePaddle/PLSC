@@ -16,6 +16,7 @@ from easydict import EasyDict as edict
 
 config = edict()
 config.is_static = True
+config.data_format = 'NCHW'  # 'NCHW' or 'NHWC'
 config.backbone = 'FresResNet100'
 config.classifier = 'LargeScaleClassifier'
 config.embedding_size = 512
@@ -23,10 +24,10 @@ config.model_parallel = True
 config.sample_ratio = 0.1
 config.loss = 'ArcFace'
 config.dropout = 0.0
+config.lsc_init_from_numpy = True
 
 config.fp16 = True
-config.init_loss_scaling = 128.0
-config.max_loss_scaling = 128.0
+config.init_loss_scaling = 27648.0
 config.incr_every_n_steps = 2000
 config.decr_every_n_nan_or_inf = 1
 config.incr_ratio = 2.0
@@ -43,8 +44,12 @@ config.train_unit = 'step'  # 'step' or 'epoch'
 config.warmup_num = 1000
 config.train_num = 180000
 config.decay_boundaries = [100000, 140000, 160000]
+config.grad_norm_clip = 2.0
+config.grad_norm_clip_max = 2.0
 
 config.use_synthetic_dataset = False
+config.dataset_type = 'CommonDataset'
+config.batch_sampler = 'DistributedBatchSampler'  # 'DistributedBatchSampler' or 'BatchSampler'
 config.dataset = "MS1M_v3"
 config.data_dir = "./MS1M_v3"
 config.label_file = "./MS1M_v3/label.txt"
