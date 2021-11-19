@@ -65,7 +65,7 @@ class FresResNet(object):
             units = [3, 8, 36, 3]
         filter_list = [64, 64, 128, 256, 512]
         num_stages = 4
-        
+
         if data_format == 'NHWC':
             image = paddle.tensor.transpose(image, [0, 2, 3, 1])
 
@@ -86,6 +86,7 @@ class FresResNet(object):
             momentum=0.9,
             data_layout=data_format,
             is_test=False if is_train else True)
+        # TODO(GuoxiaWang): add data_format attr
         input_blob = paddle.static.nn.prelu(
             input_blob,
             mode="channel",
@@ -95,18 +96,20 @@ class FresResNet(object):
         for i in range(num_stages):
             for j in range(units[i]):
                 input_blob = self.residual_unit_v3(
-                    input_blob,
-                    filter_list[i + 1],
-                    3,
-                    2 if j == 0 else 1,
-                    1,
-                    is_train, data_format)
+                    input_blob, filter_list[i + 1], 3, 2
+                    if j == 0 else 1, 1, is_train, data_format)
         fc1 = self.get_fc1(input_blob, is_train, dropout, data_format)
 
         self.output_dict['feature'] = fc1
 
-    def residual_unit_v3(self, in_data, num_filter, filter_size, stride, pad,
-                         is_train, data_format="NCHW"):
+    def residual_unit_v3(self,
+                         in_data,
+                         num_filter,
+                         filter_size,
+                         stride,
+                         pad,
+                         is_train,
+                         data_format="NCHW"):
 
         bn1 = paddle.static.nn.batch_norm(
             input=in_data,
@@ -132,7 +135,7 @@ class FresResNet(object):
             momentum=0.9,
             data_layout=data_format,
             is_test=False if is_train else True)
-        # prelu = paddle.nn.functional.relu6(bn2)
+        # TODO(GuoxiaWang): add data_format attr
         prelu = paddle.static.nn.prelu(
             bn2,
             mode="channel",

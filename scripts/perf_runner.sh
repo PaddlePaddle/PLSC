@@ -32,7 +32,9 @@ fi
 
 if [ $dtype = "fp16" ]; then
     fp16=True
-    data_format=NHWC
+    data_format=NCHW
+# TODO(GuoxiaWang): remove NCHW when PRelu support NHWC
+#    data_format=NHWC
 else
     fp16=False
     data_format=NCHW
