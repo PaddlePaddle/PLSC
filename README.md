@@ -163,7 +163,7 @@ sh scripts/inference.sh
 
 **Configuration：**
   * GPU: 8 NVIDIA Tesla V100 32G
-  * Precison: Pure FP16
+  * Precison: FP16
   * BatchSize: 128/1024
 
 | Mode    | Datasets | backbone | Ratio | agedb30 | cfp_fp | lfw  | log  | last checkpoint |
@@ -183,10 +183,10 @@ sh scripts/inference.sh
 
 | Mode                      | Precision | Res50    | Res100   |
 | ------------------------- | --------- | -------- | -------- |
-| Oneflow (static)       | AMP       | 42000000 (31792MiB)| 39000000 (31938MiB)|
-| PyTorch (dynamic)      | AMP       | 30000000 (31702MiB)| 29000000 (32286MiB)|
-| Paddle (static)           | Pure FP16 | 60000000 (32018MiB)| 60000000 (32018MiB)|
-| Paddle (dynamic)          | Pure FP16 | 67000000 (31970MiB)| 67000000 (31970MiB)|
+| Framework1 (static)       | AMP       | 42000000 (31792MiB)| 39000000 (31938MiB)|
+| Framework2 (dynamic)      | AMP       | 30000000 (31702MiB)| 29000000 (32286MiB)|
+| Paddle (static)           | FP16 | 60000000 (32018MiB)| 60000000 (32018MiB)|
+| Paddle (dynamic)          | FP16 | 67000000 (31970MiB)| 67000000 (31970MiB)|
 
 **Note:** config environment variable by ``export FLAGS_allocator_strategy=naive_best_fit``
 
