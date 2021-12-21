@@ -17,6 +17,7 @@ import os
 import sys
 import numpy as np
 import logging
+import random
 
 import paddle
 from visualdl import LogWriter
@@ -33,13 +34,15 @@ from .utils.hybrid_optimizer import HybridOptimizer
 from . import classifiers
 from . import backbones
 
+
 RELATED_FLAGS_SETTING = {
     'FLAGS_cudnn_exhaustive_search': 1,
+    'FLAGS_benchmark': 1,
+    'FLAGS_cudnn_deterministic': 1,
     'FLAGS_cudnn_batchnorm_spatial_persistent': 1,
     'FLAGS_max_inplace_grad_add': 8,
     'FLAGS_fraction_of_gpu_memory_to_use': 0.9999,
 }
-paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
 
 
 def train(args):
@@ -50,6 +53,19 @@ def train(args):
 
     gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
     place = paddle.CUDAPlace(gpu_id)
+
+    if args.seed != 0:
+        RELATED_FLAGS_SETTING.pop('FLAGS_cudnn_exhaustive_search')
+        args.seed = args.seed + rank
+        paddle.seed(args.seed)
+        np.random.seed(args.seed)
+        random.seed(args.seed)
+        args.num_workers = 0
+    else:
+        RELATED_FLAGS_SETTING.pop('FLAGS_benchmark')
+        RELATED_FLAGS_SETTING.pop('FLAGS_cudnn_deterministic')
+        
+    paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
 
     if world_size > 1:
         import paddle.distributed.fleet as fleet
@@ -67,7 +83,8 @@ def train(args):
             rank=rank,
             world_size=world_size,
             fp16=args.fp16,
-            is_bin=args.is_bin)
+            is_bin=args.is_bin,
+            seed=args.seed)
 
     num_image = trainset.total_num_samples
     total_batch_size = args.batch_size * world_size

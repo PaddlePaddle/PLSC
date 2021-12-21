@@ -71,6 +71,11 @@ def parse_args():
     parser.parse_known_args(namespace=user_namespace)
     cfg = get_config(user_namespace.config_file)
 
+    parser.add_argument(
+        '--seed',
+        type=int,
+        default=cfg.seed,
+        help='global seed, 0 means do not fix seed')
     # Model setting
     parser.add_argument(
         '--is_static',

@@ -34,11 +34,11 @@ config.train_num = 25
 config.decay_boundaries = [10, 16, 22]
 
 config.use_synthetic_dataset = False
-config.dataset = "MS1M_v2"
-config.data_dir = "./MS1M_v2"
-config.label_file = "./MS1M_v2/label.txt"
+config.dataset = "MS1M_v3"
+config.data_dir = "./MS1M_v3"
+config.label_file = "./MS1M_v3/label.txt"
 config.is_bin = False
-config.num_classes = 85742  # 85742 for MS1M_v2, 93431 for MS1M_v3
+config.num_classes = 93431  # 85742 for MS1M_v2, 93431 for MS1M_v3
 config.batch_size = 128  # global batch size 1024 of 8 GPU
 config.num_workers = 8
 
@@ -48,7 +48,7 @@ config.val_targets = ["lfw", "cfp_fp", "agedb_30"]
 
 config.logdir = './log'
 config.log_interval_step = 100
-config.output = './MS1M_v2_arcface_MobileFaceNet_128_0.1'
+config.output = './MS1M_v3_arcface_MobileFaceNet_128_0.1'
 config.resume = False
 config.checkpoint_dir = None
 config.max_num_last_checkpoint = 1

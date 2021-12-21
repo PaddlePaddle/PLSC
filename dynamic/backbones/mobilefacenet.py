@@ -42,7 +42,7 @@ class BottleNeck(nn.Layer):
             nn.Conv2D(
                 inp, inp * expansion, 1, 1, 0, bias_attr=False, data_format=data_format),
             nn.BatchNorm2D(inp * expansion, data_format=data_format),
-            nn.PReLU(inp * expansion),
+            nn.PReLU(inp * expansion, data_format=data_format),
 
             # 3*3 depth wise conv
             nn.Conv2D(
@@ -56,7 +56,7 @@ class BottleNeck(nn.Layer):
                 data_format=data_format
             ),
             nn.BatchNorm2D(inp * expansion, data_format=data_format),
-            nn.PReLU(inp * expansion),
+            nn.PReLU(inp * expansion, data_format=data_format),
 
             # 1*1 conv
             nn.Conv2D(
@@ -82,7 +82,7 @@ class ConvBlock(nn.Layer):
 
         self.bn = nn.BatchNorm2D(oup, data_format=data_format)
         if not linear:
-            self.prelu = nn.PReLU(oup)
+            self.prelu = nn.PReLU(oup, data_format=data_format)
 
     def forward(self, x):
         x = self.conv(x)
@@ -155,6 +155,8 @@ class MobileFaceNet(nn.Layer):
         x = self.conv2(x)
         x = self.linear7(x)
         x = self.linear1(x)
+        if self.data_format == "NHWC":
+            x = paddle.tensor.transpose(x, [0, 3, 1, 2])
         x = x.reshape([x.shape[0], x.shape[1] * x.shape[2] * x.shape[3]])
         return x
 

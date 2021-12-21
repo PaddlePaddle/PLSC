@@ -15,6 +15,8 @@
 from easydict import EasyDict as edict
 
 config = edict()
+config.seed = 0 # global seed, 0 means do not fix seed
+
 config.is_static = True
 config.data_format = 'NCHW'  # 'NCHW' or 'NHWC'
 config.backbone = 'FresResNet100'

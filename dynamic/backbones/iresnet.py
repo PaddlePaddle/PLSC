@@ -101,7 +101,7 @@ class BasicBlock(nn.Layer):
             act=None,
             name=name + "_branch2a",
             data_format=data_format)
-        self.prelu = PReLU(num_parameters=num_filters, name=name + "_branch2a_prelu")
+        self.prelu = PReLU(num_parameters=num_filters, data_format=data_format, name=name + "_branch2a_prelu")
         self.conv1 = ConvBNLayer(
             num_channels=num_filters,
             num_filters=num_filters,
@@ -283,7 +283,7 @@ class FresResNet(nn.Layer):
             act=None,
             name="conv1",
             data_format=self.data_format)
-        self.prelu = PReLU(num_parameters=64, name="prelu1")
+        self.prelu = PReLU(num_parameters=64, data_format=self.data_format, name="prelu1")
 
         self.block_list = paddle.nn.LayerList()
         for block in range(len(units)):
@@ -308,13 +308,15 @@ class FresResNet(nn.Layer):
         feat_w = input_image_width // 16
         feat_h = input_image_height // 16
         self.fc_channels = num_filters[-1] * feat_w * feat_h
+        #NOTE(GuoxiaWang): don't use NHWC for last fc,
+        # thus we can train using NHWC and test using NCHW
         self.fc = FC(num_filters[-1],
                      self.fc_channels,
                      num_features,
                      fc_type,
                      dropout,
                      name='fc',
-                     data_format=self.data_format)
+                     data_format="NCHW")
 
     def forward(self, inputs):
         if self.data_format == "NHWC":
@@ -324,6 +326,8 @@ class FresResNet(nn.Layer):
         y = self.prelu(y)
         for block in self.block_list:
             y = block(y)
+        if self.data_format == "NHWC":
+            y = paddle.tensor.transpose(y, [0, 3, 1, 2])
         y = self.fc(y)
         return y
 

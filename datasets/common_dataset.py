@@ -26,7 +26,6 @@ from io import BytesIO
 
 from datasets.kv_helper import read_img_from_bin
 
-
 def transform(img):
     # random horizontal flip
     if random.randint(0, 1) == 0:
@@ -40,11 +39,14 @@ def transform(img):
 
 
 class CommonDataset(paddle.io.Dataset):
-    def __init__(self, root_dir, label_file, rank=0, world_size=1, fp16=False, is_bin=True):
+    def __init__(self, root_dir, label_file, rank=0, world_size=1, fp16=False, is_bin=True, seed=0):
         super(CommonDataset, self).__init__()
         self.root_dir = root_dir
         self.label_file = label_file
         self.fp16 = fp16
+        self.seed = seed
+        if self.seed != 0:
+            random.seed(self.seed)
         with open(label_file, "r") as fin:
             self.full_lines = fin.readlines()
 
@@ -78,13 +80,17 @@ class CommonDataset(paddle.io.Dataset):
         return self.num_samples
     
 class SplitDataset(paddle.io.Dataset):
-    def __init__(self, root_dir, label_file, rank=0, world_size=1, fp16=False, is_bin=True):
+    def __init__(self, root_dir, label_file, rank=0, world_size=1, fp16=False, is_bin=True, seed=0):
         super(SplitDataset, self).__init__()
         self.root_dir = root_dir
         self.label_file = label_file
         self.rank = rank
         self.world_size = world_size
         self.fp16 = fp16
+        self.seed = seed
+        if self.seed != 0:
+            random.seed(self.seed)
+
         with open(label_file, "r") as fin:
             self.full_lines = fin.readlines()
             
