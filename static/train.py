@@ -150,7 +150,8 @@ def train(args):
             data_format=args.data_format, )
 
         callback_verification = CallBackVerification(
-            args.validation_interval_step, rank, args.batch_size, test_program,
+            args.validation_interval_step, rank, world_size,
+            args.batch_size, test_program,
             list(test_model.backbone.input_dict.values()),
             list(test_model.backbone.output_dict.values()), args.val_targets,
             args.data_dir)
@@ -210,7 +211,16 @@ def train(args):
             lr_value = train_model.optimizer.get_lr()
             callback_logging(global_step, loss_avg, epoch, lr_value)
             if args.do_validation_while_train:
-                callback_verification(global_step)
+                best_metric = callback_verification(global_step)
+                if best_metric is not None and len(best_metric) > 0:
+                    for ver_dataset in best_metric:
+                        checkpoint.save(
+                            train_program,
+                            lr_scheduler=train_model.lr_scheduler,
+                            epoch=epoch,
+                            for_train=True,
+                            best_metric=best_metric[ver_dataset])
+                        
             train_model.lr_scheduler.step()
 
             if global_step >= total_steps:

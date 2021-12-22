@@ -80,6 +80,7 @@ class CallBackVerification(object):
     def __init__(self,
                  frequent,
                  rank,
+                 world_size,
                  batch_size,
                  val_targets,
                  rec_prefix,
@@ -87,6 +88,7 @@ class CallBackVerification(object):
                  image_size=(112, 112)):
         self.frequent: int = frequent
         self.rank: int = rank
+        self.world_size: int = world_size
         self.batch_size: int = batch_size
         self.fp16 = fp16
         self.highest_acc_list: List[float] = [0.0] * len(val_targets)
@@ -98,6 +100,7 @@ class CallBackVerification(object):
             image_size=image_size)
 
     def ver_test(self, backbone: paddle.nn.Layer, global_step: int):
+        best_metric = {}
         for i in range(len(self.ver_list)):
             test_start = time.time()
             acc1, std1, acc2, std2, xnorm, embeddings_list = test(
@@ -110,12 +113,27 @@ class CallBackVerification(object):
                          (self.ver_name_list[i], global_step, xnorm))
             logging.info('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' %
                          (self.ver_name_list[i], global_step, acc2, std2))
-            if acc2 > self.highest_acc_list[i]:
-                self.highest_acc_list[i] = acc2
+            if self.world_size > 1:
+                max_acc_tensor = paddle.to_tensor(acc2, dtype='float64')
+                paddle.distributed.all_reduce(max_acc_tensor, paddle.distributed.ReduceOp.MAX)
+                max_acc = max_acc_tensor.item()
+            else:
+                max_acc = acc2
+            if max_acc > self.highest_acc_list[i]:
+                self.highest_acc_list[i] = max_acc
+                if abs(max_acc - acc2) < 1e-8:
+                    best_metric[self.ver_name_list[i]] = {
+                        'global_step': global_step, 
+                        'acc2': acc2, 
+                        'rank': self.rank,
+                        'dataset_name': self.ver_name_list[i],
+                    }
+                
             logging.info('[%s][%d]Accuracy-Highest: %1.5f' % (
                 self.ver_name_list[i], global_step, self.highest_acc_list[i]))
             test_end = time.time()
             logging.info("test time: {:.4f}".format(test_end - test_start))
+        return best_metric
 
     def init_dataset(self, val_targets, data_dir, image_size):
         for name in val_targets:
@@ -129,5 +147,7 @@ class CallBackVerification(object):
         if num_update > 0 and num_update % self.frequent == 0:
             backbone.eval()
             with paddle.no_grad():
-                self.ver_test(backbone, num_update)
+                best_metric = self.ver_test(backbone, num_update)
             backbone.train()
+            return best_metric
+        return None

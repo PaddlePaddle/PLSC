@@ -19,6 +19,8 @@ import logging
 import numpy as np
 import shutil
 import json
+
+from paddle.fluid.data_feeder import convert_dtype
 from utils.rearrange_weight import rearrange_weight
 
 
@@ -40,8 +42,15 @@ class Checkpoint(object):
         self.checkpoint_dir: str = checkpoint_dir
         self.max_num_last_checkpoint: int = max_num_last_checkpoint
 
-    def save(self, program, lr_scheduler=None, epoch=0, for_train=True):
-        model_save_dir = os.path.join(self.model_save_dir, str(epoch))
+    def save(self, program, lr_scheduler=None, epoch=0, for_train=True, best_metric=None):
+        
+        if best_metric is not None:
+            save_rank = best_metric['rank']
+            model_save_dir = os.path.join(self.model_save_dir, 'best_model', str(best_metric['dataset_name']))
+        else:
+            save_rank = 0 # default we only save rank 0 backbone
+            model_save_dir = os.path.join(self.model_save_dir, str(epoch))
+            
         if not os.path.exists(model_save_dir):
             # may be more than one processes trying
             # to create the directory
@@ -56,7 +65,7 @@ class Checkpoint(object):
         for name, param in param_state_dict.items():
             # for non dist param, we only save their at rank 0,
             # but for dist param, we need to save their at all ranks.
-            if 'dist@' in name and '@rank@' in name or self.rank == 0:
+            if 'dist@' in name and '@rank@' in name or self.rank == save_rank:
                 paddle.save(param,
                             os.path.join(model_save_dir, name + '.pdparam'))
 
@@ -71,7 +80,7 @@ class Checkpoint(object):
                     paddle.save(opt,
                                 os.path.join(model_save_dir, name + '.pdopt'))
 
-            if self.rank == 0:
+            if self.rank == save_rank:
                 # save some extra info for resume
                 # pretrain_world_size, embedding_size, num_classes are used for
                 # re-split fc weight when gpu setting changed.
@@ -83,6 +92,8 @@ class Checkpoint(object):
                 extra_info['num_classes'] = self.num_classes
                 extra_info['epoch'] = epoch
                 extra_info['lr_state'] = lr_scheduler.state_dict()
+                if best_metric is not None:
+                    extra_info['best_metric'] = best_metric
                 with open(config_file, 'w') as f:
                     json.dump(extra_info, f)
 
@@ -97,6 +108,14 @@ class Checkpoint(object):
     def load(self, program, for_train=True, dtype=None):
         assert os.path.exists(self.checkpoint_dir)
         checkpoint_dir = os.path.abspath(self.checkpoint_dir)
+        
+        param_state_dict = program.state_dict(mode='param')
+        opt_state_dict = program.state_dict(mode='opt')
+        type_dict = {}
+        for name, param in param_state_dict.items():
+            type_dict[name] = convert_dtype(param._dtype())
+        for name, opt in opt_state_dict.items():
+            type_dict[name] = convert_dtype(opt._dtype()) 
 
         state_dict = {}
         dist_weight_state_dict = {}
@@ -121,6 +140,10 @@ class Checkpoint(object):
             if dtype:
                 assert dtype in ['float32', 'float16']
                 tensor = tensor.astype(dtype)
+            elif name in type_dict:
+                tensor = tensor.astype(type_dict[name])
+            else:
+                pass
 
             if 'dist@' in name and '@rank@' in name:
                 if '.w' in name and 'velocity' not in name:

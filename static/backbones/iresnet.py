@@ -86,8 +86,6 @@ class FresResNet(object):
             momentum=0.9,
             data_layout=data_format,
             is_test=False if is_train else True)
-        print(input_blob.shape)
-        print(data_format, '>>>>>>')
         input_blob = paddle.static.nn.prelu(
             input_blob,
             mode="channel",

@@ -30,11 +30,11 @@ def validation(args):
         checkpoint_dir=args.checkpoint_dir, )
 
     backbone = eval("backbones.{}".format(args.backbone))(
-        num_features=args.embedding_size)
+        num_features=args.embedding_size, dropout=0.0, data_format="NHWC")
     checkpoint.load(backbone, for_train=False)
     backbone.eval()
 
     callback_verification = CallBackVerification(
-        1, 0, args.batch_size, args.val_targets, args.data_dir)
+        1, 0, 1, args.batch_size, args.val_targets, args.data_dir)
 
     callback_verification(1, backbone)
