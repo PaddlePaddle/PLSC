@@ -202,6 +202,7 @@ sh scripts/inference.sh
 ## 9. Demo
 
 Combined with face detection model, we can complete the face recognition process.
+**Note: We only show a demo which can not be use to commercial application.**
 
 Firstly, use the fllowing commands to download the models.
 

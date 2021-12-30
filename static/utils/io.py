@@ -42,15 +42,21 @@ class Checkpoint(object):
         self.checkpoint_dir: str = checkpoint_dir
         self.max_num_last_checkpoint: int = max_num_last_checkpoint
 
-    def save(self, program, lr_scheduler=None, epoch=0, for_train=True, best_metric=None):
-        
+    def save(self,
+             program,
+             lr_scheduler=None,
+             epoch=0,
+             for_train=True,
+             best_metric=None):
+
         if best_metric is not None:
             save_rank = best_metric['rank']
-            model_save_dir = os.path.join(self.model_save_dir, 'best_model', str(best_metric['dataset_name']))
+            model_save_dir = os.path.join(self.model_save_dir, 'best_model',
+                                          str(best_metric['dataset_name']))
         else:
-            save_rank = 0 # default we only save rank 0 backbone
+            save_rank = 0  # default we only save rank 0 backbone
             model_save_dir = os.path.join(self.model_save_dir, str(epoch))
-            
+
         if not os.path.exists(model_save_dir):
             # may be more than one processes trying
             # to create the directory
@@ -108,14 +114,17 @@ class Checkpoint(object):
     def load(self, program, for_train=True, dtype=None):
         assert os.path.exists(self.checkpoint_dir)
         checkpoint_dir = os.path.abspath(self.checkpoint_dir)
-        
+
         param_state_dict = program.state_dict(mode='param')
         opt_state_dict = program.state_dict(mode='opt')
         type_dict = {}
+        shape_dict = {}
         for name, param in param_state_dict.items():
             type_dict[name] = convert_dtype(param._dtype())
+            shape_dict[name] = param.shape()
         for name, opt in opt_state_dict.items():
-            type_dict[name] = convert_dtype(opt._dtype()) 
+            type_dict[name] = convert_dtype(opt._dtype())
+            shape_dict[name] = opt.shape()
 
         state_dict = {}
         dist_weight_state_dict = {}
@@ -136,6 +145,9 @@ class Checkpoint(object):
             if not for_train and ext == '.pdopt':
                 continue
 
+            if name not in type_dict:
+                continue
+
             tensor = paddle.load(path, return_numpy=True)
             if dtype:
                 assert dtype in ['float32', 'float16']
@@ -144,6 +156,19 @@ class Checkpoint(object):
                 tensor = tensor.astype(type_dict[name])
             else:
                 pass
+
+            if list(shape_dict[name]) != list(tensor.shape):
+                # for prelu NHWC[1, 1, 1, C] and NCHW [1, C, 1, 1]
+                expect_shape = list(shape_dict[name])
+                actual_shape = list(tensor.shape)
+                if len(expect_shape) == len(actual_shape) and \
+                    expect_shape[0] == actual_shape[0] and expect_shape[0] == 1 and \
+                    expect_shape[2] == actual_shape[2] and expect_shape[2] == 1 and \
+                    expect_shape[1] == actual_shape[3]:
+                    if actual_shape[3] != 1:
+                        tensor = tensor.transpose([0, 3, 1, 2])
+                    elif actual_shape[1] != 1:
+                        tensor = tensor.transpose([0, 2, 3, 1])
 
             if 'dist@' in name and '@rank@' in name:
                 if '.w' in name and 'velocity' not in name:

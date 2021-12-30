@@ -17,6 +17,7 @@ import os
 import sys
 import numpy as np
 import logging
+import random
 
 import paddle
 from visualdl import LogWriter
@@ -32,14 +33,6 @@ from . import classifiers
 from . import backbones
 from .static_model import StaticModel
 
-RELATED_FLAGS_SETTING = {
-    'FLAGS_cudnn_exhaustive_search': 1,
-    'FLAGS_cudnn_batchnorm_spatial_persistent': 1,
-    'FLAGS_max_inplace_grad_add': 8,
-    'FLAGS_fraction_of_gpu_memory_to_use': 0.9999,
-}
-paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
-
 
 def train(args):
 
@@ -51,12 +44,30 @@ def train(args):
     gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
     place = paddle.CUDAPlace(gpu_id)
 
+    RELATED_FLAGS_SETTING = {}
+    if args.seed == 0:
+        RELATED_FLAGS_SETTING['FLAGS_cudnn_deterministic'] = 1
+        RELATED_FLAGS_SETTING['FLAGS_benchmark'] = 1
+        args.num_workers = 0
+    else:
+        # args.seed == None or args.seed != 0
+        RELATED_FLAGS_SETTING['FLAGS_cudnn_exhaustive_search'] = 1
+        RELATED_FLAGS_SETTING['FLAGS_cudnn_batchnorm_spatial_persistent'] = 1
+        RELATED_FLAGS_SETTING['FLAGS_max_inplace_grad_add'] = 8
+    paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
+
+    if args.seed is not None:
+        args.seed = args.seed + rank
+        paddle.seed(args.seed)
+        np.random.seed(args.seed)
+        random.seed(args.seed)
+
     if world_size > 1:
         import paddle.distributed.fleet as fleet
         strategy = fleet.DistributedStrategy()
         strategy.without_graph_optimization = True
         fleet.init(is_collective=True, strategy=strategy)
-        
+
     if args.use_synthetic_dataset:
         trainset = datasets.SyntheticDataset(args.num_classes, fp16=args.fp16)
     else:
@@ -131,9 +142,9 @@ def train(args):
             'custom_black_list': args.custom_black_list,
         },
         margin_loss_params=margin_loss_params,
-        data_format=args.data_format, 
+        data_format=args.data_format,
         lsc_init_from_numpy=args.lsc_init_from_numpy, )
-    
+
     if rank == 0:
         with open(os.path.join(args.output, 'main_program.txt'), 'w') as f:
             f.write(str(train_program))
@@ -150,8 +161,8 @@ def train(args):
             data_format=args.data_format, )
 
         callback_verification = CallBackVerification(
-            args.validation_interval_step, rank, world_size,
-            args.batch_size, test_program,
+            args.validation_interval_step, rank, world_size, args.batch_size,
+            test_program,
             list(test_model.backbone.input_dict.values()),
             list(test_model.backbone.output_dict.values()), args.val_targets,
             args.data_dir)
@@ -182,7 +193,7 @@ def train(args):
         # since we always use step style for lr_scheduler
         global_step = lr_state['last_epoch']
         train_model.lr_scheduler.set_state_dict(lr_state)
-    
+
     batch_sampler = eval("paddle.io.{}".format(args.batch_sampler))(
         dataset=trainset,
         batch_size=args.batch_size,
@@ -220,7 +231,7 @@ def train(args):
                             epoch=epoch,
                             for_train=True,
                             best_metric=best_metric[ver_dataset])
-                        
+
             train_model.lr_scheduler.step()
 
             if global_step >= total_steps:

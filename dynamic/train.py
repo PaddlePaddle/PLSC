@@ -35,16 +35,6 @@ from . import classifiers
 from . import backbones
 
 
-RELATED_FLAGS_SETTING = {
-    'FLAGS_cudnn_exhaustive_search': 1,
-    'FLAGS_benchmark': 1,
-    'FLAGS_cudnn_deterministic': 1,
-    'FLAGS_cudnn_batchnorm_spatial_persistent': 1,
-    'FLAGS_max_inplace_grad_add': 8,
-    'FLAGS_fraction_of_gpu_memory_to_use': 0.9999,
-}
-
-
 def train(args):
     writer = LogWriter(logdir=args.logdir)
 
@@ -54,18 +44,23 @@ def train(args):
     gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
     place = paddle.CUDAPlace(gpu_id)
 
-    if args.seed != 0:
-        RELATED_FLAGS_SETTING.pop('FLAGS_cudnn_exhaustive_search')
+    RELATED_FLAGS_SETTING = {}
+    if args.seed == 0:
+        RELATED_FLAGS_SETTING['FLAGS_cudnn_deterministic'] = 1
+        RELATED_FLAGS_SETTING['FLAGS_benchmark'] = 1
+        args.num_workers = 0
+    else:
+        # args.seed == None or args.seed != 0
+        RELATED_FLAGS_SETTING['FLAGS_cudnn_exhaustive_search'] = 1
+        RELATED_FLAGS_SETTING['FLAGS_cudnn_batchnorm_spatial_persistent'] = 1
+        RELATED_FLAGS_SETTING['FLAGS_max_inplace_grad_add'] = 8
+    paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
+
+    if args.seed is not None:
         args.seed = args.seed + rank
         paddle.seed(args.seed)
         np.random.seed(args.seed)
         random.seed(args.seed)
-        args.num_workers = 0
-    else:
-        RELATED_FLAGS_SETTING.pop('FLAGS_benchmark')
-        RELATED_FLAGS_SETTING.pop('FLAGS_cudnn_deterministic')
-        
-    paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
 
     if world_size > 1:
         import paddle.distributed.fleet as fleet
@@ -235,8 +230,11 @@ def train(args):
                 if best_metric is not None and len(best_metric) > 0:
                     for ver_dataset in best_metric:
                         checkpoint.save(
-                            backbone, classifier, optimizer,
-                            epoch=epoch, for_train=True,
+                            backbone,
+                            classifier,
+                            optimizer,
+                            epoch=epoch,
+                            for_train=True,
                             best_metric=best_metric[ver_dataset])
             lr_scheduler.step()
 

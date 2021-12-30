@@ -38,4 +38,4 @@ python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
     --warmup_num 0 \
     --train_num 25 \
     --decay_boundaries "10,16,22" \
-    --output MS1M_v3_arcface_dynamic_0.1
+    --output MS1M_v3_arcface_dynamic_0.1_NHWC_FP16

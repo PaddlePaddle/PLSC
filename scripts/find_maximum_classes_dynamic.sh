@@ -13,6 +13,7 @@
 # limitations under the License.
 
 export FLAGS_allocator_strategy=naive_best_fit
+export FLAGS_fraction_of_gpu_memory_to_use=0.9999
 python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
     --config_file configs/ms1mv3_r50.py \
     --is_static False \
