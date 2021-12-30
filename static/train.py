@@ -36,7 +36,8 @@ from .static_model import StaticModel
 
 def train(args):
 
-    writer = LogWriter(logdir=args.logdir)
+    # writer = LogWriter(logdir=args.logdir)
+    writer = None
 
     rank = int(os.getenv("PADDLE_TRAINER_ID", 0))
     world_size = int(os.getenv("PADDLE_TRAINERS_NUM", 1))
