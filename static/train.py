@@ -36,9 +36,6 @@ from .static_model import StaticModel
 
 def train(args):
 
-    # writer = LogWriter(logdir=args.logdir)
-    writer = None
-
     rank = int(os.getenv("PADDLE_TRAINER_ID", 0))
     world_size = int(os.getenv("PADDLE_TRAINERS_NUM", 1))
 
@@ -170,7 +167,7 @@ def train(args):
 
     callback_logging = CallBackLogging(args.log_interval_step, rank,
                                        world_size, total_steps,
-                                       args.batch_size, writer)
+                                       args.batch_size)
     checkpoint = Checkpoint(
         rank=rank,
         world_size=world_size,
@@ -244,4 +241,3 @@ def train(args):
             lr_scheduler=train_model.lr_scheduler,
             epoch=epoch,
             for_train=True)
-    writer.close()
