@@ -15,7 +15,7 @@
 from easydict import EasyDict as edict
 
 config = edict()
-config.seed = 2333  # global seed, None means do not fix seed, 0 means to run benchmark
+config.seed = None  # global seed, None means do not fix seed, 0 means to run benchmark
 
 config.is_static = True
 config.data_format = 'NHWC'  # 'NCHW' or 'NHWC'
