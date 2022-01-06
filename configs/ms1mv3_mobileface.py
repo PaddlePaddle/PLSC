@@ -16,13 +16,16 @@ from easydict import EasyDict as edict
 
 config = edict()
 config.is_static = False
+config.data_format = 'NCHW'
 config.backbone = 'MobileFaceNet_128'
 config.classifier = 'LargeScaleClassifier'
 config.embedding_size = 128
 config.model_parallel = True
-config.sample_ratio = 1.0
+config.sample_ratio = 0.1
 config.loss = 'ArcFace'
 config.dropout = 0.0
+
+config.fp16 = False
 
 config.lr = 0.1  # for global batch size = 512
 config.lr_decay = 0.1
