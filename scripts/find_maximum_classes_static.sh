@@ -13,7 +13,7 @@
 # limitations under the License.
 
 export FLAGS_allocator_strategy=naive_best_fit
-export FLAGS_fraction_of_gpu_memory_to_use=0.9999
+export FLAGS_fraction_of_gpu_memory_to_use=0.999
 python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
     --config_file configs/ms1mv3_r50.py \
     --is_static True \
@@ -23,10 +23,11 @@ python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
     --sample_ratio 0.1 \
     --loss ArcFace \
     --batch_size 64 \
-    --num_classes 60000000 \
+    --num_classes 92000000 \
     --use_synthetic_dataset True \
     --do_validation_while_train False \
     --log_interval_step 1 \
     --fp16 True \
     --lsc_init_from_numpy False \
     --output fp16_arcface_static_0.1_maximum_classes
+
