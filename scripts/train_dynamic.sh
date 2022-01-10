@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
+# multi node ip list, e.g:
+# TRAINER_IP_LIST=10.11.12.1,10.11.12.2
+TRAINER_IP_LIST=127.0.0.1
+# other gpus training, e.g:
+# CUDA_VISIBLE_DEVICES=2
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+python -m paddle.distributed.launch --ips=$TRAINER_IP_LIST --gpus=$CUDA_VISIBLE_DEVICES tools/train.py \
     --config_file configs/ms1mv3_r50.py \
     --is_static False \
     --backbone FresResNet50 \

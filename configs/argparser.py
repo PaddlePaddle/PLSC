@@ -75,7 +75,7 @@ def parse_args():
         '--seed',
         type=int,
         default=cfg.seed,
-        help='global seed, 0 means do not fix seed')
+        help='global seed, None means do not fix seed, int value means to run reproduction')
     # Model setting
     parser.add_argument(
         '--is_static',
@@ -86,7 +86,7 @@ def parse_args():
         '--data_format',
         type=str,
         default=cfg.data_format,
-        help='model data layout, "NCHW" or "NHWC"')
+        help='model data layout, "NCHW" for FP32 or "NHWC" for FP16')
     parser.add_argument(
         '--backbone', type=str, default=cfg.backbone, help='backbone network')
     parser.add_argument(
