@@ -12,7 +12,7 @@
 
 **Update (2021-10-10):** Added FP16 training, improved throughtput and optimized GPU memory. It supported 60 million classes on single node 8 NVIDIA V100 (32G) and has high training throughtput.
 
-**Update (2021-09-10):** This repository supported both ``static`` mode and ``dynamic`` mode to use paddlepaddle v2.2, which supported 48 million classes on single node 8 NVIDIA V100 (32G). It added PartialFC, SparseMomentum, and [ArcFace](https://arxiv.org/abs/1801.07698), [CosFace](https://arxiv.org/abs/1801.09414), [PartialFC](https://arxiv.org/abs/2010.05222) (we refer to MarginLoss). Backbone includes IResNet and MobileNet.
+**Update (2021-09-10):** This repository supported both ``static`` mode and ``dynamic`` mode to use paddlepaddle v2.2, which supported 48 million classes on single node 8 NVIDIA V100 (32G). It added [PartialFC](https://arxiv.org/abs/2010.05222), SparseMomentum, and [ArcFace](https://arxiv.org/abs/1801.07698), [CosFace](https://arxiv.org/abs/1801.09414) (we refer to MarginLoss). Backbone includes IResNet and MobileNet.
 
 
 ## 3. Environment Preparation
