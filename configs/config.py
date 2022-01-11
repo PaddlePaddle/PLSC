@@ -15,8 +15,10 @@
 from easydict import EasyDict as edict
 
 config = edict()
+config.seed = None  # global seed, None means do not fix seed, int value means to run reproduction
+
 config.is_static = True
-config.data_format = 'NCHW'  # 'NCHW' or 'NHWC'
+config.data_format = 'NHWC'  # 'NCHW' for FP32 or 'NHWC' for FP16
 config.backbone = 'FresResNet100'
 config.classifier = 'LargeScaleClassifier'
 config.embedding_size = 512

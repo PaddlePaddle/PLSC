@@ -66,11 +66,12 @@ def test(rank, batch_size, data_set, executor, test_program, data_feeder,
     acc, std = np.mean(accuracy), np.std(accuracy)
     return acc, std, xnorm
 
-
+# Ref: https://github.com/deepinsight/insightface/blob/master/recognition/arcface_torch/utils/utils_callbacks.py
 class CallBackVerification(object):
     def __init__(self,
                  frequent,
                  rank,
+                 world_size,
                  batch_size,
                  test_program,
                  feed_list,
@@ -80,12 +81,13 @@ class CallBackVerification(object):
                  image_size=(112, 112)):
         self.frequent: int = frequent
         self.rank: int = rank
+        self.world_size: int = world_size
         self.batch_size: int = batch_size
 
         self.test_program: paddle.static.Program = test_program
         self.feed_list: List[paddle.fluid.framework.Variable] = feed_list
         self.fetch_list: List[paddle.fluid.framework.Variable] = fetch_list
-
+                
         self.highest_acc_list: List[float] = [0.0] * len(val_targets)
         self.ver_list: List[object] = []
         self.ver_name_list: List[str] = []
@@ -95,12 +97,19 @@ class CallBackVerification(object):
             image_size=image_size)
 
         gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
-        place = paddle.CUDAPlace(gpu_id)
-        self.executor = paddle.static.Executor(place)
+        self.place = paddle.CUDAPlace(gpu_id)
+        self.executor = paddle.static.Executor(self.place)
         self.data_feeder = paddle.fluid.DataFeeder(
-            place=place, feed_list=self.feed_list, program=self.test_program)
+            place=self.place, feed_list=self.feed_list, program=self.test_program)
+        
+        if self.world_size > 1:
+            self.test_scope = paddle.static.Scope()
+            with paddle.fluid.scope_guard(self.test_scope):
+                self.max_acc_var = paddle.static.create_global_var(shape=[1], value=0.0, dtype='float64', persistable=False, name='acc2')
+                self.executor.run(paddle.static.default_startup_program())
 
     def ver_test(self, global_step: int):
+        best_metric = {}
         for i in range(len(self.ver_list)):
             test_start = time.time()
             acc2, std2, xnorm = test(
@@ -110,12 +119,30 @@ class CallBackVerification(object):
                          (self.ver_name_list[i], global_step, xnorm))
             logging.info('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' %
                          (self.ver_name_list[i], global_step, acc2, std2))
-            if acc2 > self.highest_acc_list[i]:
-                self.highest_acc_list[i] = acc2
+            if self.world_size > 1:
+                with paddle.fluid.scope_guard(self.test_scope):
+                    max_acc_tensor = self.max_acc_var.get_value()
+                max_acc_tensor.set(np.array([acc2], dtype='float64'), self.place)
+                paddle.distributed.all_reduce(self.max_acc_var, paddle.distributed.ReduceOp.MAX)
+                max_acc = np.asscalar(np.array(max_acc_tensor))
+            else:
+                max_acc = acc2
+
+            if max_acc > self.highest_acc_list[i]:
+                self.highest_acc_list[i] = max_acc
+                if abs(max_acc - acc2) < 1e-8:
+                    best_metric[self.ver_name_list[i]] = {
+                        'global_step': global_step, 
+                        'acc2': acc2, 
+                        'rank': self.rank,
+                        'dataset_name': self.ver_name_list[i],
+                    }
+                    
             logging.info('[%s][%d]Accuracy-Highest: %1.5f' % (
                 self.ver_name_list[i], global_step, self.highest_acc_list[i]))
             test_end = time.time()
             logging.info("test time: {:.4f}".format(test_end - test_start))
+        return best_metric
 
     def init_dataset(self, val_targets, data_dir, image_size):
         for name in val_targets:
@@ -127,4 +154,6 @@ class CallBackVerification(object):
 
     def __call__(self, num_update):
         if num_update > 0 and num_update % self.frequent == 0:
-            self.ver_test(num_update)
+            best_metric = self.ver_test(num_update)
+            return best_metric
+        return None

@@ -50,7 +50,7 @@ def validation(args):
     checkpoint.load(program=test_program, for_train=False)
 
     callback_verification = CallBackVerification(
-        1, 0, args.batch_size, test_program,
+        1, 0, 1, args.batch_size, test_program,
         list(test_model.backbone.input_dict.values()),
         list(test_model.backbone.output_dict.values()), args.val_targets,
         args.data_dir)

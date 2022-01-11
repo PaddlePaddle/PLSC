@@ -19,6 +19,8 @@ import logging
 import numpy as np
 import shutil
 import json
+
+from paddle.fluid.data_feeder import convert_dtype
 from utils.rearrange_weight import rearrange_weight
 
 
@@ -45,9 +47,16 @@ class Checkpoint(object):
              classifier: paddle.nn.Layer=None,
              optimizer=None,
              epoch=0,
-             for_train=True):
-
-        model_save_dir = os.path.join(self.model_save_dir, str(epoch))
+             for_train=True,
+             best_metric=None):
+        
+        if best_metric is not None:
+            save_rank = best_metric['rank']
+            model_save_dir = os.path.join(self.model_save_dir, 'best_model', str(best_metric['dataset_name']))
+        else:
+            save_rank = 0 # default we only save rank 0 backbone
+            model_save_dir = os.path.join(self.model_save_dir, str(epoch))
+            
         if not os.path.exists(model_save_dir):
             # may be more than one processes trying
             # to create the directory
@@ -58,7 +67,7 @@ class Checkpoint(object):
                     raise
                 pass
 
-        if self.rank == 0:
+        if self.rank == save_rank:
             # for non dist param, we only save their at rank 0.
             for name, param in backbone.state_dict().items():
                 paddle.save(
@@ -85,7 +94,7 @@ class Checkpoint(object):
                     paddle.save(opt,
                                 os.path.join(model_save_dir, name + '.pdopt'))
 
-            if self.rank == 0:
+            if self.rank == save_rank:
                 # save some extra info for resume
                 # pretrain_world_size, embedding_size, num_classes are used for
                 # re-split fc weight when gpu setting changed.
@@ -97,6 +106,8 @@ class Checkpoint(object):
                 extra_info['num_classes'] = self.num_classes
                 extra_info['epoch'] = epoch
                 extra_info['lr_state'] = lr_state_dict
+                if best_metric is not None:
+                    extra_info['best_metric'] = best_metric
                 with open(config_file, 'w') as f:
                     json.dump(extra_info, f)
 
@@ -117,7 +128,25 @@ class Checkpoint(object):
 
         assert os.path.exists(self.checkpoint_dir)
         checkpoint_dir = os.path.abspath(self.checkpoint_dir)
-
+        
+        type_dict = {}
+        for name, param in backbone.state_dict().items():
+            type_dict[param.name] = convert_dtype(param.dtype)
+            
+        if classifier is not None:
+            # for dist param, we need to save their at all ranks.
+            for name, param in classifier.state_dict().items():
+                type_dict[param.name] = convert_dtype(param.dtype)
+        
+        if for_train:
+            assert optimizer is not None
+            opt_state_dict = optimizer.state_dict()
+            lr_state_dict = opt_state_dict['LR_Scheduler']
+            for name, opt in opt_state_dict.items():
+                if name == 'LR_Scheduler' or '@GRAD' in name:
+                    continue
+                type_dict[name] = convert_dtype(opt.dtype)
+        
         param_state_dict = {}
         opt_state_dict = {}
         dist_param_state_dict = {}
@@ -139,11 +168,16 @@ class Checkpoint(object):
 
             if not for_train and ext == '.pdopt':
                 continue
+                
+            if classifier is None and 'dist@' in name and '@rank@' in name:
+                continue
 
             tensor = paddle.load(path, return_numpy=True)
             if dtype:
                 assert dtype in ['float32', 'float16']
                 tensor = tensor.astype(dtype)
+            else:
+                tensor = tensor.astype(type_dict[name])
 
             if 'dist@' in name and '@rank@' in name:
                 if '.w' in name and 'velocity' not in name:

@@ -86,10 +86,10 @@ class FresResNet(object):
             momentum=0.9,
             data_layout=data_format,
             is_test=False if is_train else True)
-        # TODO(GuoxiaWang): add data_format attr
         input_blob = paddle.static.nn.prelu(
             input_blob,
             mode="channel",
+            data_format=data_format,
             param_attr=paddle.ParamAttr(
                 initializer=paddle.nn.initializer.Constant(0.25)))
 
@@ -98,8 +98,12 @@ class FresResNet(object):
                 input_blob = self.residual_unit_v3(
                     input_blob, filter_list[i + 1], 3, 2
                     if j == 0 else 1, 1, is_train, data_format)
-        fc1 = self.get_fc1(input_blob, is_train, dropout, data_format)
 
+        if data_format == 'NHWC':
+            input_blob = paddle.tensor.transpose(input_blob, [0, 3, 1, 2])
+        #NOTE(GuoxiaWang): don't use NHWC for last fc,
+        # thus we can train using NHWC and test using NCHW
+        fc1 = self.get_fc1(input_blob, is_train, dropout, data_format="NCHW")
         self.output_dict['feature'] = fc1
 
     def residual_unit_v3(self,
@@ -135,10 +139,10 @@ class FresResNet(object):
             momentum=0.9,
             data_layout=data_format,
             is_test=False if is_train else True)
-        # TODO(GuoxiaWang): add data_format attr
         prelu = paddle.static.nn.prelu(
             bn2,
             mode="channel",
+            data_format=data_format,
             param_attr=paddle.ParamAttr(
                 initializer=paddle.nn.initializer.Constant(0.25)))
         conv2 = paddle.static.nn.conv2d(

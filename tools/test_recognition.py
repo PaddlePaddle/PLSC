@@ -20,6 +20,7 @@ import imghdr
 import pickle
 import tarfile
 from functools import partial
+from collections import defaultdict
 
 import cv2
 import numpy as np
@@ -108,8 +109,8 @@ def parser(add_help=True):
     parser.add_argument(
         "--rec_thresh",
         type=float,
-        default=0.45,
-        help="The threshold of recognition postprocess. Default by 0.45.")
+        default=0.35,
+        help="The threshold of recognition postprocess. Default by 0.35.")
     parser.add_argument(
         "--max_batch_size",
         type=int,
@@ -141,7 +142,7 @@ def print_config(args):
         table.add_row([param, args[param]])
     width = len(str(table).split("\n")[0])
     print("{}".format("-" * width))
-    print("PaddleFace".center(width))
+    print("PLSC".center(width))
     print(table)
     print("Powered by PaddlePaddle!".rjust(width))
     print("{}".format("-" * width))
@@ -473,23 +474,30 @@ class Recognizer(BasePredictor):
         pass
 
     def retrieval(self, np_feature):
-        labels = []
+        id_score_list = []
         for feature in np_feature:
             similarity = cosine_similarity(self.index_feature,
                                            feature).squeeze()
             abs_similarity = np.abs(similarity)
             candidate_idx = np.argpartition(abs_similarity,
                                             -self.cdd_num)[-self.cdd_num:]
+
             remove_idx = np.where(abs_similarity[candidate_idx] < self.thresh)
             candidate_idx = np.delete(candidate_idx, remove_idx)
             candidate_label_list = list(np.array(self.label)[candidate_idx])
+            candidate_score_list = abs_similarity[candidate_idx]
+            candidate_score_dict = defaultdict(list)
+            for lb, score in zip(candidate_label_list, candidate_score_list):
+                candidate_score_dict[lb].append(score)
             if len(candidate_label_list) == 0:
-                maxlabel = ""
+                maxlabel = "unknown"
+                maxscore = -1.0
             else:
                 maxlabel = max(candidate_label_list,
                                key=candidate_label_list.count)
-            labels.append(maxlabel)
-        return labels
+                maxscore = max(candidate_score_dict[maxlabel])
+            id_score_list.append((maxlabel, maxscore))
+        return id_score_list
 
     def load_index(self, file_path):
         with open(file_path, "rb") as f:
@@ -549,14 +557,14 @@ class InsightFace(object):
         img = img.astype(np.float32, copy=False)
         return img
 
-    def draw(self, img, box_list, labels):
-        self.color_map.update(labels)
+    def draw(self, img, box_list, id_score_list):
+        self.color_map.update([id for id, score in id_score_list])
         im = Image.fromarray(img)
         draw = ImageDraw.Draw(im)
 
         for i, dt in enumerate(box_list):
             bbox, score = dt[2:], dt[1]
-            label = labels[i]
+            label, idscore = id_score_list[i]
             color = tuple(self.color_map[label])
 
             xmin, ymin, xmax, ymax = bbox
@@ -564,19 +572,31 @@ class InsightFace(object):
             font_size = max(int((xmax - xmin) // 6), 10)
             font = ImageFont.truetype(self.font_path, font_size)
 
-            text = "{} {:.4f}".format(label, score)
+            face_text = "{} {:.4f}".format('face', score)
             th = sum(font.getmetrics())
-            tw = font.getsize(text)[0]
+            tw = font.getsize(face_text)[0]
             start_y = max(0, ymin - th)
+
+            id_text = "{} {:.4f}".format(label, idscore)
+            tw = max(tw, font.getsize(id_text)[0])
+            draw.rectangle(
+                [(xmin, start_y - th), (xmin + tw + 1, start_y)], fill=color)
+            draw.text(
+                (xmin + 1, start_y - th),
+                id_text,
+                fill=(255, 255, 255),
+                font=font,
+                anchor="la")
 
             draw.rectangle(
                 [(xmin, start_y), (xmin + tw + 1, start_y + th)], fill=color)
             draw.text(
                 (xmin + 1, start_y),
-                text,
+                face_text,
                 fill=(255, 255, 255),
                 font=font,
                 anchor="la")
+
             draw.rectangle(
                 [(xmin, ymin), (xmax, ymax)], width=2, outline=color)
         return np.array(im)
@@ -631,18 +651,20 @@ class InsightFace(object):
                 continue
             box_list, np_feature = self.predict_np_img(img)
             if np_feature is not None:
-                labels = self.rec_predictor.retrieval(np_feature)
+                id_score_list = self.rec_predictor.retrieval(np_feature)
             else:
-                labels = ["face"] * len(box_list)
+                id_score_list = [("unknown", -1.0)] * len(box_list)
             if box_list is not None:
-                result = self.draw(img, box_list, labels=labels)
+                result = self.draw(img, box_list, id_score_list=id_score_list)
                 self.output_writer.write(result, file_name)
             if print_info:
-                logging.info(f"File: {file_name}, predict label(s): {labels}")
+                logging.info(
+                    f"File: {file_name}, predict id_score_list(s): {id_score_list}"
+                )
             yield {
                 "box_list": box_list,
                 "features": np_feature,
-                "labels": labels
+                "id_score_list": id_score_list
             }
         logging.info(f"Predict complete!")
 

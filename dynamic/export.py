@@ -30,7 +30,7 @@ def export(args):
 
     backbone = eval("backbones.{}".format(args.backbone))(
         num_features=args.embedding_size)
-    checkpoint.load(backbone, for_train=False, dtype='float32')
+    checkpoint.load(backbone, for_train=False)
 
     print("Load checkpoint from '{}'.".format(args.checkpoint_dir))
     backbone.eval()

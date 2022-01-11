@@ -1,4 +1,3 @@
-visualdl
 opencv-python
 pillow
 numpy
@@ -14,3 +13,4 @@ opencv-python==4.4.0.46
 onnxruntime
 onnx
 paddle2onnx
+paddlepaddle-gpu>=2.2.2

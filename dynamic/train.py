@@ -17,6 +17,7 @@ import os
 import sys
 import numpy as np
 import logging
+import random
 
 import paddle
 from visualdl import LogWriter
@@ -33,23 +34,32 @@ from .utils.hybrid_optimizer import HybridOptimizer
 from . import classifiers
 from . import backbones
 
-RELATED_FLAGS_SETTING = {
-    'FLAGS_cudnn_exhaustive_search': 1,
-    'FLAGS_cudnn_batchnorm_spatial_persistent': 1,
-    'FLAGS_max_inplace_grad_add': 8,
-    'FLAGS_fraction_of_gpu_memory_to_use': 0.9999,
-}
-paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
-
 
 def train(args):
-    writer = LogWriter(logdir=args.logdir)
 
     rank = int(os.getenv("PADDLE_TRAINER_ID", 0))
     world_size = int(os.getenv("PADDLE_TRAINERS_NUM", 1))
 
     gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
     place = paddle.CUDAPlace(gpu_id)
+
+    RELATED_FLAGS_SETTING = {}
+    if args.seed == 0:
+        RELATED_FLAGS_SETTING['FLAGS_cudnn_deterministic'] = 1
+        RELATED_FLAGS_SETTING['FLAGS_benchmark'] = 1
+        args.num_workers = 0
+    else:
+        # args.seed == None or args.seed != 0
+        RELATED_FLAGS_SETTING['FLAGS_cudnn_exhaustive_search'] = 1
+        RELATED_FLAGS_SETTING['FLAGS_cudnn_batchnorm_spatial_persistent'] = 1
+        RELATED_FLAGS_SETTING['FLAGS_max_inplace_grad_add'] = 8
+    paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
+
+    if args.seed is not None:
+        args.seed = args.seed + rank
+        paddle.seed(args.seed)
+        np.random.seed(args.seed)
+        random.seed(args.seed)
 
     if world_size > 1:
         import paddle.distributed.fleet as fleet
@@ -67,7 +77,8 @@ def train(args):
             rank=rank,
             world_size=world_size,
             fp16=args.fp16,
-            is_bin=args.is_bin)
+            is_bin=args.is_bin,
+            seed=args.seed)
 
     num_image = trainset.total_num_samples
     total_batch_size = args.batch_size * world_size
@@ -139,6 +150,7 @@ def train(args):
         callback_verification = CallBackVerification(
             args.validation_interval_step,
             rank,
+            world_size,
             args.batch_size,
             args.val_targets,
             args.data_dir,
@@ -146,7 +158,7 @@ def train(args):
 
     callback_logging = CallBackLogging(args.log_interval_step, rank,
                                        world_size, total_steps,
-                                       args.batch_size, writer)
+                                       args.batch_size)
 
     checkpoint = Checkpoint(
         rank=rank,
@@ -213,7 +225,16 @@ def train(args):
             loss_avg.update(loss_v.item(), 1)
             callback_logging(global_step, loss_avg, epoch, lr_value)
             if args.do_validation_while_train:
-                callback_verification(global_step, backbone)
+                best_metric = callback_verification(global_step, backbone)
+                if best_metric is not None and len(best_metric) > 0:
+                    for ver_dataset in best_metric:
+                        checkpoint.save(
+                            backbone,
+                            classifier,
+                            optimizer,
+                            epoch=epoch,
+                            for_train=True,
+                            best_metric=best_metric[ver_dataset])
             lr_scheduler.step()
 
             if global_step >= total_steps:
@@ -222,4 +243,3 @@ def train(args):
 
         checkpoint.save(
             backbone, classifier, optimizer, epoch=epoch, for_train=True)
-    writer.close()

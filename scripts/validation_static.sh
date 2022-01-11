@@ -16,7 +16,7 @@ python tools/validation.py \
     --is_static True \
     --backbone FresResNet50 \
     --embedding_size 512 \
-    --checkpoint_dir MS1M_v3_arcface_static_128_fp16_0.1/FresResNet50/24 \
+    --checkpoint_dir MS1M_v3_arcface_static_0.1_NHWC_FP16/FresResNet50/best_model/cfp_fp/ \
     --data_dir MS1M_v3/ \
     --val_targets lfw,cfp_fp,agedb_30 \
     --batch_size 128
