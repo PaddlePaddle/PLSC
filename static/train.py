@@ -20,7 +20,6 @@ import logging
 import random
 
 import paddle
-from visualdl import LogWriter
 
 from utils.logging import AverageMeter, CallBackLogging
 import datasets

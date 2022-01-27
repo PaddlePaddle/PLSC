@@ -18,7 +18,6 @@ import sys
 import numpy as np
 
 import paddle
-from visualdl import LogWriter
 
 from utils.logging import AverageMeter, init_logging, CallBackLogging
 from utils import losses
