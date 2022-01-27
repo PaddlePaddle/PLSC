@@ -23,7 +23,7 @@ python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
     --sample_ratio 0.1 \
     --loss ArcFace \
     --batch_size 64 \
-    --num_classes 92000000 \
+    --num_classes 60000000 \
     --use_synthetic_dataset True \
     --do_validation_while_train False \
     --log_interval_step 1 \
