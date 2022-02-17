@@ -19,9 +19,23 @@ import paddle
 import paddle.nn as nn
 
 
-class LargeScaleClassifier(nn.Layer):
+class FakeDDPGroup(paddle.distributed.collective.Group):
+    def __init__(self):
+        self.rank = 0
+        self.nranks = 1
+        self.id = 0
+        self.ranks = [0]
+
+    def is_member(self):
+        return True
+
+    def get_group_rank(self, rank):
+        return 0
+
+
+class GeneralScaleClassifier(nn.Layer):
     """
-    DistributedModelParallel Partial FC
+    DistributedDataParallel PartialFC
 
     Author: {Xiang An, Yang Xiao, XuHan Zhu} in DeepGlint,
     Partial FC: Training 10 Million Identities on a Single Machine
@@ -43,52 +57,48 @@ class LargeScaleClassifier(nn.Layer):
                  fp16=False,
                  numpy_init=True,
                  name=None):
-        super(LargeScaleClassifier, self).__init__()
+        super(GeneralScaleClassifier, self).__init__()
         self.num_classes: int = num_classes
         self.rank: int = rank
         self.world_size: int = world_size
         self.sample_ratio: float = sample_ratio
         self.embedding_size: int = embedding_size
         self.fp16 = fp16
-        self.num_local: int = (num_classes + world_size - 1) // world_size
-        if num_classes % world_size != 0 and rank == world_size - 1:
-            self.num_local = num_classes % self.num_local
-        self.num_sample: int = int(self.sample_ratio * self.num_local)
+        self.num_sample: int = int(self.sample_ratio * self.num_classes)
         self.margin1 = margin1
         self.margin2 = margin2
         self.margin3 = margin3
         self.logit_scale = scale
 
+        # construct a fake DistributedDataParallel group
+        self.group = FakeDDPGroup()
+
         if name is None:
-            name = 'dist@fc@rank@%05d.w' % rank
+            name = 'gfc.w'
 
         if numpy_init:
-            stddev = math.sqrt(2.0 / (self.embedding_size + self.num_local))
+            stddev = math.sqrt(2.0 / (self.embedding_size + self.num_classes))
             init_total = np.random.RandomState(2021).normal(0.0, stddev, (
-                self.embedding_size, num_classes))
-            start_index = rank * ((num_classes + world_size - 1) // world_size)
-            end_index = start_index + self.num_local
-            init_local = init_total[:, start_index:end_index]
+                self.embedding_size, self.num_classes))
             param_attr = paddle.ParamAttr(
                 name=name,
                 initializer=paddle.fluid.initializer.NumpyArrayInitializer(
-                    init_local))
+                    init_total))
         else:
-            stddev = math.sqrt(2.0 / (self.embedding_size + self.num_local))
+            stddev = math.sqrt(2.0 / (self.embedding_size + self.num_classes))
             param_attr = paddle.ParamAttr(
                 name=name,
                 initializer=paddle.nn.initializer.Normal(std=stddev))
 
         self.index = None
         self.weight = self.create_parameter(
-            shape=[self.embedding_size, self.num_local],
+            shape=[self.embedding_size, self.num_classes],
             attr=param_attr,
             is_bias=False,
             dtype='float16' if self.fp16 else 'float32')
 
         # NOTE(GuoxiaWang): stop full gradient and set is_sparse_grad attr
         # is_sparse_grad be used fo sparse_momentum
-        self.weight.is_distributed = True
         if self.sample_ratio < 1.0:
             setattr(self.weight, 'is_sparse_grad', True)
             self.weight.stop_gradient = True
@@ -103,23 +113,16 @@ class LargeScaleClassifier(nn.Layer):
 
     def forward(self, feature, label):
 
-        if self.world_size > 1:
-            feature_list = []
-            paddle.distributed.all_gather(feature_list, feature)
-            total_feature = paddle.concat(feature_list, axis=0)
-
-            label_list = []
-            paddle.distributed.all_gather(label_list, label)
-            total_label = paddle.concat(label_list, axis=0)
-            total_label.stop_gradient = True
-        else:
-            total_feature = feature
-            total_label = label
+        total_feature = feature
+        total_label = label
 
         if self.sample_ratio < 1.0:
             # partial fc sample process
             total_label, self.index = paddle.nn.functional.class_center_sample(
-                total_label, self.num_local, self.num_sample)
+                total_label,
+                self.num_classes,
+                self.num_sample,
+                group=self.group)
             total_label.stop_gradient = True
             self.index.stop_gradient = True
             self.sub_weight = paddle.gather(self.weight, self.index, axis=1)
@@ -144,7 +147,8 @@ class LargeScaleClassifier(nn.Layer):
             margin3=self.margin3,
             scale=self.logit_scale,
             return_softmax=False,
-            reduction=None, )
+            reduction=None,
+            group=self.group, )
 
         loss = paddle.mean(loss)
 

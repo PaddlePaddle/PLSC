@@ -13,3 +13,4 @@
 # limitations under the License.
 
 from .lsc import LargeScaleClassifier
+from .gsc import GeneralScaleClassifier
