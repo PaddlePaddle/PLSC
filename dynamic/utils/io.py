@@ -177,7 +177,8 @@ class Checkpoint(object):
                 assert dtype in ['float32', 'float16']
                 tensor = tensor.astype(dtype)
             else:
-                tensor = tensor.astype(type_dict[name])
+                if name in type_dict:
+                    tensor = tensor.astype(type_dict[name])
 
             if 'dist@' in name and '@rank@' in name:
                 if '.w' in name and 'velocity' not in name:
