@@ -12,24 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import os
-sys.path.insert(0, os.path.abspath('.'))
+import sys
+__dir__ = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.abspath(os.path.join(__dir__, '../')))
+
+from plsc.utils import config
+from plsc.engine.engine import Engine
 
 import paddle
-from configs import argparser as parser
-from utils.logging import init_logging
+paddle.disable_static()
 
-if __name__ == '__main__':
-    args = parser.parse_args()
-    if args.is_static:
-        from static.train import train
-        paddle.enable_static()
-    else:
-        from dynamic.train import train
-
-    rank = int(os.getenv("PADDLE_TRAINER_ID", 0))
-    os.makedirs(args.output, exist_ok=True)
-    init_logging(rank, args.output)
-    parser.print_args(args)
-    train(args)
+if __name__ == "__main__":
+    args = config.parse_args()
+    config = config.get_config(
+        args.config, overrides=args.override, show=False)
+    config.profiler_options = args.profiler_options
+    engine = Engine(config, mode="train")
+    engine.train()

@@ -3,7 +3,6 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-#
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
@@ -12,24 +11,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-import os
-import sys
-__dir__ = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.abspath(os.path.join(__dir__, '../')))
-
-from plsc.utils import config
-from plsc.engine.engine import Engine
-
 import paddle
-paddle.disable_static()
 
-if __name__ == "__main__":
-    args = config.parse_args()
-    config = config.get_config(
-        args.config, overrides=args.override, show=False)
-    config.profiler_options = args.profiler_options
-    engine = Engine(config, mode="export")
-    engine.export()
+from plsc.utils import logger
+
+from .lr_scheduler import TimmCosine, ViTLRScheduler, Step, Poly
+
+
+def build_lr_scheduler(lr_config, epochs, step_each_epoch):
+    lr_config.update({'epochs': epochs, 'step_each_epoch': step_each_epoch})
+    if 'name' in lr_config:
+        lr_name = lr_config.pop('name')
+        lr = eval(lr_name)(**lr_config)
+        if isinstance(lr, paddle.optimizer.lr.LRScheduler):
+            return lr
+        else:
+            return lr()
+    else:
+        lr = lr_config['learning_rate']
+    logger.debug("build lr ({}) success..".format(lr))
+    return lr

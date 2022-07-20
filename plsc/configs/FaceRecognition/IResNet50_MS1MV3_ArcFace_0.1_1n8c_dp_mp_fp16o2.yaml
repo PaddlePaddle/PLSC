@@ -1,0 +1,129 @@
+# global configs
+Global:
+  task_type: recognition
+  train_epoch_func: defualt_train_one_epoch
+  eval_func: face_verification_eval
+  checkpoint: null
+  pretrained_model: null
+  output_dir: ./output/
+  device: gpu
+  save_interval: 1
+  max_num_latest_checkpoint: 0
+  eval_during_train: True
+  eval_interval: 2000
+  eval_unit: "step"
+  accum_steps: 1
+  epochs: 25
+  print_batch_step: 100
+  use_visualdl: True
+  seed: 2022
+
+# FP16 setting
+FP16:
+  level: O2
+  GradScaler:
+    init_loss_scaling: 27648.0
+    no_unscale_list: ['dist']
+    
+DistributedStrategy:
+  data_parallel: True
+
+# model architecture
+Model:
+  name: IResNet50
+  num_features : 512
+  data_format : "NHWC"
+  class_num: 93431
+  pfc_config:
+    sample_ratio: 0.1
+    model_parallel: True
+ 
+# loss function config for traing/eval process
+Loss:
+  Train:
+    - MarginLoss:
+        m1: 1.0
+        m2: 0.5
+        m3: 0.0
+        s: 64.0
+        model_parallel: True
+        weight: 1.0
+        
+LRScheduler:
+  name: Step
+  boundaries: [10, 16, 22]
+  values: [0.2, 0.02, 0.002, 0.0002]
+  decay_unit: epoch
+
+Optimizer:
+  name: Momentum
+  momentum: 0.9
+  weight_decay: 5e-4
+  use_master_param: False
+  grad_clip:
+    name: ClipGradByGlobalNorm
+    clip_norm: 2.0
+    clip_norm_max: 2.0
+    always_clip: True
+    no_clip_list: ['dist']
+
+# data loader for train and eval
+DataLoader:
+  Train:
+    dataset:
+      name: FaceIdentificationDataset
+      image_root: ./dataset/MS1M_v3/
+      cls_label_path: ./dataset/MS1M_v3/label.txt
+      transform_ops:
+        - DecodeImage:
+            to_rgb: True
+            channel_first: False
+        - RandFlipImage:
+            flip_code: 1
+        - NormalizeImage:
+            scale: 1.0/255.0
+            mean: [0.5, 0.5, 0.5]
+            std: [0.5, 0.5, 0.5]
+            order: ''
+        - ToCHWImage: 
+    sampler:
+      name: DistributedBatchSampler
+      batch_size: 128
+      drop_last: False
+      shuffle: True
+    loader:
+      num_workers: 8
+      use_shared_memory: True
+
+  Eval:
+    dataset: 
+      name: FaceVerificationDataset
+      image_root: ./dataset/MS1M_v3/agedb_30
+      cls_label_path: ./dataset/MS1M_v3/agedb_30/label.txt
+      transform_ops:
+        - DecodeImage:
+            to_rgb: True
+            channel_first: False
+        - NormalizeImage:
+            scale: 1.0/255.0
+            mean: [0.5, 0.5, 0.5]
+            std: [0.5, 0.5, 0.5]
+            order: ''
+        - ToCHWImage:
+    sampler:
+      name: BatchSampler
+      batch_size: 128
+      drop_last: False
+      shuffle: False
+    loader:
+      num_workers: 0
+      use_shared_memory: True
+
+Metric:
+  Eval:
+    - LFWAcc:
+        flip_test: True
+
+Export:
+  export_type: onnx
+  input_shape: [None, 3, 112, 112]
