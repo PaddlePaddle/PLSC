@@ -20,9 +20,9 @@
 ### 3.1 Install Paddle from PyPI
 
 ```shell
-# python required 3.x or later
-# paddlepaddle required 2.2.2 or later
-pip install paddlepaddle-gpu==2.2.2
+# python required 3.7
+# paddlepaddle required 2.2.2
+pip install paddlepaddle-gpu==2.2.2.post112
 ```
 
 ### 3.2 Install Paddle from Source Code
@@ -35,7 +35,6 @@ git clone https://github.com/PaddlePaddle/Paddle.git
 
 cd /path/to/Paddle/
 
-# [optional] checkout release/2.2 branch
 git checkout -b release/2.2 upstream/release/2.2
 
 mkdir build && cd build
