@@ -168,6 +168,7 @@ class ParamStorage(object):
         with device_guard(dev_id, "cpu"):
             tmp_var = core.eager.Tensor(
                 self.buffer._slice(self._fill, var_end))
+            tmp_var.get_tensor()._set_dims(param.shape)
             if convert_gpu:
                 param_cpu = param.cpu()
                 param.value().get_tensor()._clear()
@@ -372,11 +373,13 @@ class GradStorage(object):
             with device_guard(dev_id, self._device):
                 tmp_var = core.eager.Tensor(
                     self.buffer._slice(self._fill, grad_end))
+                tmp_var.get_tensor()._set_dims(param.shape)
                 param._copy_gradient_from(tmp_var)
 
         elif self._device == "gpu":
             tmp_var = core.eager.Tensor(
                 self.buffer._slice(self._fill, grad_end))
+            tmp_var.get_tensor()._set_dims(param.shape)
             param._copy_gradient_from(tmp_var)
 
         self._fill = offset
