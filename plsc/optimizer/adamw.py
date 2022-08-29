@@ -18,6 +18,7 @@ from __future__ import print_function
 
 import math
 import paddle
+from paddle import _legacy_C_ops as _C_ops
 from .optimizer import Optimizer
 from plsc.utils import logger
 
@@ -100,7 +101,7 @@ class AdamW(Optimizer):
                         paddle.float16, paddle.bfloat16
                 }:
                     master_param = state['master_param']
-                _, _, _, _, _, _ = paddle._C_ops.adamw(
+                _, _, _, _, _, _ = _C_ops.adamw(
                     p, grad,
                     paddle.to_tensor(lr), exp_avg, exp_avg_sq, beta1_pow,
                     beta2_pow, master_param, p, exp_avg, exp_avg_sq, beta1_pow,

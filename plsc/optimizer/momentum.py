@@ -18,6 +18,7 @@ from __future__ import print_function
 
 import math
 import paddle
+from paddle import _legacy_C_ops as _C_ops
 from .optimizer import Optimizer
 from plsc.utils import logger
 
@@ -101,7 +102,7 @@ class Momentum(Optimizer):
                     axis = getattr(p, 'axis', None)
                     assert index is not None
                     assert axis is not None
-                    _, _, _ = paddle._C_ops.sparse_momentum(
+                    _, _, _ = _C_ops.sparse_momentum(
                         p,
                         grad,
                         exp_avg,
@@ -125,7 +126,7 @@ class Momentum(Optimizer):
                         'multi_precision',
                         master_param is not None)
                 else:
-                    _, _, _ = paddle._C_ops.momentum(
+                    _, _, _ = _C_ops.momentum(
                         p,
                         grad,
                         exp_avg,
