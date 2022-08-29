@@ -14,6 +14,7 @@
 
 import warnings
 import paddle
+from paddle import _legacy_C_ops as _C_ops
 
 
 def _squared_l2_norm(x):
@@ -22,7 +23,7 @@ def _squared_l2_norm(x):
         sum_square = paddle.sum(square)
         return sum_square
 
-    return paddle._C_ops.squared_l2_norm(x)
+    return _C_ops.squared_l2_norm(x)
 
 
 class ClipGradByGlobalNorm(object):
