@@ -59,7 +59,7 @@ class AllGather(paddle.autograd.PyLayer):
         for _op in dist_ops:
             _op.wait()
 
-        grad_out *= len(grad_list)  # cooperate with distributed loss function
+        #grad_out *= len(grad_list)  # cooperate with distributed loss function
         return grad_out
 
 
@@ -93,12 +93,14 @@ class PartialFC(nn.Layer):
                  embedding_size=512,
                  sample_ratio=1.0,
                  model_parallel=False,
+                 sparse_update=True,
                  name=None):
         super(PartialFC, self).__init__()
         self.num_classes: int = num_classes
         self.sample_ratio: float = sample_ratio
         self.embedding_size: int = embedding_size
         self.model_parallel: bool = model_parallel
+        self.sparse_update: bool = sparse_update
 
         assert self.sample_ratio > 0 and self.sample_ratio <= 1.0
 
@@ -151,7 +153,7 @@ class PartialFC(nn.Layer):
 
         # NOTE(GuoxiaWang): stop full gradient and set has_sparse_grad attr,
         # has_sparse_grad be used to sparse_momentum
-        if self.sample_ratio < 1.0 and self.model_parallel:
+        if self.sample_ratio < 1.0 and self.model_parallel and self.sparse_update:
             setattr(self.weight, 'has_sparse_grad', True)
             self.weight.stop_gradient = True
         self.sub_weight = None
@@ -177,7 +179,7 @@ class PartialFC(nn.Layer):
             # NOTE(GuoxiaWang): stop generate the full gradient 
             # when use partial fc in model parallel,
             # but it requires sub gradient.
-            if self.model_parallel:
+            if self.model_parallel and self.sparse_update:
                 self.sub_weight.stop_gradient = False
 
                 def sparse_grad_hook_fn():
