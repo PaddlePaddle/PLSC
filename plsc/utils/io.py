@@ -108,7 +108,9 @@ def _optimizer_state_dict_split(state_dict):
             dist_state_dict['param_groups'].append(group)
             state_dict['param_groups'].remove(group)
             for name in group['params']:
-                dist_state_dict['state'][name] = state_dict['state'].pop(name)
+                if name in state_dict['state']:
+                    dist_state_dict['state'][name] = state_dict['state'].pop(
+                        name)
     return state_dict, dist_state_dict
 
 
