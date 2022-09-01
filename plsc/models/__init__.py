@@ -19,6 +19,7 @@ from .layers import Model
 from .vision_transformer import *
 from .deit import *
 from .iresnet import *
+from .face_vit import *
 
 __all__ = ["build_model"]
 
