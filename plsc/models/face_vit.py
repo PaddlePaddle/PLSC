@@ -16,6 +16,7 @@
 # https://github.com/deepinsight/insightface/blob/master/recognition/arcface_torch/backbones/vit.py
 
 from collections.abc import Callable
+import collections
 
 import os
 import math
@@ -456,18 +457,6 @@ class FaceViT(Model):
         y, targets = self.head(y, inputs['targets'])
 
         return {'logits': y, 'targets': targets}
-
-    def load_pretrained(self, path, rank=0, finetune=False):
-        if not os.path.exists(path + '.pdparams'):
-            raise ValueError("Model pretrain path {} does not "
-                             "exists.".format(path))
-
-        state_dict = self.state_dict()
-        param_state_dict = paddle.load(path + ".pdparams")
-        if not finetune:
-            self.set_dict(param_state_dict)
-            return
-        return
 
     def load_pretrained(self, path, rank=0, finetune=False):
         if not os.path.exists(path + '.pdparams'):
