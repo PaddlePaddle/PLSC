@@ -17,6 +17,8 @@ from __future__ import print_function
 import numpy as np
 import os
 
+import paddle
+
 from .common_dataset import CommonDataset
 from plsc.utils import logger
 
@@ -79,3 +81,26 @@ class FaceVerificationDataset(CommonDataset):
                 self.labels.append(np.int32(l[2]))
                 assert os.path.exists(self.images[-2])
                 assert os.path.exists(self.images[-1])
+
+
+class FaceRandomDataset(paddle.io.Dataset):
+    def __init__(self, num_classes):
+        super(FaceRandomDataset, self).__init__()
+        self.num_classes = num_classes
+        self.label_list = np.random.randint(
+            0, num_classes, (51200, ), dtype=np.int32)
+
+        self.total_num_samples = len(self.label_list)
+        self.num_samples = len(self.label_list)
+
+    def __getitem__(self, idx):
+        label = self.label_list[idx]
+        img = np.random.uniform(
+            low=-1.0, high=1.0, size=(3, 112, 112)).astype(np.float32)
+
+        label = np.int32(label)
+
+        return img, label
+
+    def __len__(self):
+        return self.num_samples

@@ -144,16 +144,13 @@ class Engine(object):
                 self.eval_loss_func = None
 
         # build metric
+        self.train_metric_func = None
         if self.mode == 'train':
             metric_config = self.config.get("Metric")
             if metric_config is not None:
                 metric_config = metric_config.get("Train")
                 if metric_config is not None:
                     self.train_metric_func = build_metrics(metric_config)
-                else:
-                    self.train_metric_func = None
-        else:
-            self.train_metric_func = None
 
         if self.mode == "eval" or (self.mode == "train" and
                                    self.config["Global"]["eval_during_train"]):
