@@ -35,7 +35,7 @@ class Momentum(Optimizer):
 
         defaults = dict(
             lr=lr,
-            momentum=0.9,
+            momentum=momentum,
             weight_decay=weight_decay,
             use_master_param=use_master_param,
             grad_clip=grad_clip, )
@@ -79,9 +79,11 @@ class Momentum(Optimizer):
                 state = self.state[p.name]
 
                 # State initialization
+                initialized = True
                 if len(state) == 0:
                     # Exponential moving average of gradient values
                     state['exp_avg'] = paddle.zeros_like(p)
+                    initialized = False
 
                     if group['use_master_param'] and p.dtype in {
                             paddle.float16, paddle.bfloat16
@@ -126,23 +128,42 @@ class Momentum(Optimizer):
                         'multi_precision',
                         master_param is not None)
                 else:
-                    _, _, _ = _C_ops.momentum(
-                        p,
-                        grad,
-                        exp_avg,
-                        paddle.to_tensor(
-                            lr, dtype='float32'),
-                        master_param,
-                        p,
-                        exp_avg,
-                        master_param,
-                        'mu',
-                        momentum,
-                        'use_nesterov',
-                        False,
-                        'regularization_method',
-                        'l2_decay',
-                        'regularization_coeff',
-                        group['weight_decay'],
-                        'multi_precision',
-                        master_param is not None)
+                    p_fp32 = p
+                    if group['use_master_param'] and p.dtype in {
+                            paddle.float16, paddle.bfloat16
+                    }:
+                        p_fp32 = state['master_param']
+
+                    if group['weight_decay'] != 0.0:
+                        grad = (grad + group['weight_decay'] * p_fp32
+                                ).astype(grad.dtype)
+
+                    if initialized is False:
+                        exp_avg.copy_(grad, False)
+                    else:
+                        exp_avg.copy_(exp_avg * momentum + grad, False)
+                    p_fp32.copy_(p_fp32 - lr * exp_avg, False)
+
+                    if p.dtype in {paddle.float16, paddle.bfloat16}:
+                        p.copy_(paddle.cast(p_fp32, p.dtype), False)
+
+                    # _, _, _ = _C_ops.momentum(
+                    #     p,
+                    #     grad,
+                    #     exp_avg,
+                    #     paddle.to_tensor(
+                    #         lr, dtype='float32'),
+                    #     master_param,
+                    #     p,
+                    #     exp_avg,
+                    #     master_param,
+                    #     'mu',
+                    #     momentum,
+                    #     'use_nesterov',
+                    #     False,
+                    #     'regularization_method',
+                    #     'l2_decay',
+                    #     'regularization_coeff',
+                    #     group['weight_decay'],
+                    #     'multi_precision',
+                    #     master_param is not None)

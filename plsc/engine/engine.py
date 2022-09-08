@@ -56,6 +56,12 @@ class Engine(object):
         self.save_interval = self.config["Global"].get("save_interval", 1)
         self.accum_steps = self.config["Global"].get("accum_steps", 1)
 
+        assert isinstance(self.accum_steps, int) and self.accum_steps > 0, \
+            "accum_steps must be int dtype and greater than 0"
+
+        # global iter counter
+        self.global_step = 0
+
         # init distribution env
         self.config["Global"]["distributed"] = dist.get_world_size() != 1
         self.config["Global"]["rank"] = dist.get_rank()
@@ -170,6 +176,9 @@ class Engine(object):
         config_fp16 = self.config.get('FP16', {})
         assert config_fp16 is not None
         self.fp16_level = config_fp16.get("level", 'O2')
+        assert self.fp16_level in ['O0', 'O1', 'O2']
+        if self.fp16 and self.fp16_level == 'O0':
+            self.fp16 = False
         self.fp16_custom_white_list = config_fp16.get("fp16_custom_white_list",
                                                       None)
         self.fp16_custom_black_list = config_fp16.get("fp16_custom_black_list",
@@ -279,8 +288,6 @@ class Engine(object):
             "reader_cost": AverageMeter(
                 "reader_cost", ".5f", postfix=" s,"),
         }
-        # global iter counter
-        self.global_step = 0
 
         # load checkpoint and resume
         if self.config["Global"]["checkpoint"] is not None:
