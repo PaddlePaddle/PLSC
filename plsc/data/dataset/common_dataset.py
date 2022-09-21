@@ -58,7 +58,7 @@ class CommonDataset(Dataset):
                 cls_idx = [int(e) for e in self.labels[idx].split(',')]
                 for idx in cls_idx:
                     one_hot[idx] = 1.0
-                return (img, onehot)
+                return (img, one_hot)
             else:
                 return (img, np.int32(self.labels[idx]))
 

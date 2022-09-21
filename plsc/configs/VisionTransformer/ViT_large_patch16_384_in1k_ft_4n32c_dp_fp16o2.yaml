@@ -2,7 +2,7 @@
 Global:
   checkpoint: null
   finetune: True
-  pretrained_model: ./pretrained/vit_jax/imagenet21k-ViT-L_16
+  pretrained_model: ./pretrained/ViT_large_patch16_224/best_model
   output_dir: ./output/
   device: gpu
   save_interval: 1
@@ -126,4 +126,4 @@ Metric:
 
 Export:
   export_type: paddle
-  input_shape: [None, 3, 224, 224]
+  input_shape: [None, 3, 384, 384]
