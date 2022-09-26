@@ -27,9 +27,8 @@ DistributedStrategy:
 # model architecture
 Model:
   name: ViT_large_patch16_224
-  class_num: 10450
+  class_num: 21841
   drop_rate: 0.1
-  representation_size: 768
  
 # loss function config for traing/eval process
 Loss:
@@ -53,9 +52,6 @@ Optimizer:
   epsilon: 1e-8
   weight_decay: 0.03
   exp_avg_force_fp32: True
-  grad_clip:
-    name: ClipGradByGlobalNorm
-    clip_norm: 1.0
 
 
 # data loader for train and eval
@@ -63,10 +59,9 @@ DataLoader:
   Train:
     dataset:
       name: ImageNetDataset
-      image_root: ./dataset/ImageNet21K/
-      multi_label: True
-      class_num: 10450
-      cls_label_path: ./dataset/ImageNet21K/multi_label_train_list.txt
+      image_root: ./dataset/ImageNet22K/
+      class_num: 21841
+      cls_label_path: ./dataset/ImageNet22K/train_list.txt
       transform_ops:
         - DecodeImage:
             to_rgb: True
@@ -97,8 +92,8 @@ DataLoader:
   Eval:
     dataset: 
       name: ImageNetDataset
-      image_root: ./dataset/ImageNet21K/
-      cls_label_path: ./dataset/ImageNet21K/val_list.txt
+      image_root: ./dataset/ImageNet22K/
+      cls_label_path: ./dataset/ImageNet22K/val_list.txt
       transform_ops:
         - DecodeImage:
             to_rgb: True

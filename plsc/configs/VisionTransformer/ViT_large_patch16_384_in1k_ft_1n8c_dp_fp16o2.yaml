@@ -1,7 +1,8 @@
 # global configs
 Global:
   checkpoint: null
-  pretrained_model: null
+  finetune: True
+  pretrained_model: ./pretrained/vit_jax/imagenet21k-ViT-L_16
   output_dir: ./output/
   device: gpu
   save_interval: 1
@@ -9,8 +10,8 @@ Global:
   eval_during_train: True
   eval_interval: 1
   eval_unit: "epoch"
-  accum_steps: 1
-  epochs: 300
+  accum_steps: 8
+  epochs: 8
   print_batch_step: 10
   use_visualdl: False
   seed: 2021
@@ -18,13 +19,15 @@ Global:
 # FP16 setting
 FP16:
   level: O2
+  GradScaler:
+    init_loss_scaling: 65536.0
   
 DistributedStrategy:
-  data_sharding: True
+  data_parallel: True
 
 # model architecture
 Model:
-  name: ViT_base_patch16_224
+  name: ViT_large_patch16_384
   class_num: 1000
   drop_rate: 0.1
  
@@ -32,26 +35,26 @@ Model:
 Loss:
   Train:
     - ViTCELoss:
+        type: softmax
         weight: 1.0
-        epsilon: 0.0001
   Eval:
     - CELoss:
         weight: 1.0
 
 LRScheduler:
   name: ViTLRScheduler
-  learning_rate: 3e-3
+  learning_rate: 0.03
   decay_type: cosine
-  warmup_steps: 10000
+  warmup_steps: 500
 
 Optimizer:
-  name: AdamW
-  betas: (0.9, 0.999)
-  epsilon: 1e-8
-  weight_decay: 0.3
+  name: Momentum
+  momentum: 0.9
+  weight_decay: 0.0001
   grad_clip:
     name: ClipGradByGlobalNorm
     clip_norm: 1.0
+
 
 # data loader for train and eval
 DataLoader:
@@ -59,15 +62,16 @@ DataLoader:
     dataset:
       name: ImageNetDataset
       image_root: ./dataset/ILSVRC2012/
+      class_num: 1000
       cls_label_path: ./dataset/ILSVRC2012/train_list.txt
       transform_ops:
         - DecodeImage:
             to_rgb: True
             channel_first: False
         - RandCropImage:
-            size: 224
+            size: 384
             scale: [0.05, 1.0]
-            interpolation: bicubic
+            interpolation: bilinear
             backend: pil
         - RandFlipImage:
             flip_code: 1
@@ -80,8 +84,8 @@ DataLoader:
 
     sampler:
       name: DistributedBatchSampler
-      batch_size: 128
-      drop_last: False
+      batch_size: 64 # total batchsize 512
+      drop_last: True
       shuffle: True
     loader:
       num_workers: 8
@@ -97,11 +101,9 @@ DataLoader:
             to_rgb: True
             channel_first: False
         - ResizeImage:
-            resize_short: 256
-            interpolation: bicubic
+            size: 384
+            interpolation: bilinear
             backend: pil
-        - CenterCropImage:
-            size: 224
         - NormalizeImage:
             scale: 1.0/255.0
             mean: [0.5, 0.5, 0.5]
@@ -119,9 +121,6 @@ DataLoader:
       use_shared_memory: True
 
 Metric:
-  Train:
-    - TopkAcc:
-        topk: [1, 5]
   Eval:
     - TopkAcc:
         topk: [1, 5]

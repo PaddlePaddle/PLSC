@@ -18,12 +18,14 @@
 
 from collections.abc import Callable
 
+import scipy
 import os
 import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.nn.initializer import Constant, Normal, XavierUniform
 
+from plsc.utils import logger
 from plsc.models.layers import Model
 
 __all__ = [
@@ -41,7 +43,6 @@ __all__ = [
     'ViT_G_patch14_224',
     'ViT_6B_patch14_224',
     'VisionTransformer',
-    'ViT_debug_patch16_224',
 ]
 
 mlp_bias_normal_ = Normal(std=1e-6)
@@ -65,7 +66,11 @@ def drop_path(x, drop_prob=0., training=False):
         return x
     keep_prob = paddle.to_tensor(1 - drop_prob)
     shape = (paddle.shape(x)[0], ) + (1, ) * (x.ndim - 1)
-    random_tensor = keep_prob + paddle.rand(shape, dtype=x.dtype)
+    if x.dtype == paddle.float16:
+        random_tensor = keep_prob + paddle.rand(
+            shape, dtype=paddle.float32).astype(x.dtype)
+    else:
+        random_tensor = keep_prob + paddle.rand(shape, dtype=x.dtype)
     random_tensor = paddle.floor(random_tensor)  # binarize
     output = x.divide(keep_prob) * random_tensor
     return output
@@ -352,38 +357,54 @@ class VisionTransformer(Model):
 
         state_dict = self.state_dict()
         param_state_dict = paddle.load(path + ".pdparams")
+
+        # for FP16 saving pretrained weight
+        for key, value in param_state_dict.items():
+            if key in param_state_dict and key in state_dict and param_state_dict[
+                    key].dtype != state_dict[key].dtype:
+                param_state_dict[key] = param_state_dict[key].astype(
+                    state_dict[key].dtype)
+
         if not finetune:
             self.set_dict(param_state_dict)
             return
 
         for k in ['head0.weight', 'head0.bias', 'head.weight', 'head.bias']:
-            if k in param_state_dict and param_state_dict[
-                    k].shape != state_dict[k].shape:
-                print(f"Removing key {k} from pretrained checkpoint")
+            if k in param_state_dict:
+                logger.info(f"Removing key {k} from pretrained checkpoint")
                 del param_state_dict[k]
 
         # interpolate position embedding
-        pos_embed_checkpoint = param_state_dict['pos_embed']
-        embedding_size = pos_embed_checkpoint.shape[-1]
+        pos_embed_ckt = param_state_dict['pos_embed']  # [1, N, 1024]
+        embedding_size = pos_embed_ckt.shape[-1]
         num_patches = self.patch_embed.num_patches
         num_extra_tokens = self.pos_embed.shape[-2] - num_patches
         # height (== width) for the checkpoint position embedding
-        orig_size = int((pos_embed_checkpoint.shape[-2] - num_extra_tokens)**
-                        0.5)
+        orig_size = int((pos_embed_ckt.shape[-2] - num_extra_tokens)**0.5)
         # height (== width) for the new position embedding
         new_size = int(num_patches**0.5)
         # class_token and dist_token are kept unchanged
-        extra_tokens = pos_embed_checkpoint[:, :num_extra_tokens]
+        extra_tokens = pos_embed_ckt[:, :num_extra_tokens]
         # only the position tokens are interpolated
-        pos_tokens = pos_embed_checkpoint[:, num_extra_tokens:]
+        pos_tokens = pos_embed_ckt[0, num_extra_tokens:]
+        # pos_tokens = pos_tokens.reshape([orig_size, orig_size, embedding_size])
+
+        # zoom = (new_size / orig_size, new_size / orig_size, 1)
+        # pos_tokens_new = scipy.ndimage.zoom(pos_tokens.numpy(), zoom, order=1)
+        # pos_tokens = paddle.to_tensor(pos_tokens_new, dtype=pos_tokens.dtype)
+        # pos_tokens = pos_tokens.reshape([1, new_size*new_size, embedding_size])
+        # new_pos_embed = paddle.concat((extra_tokens, pos_tokens), axis=1)
+        # param_state_dict['pos_embed'] = new_pos_embed
+
         pos_tokens = paddle.transpose(
             pos_tokens.reshape([-1, orig_size, orig_size, embedding_size]),
             perm=[0, 3, 1, 2])
+        dtype = pos_tokens.dtype
         pos_tokens = paddle.nn.functional.interpolate(
-            pos_tokens,
+            pos_tokens.astype(paddle.float32),
             size=(new_size, new_size),
             mode='bicubic',
-            align_corners=False)
+            align_corners=False).astype(dtype)
         pos_tokens = paddle.transpose(
             pos_tokens, perm=[0, 2, 3, 1]).flatten(1, 2)
         new_pos_embed = paddle.concat((extra_tokens, pos_tokens), axis=1)
@@ -396,19 +417,6 @@ class VisionTransformer(Model):
         paddle.save(self.state_dict(), path + ".pdparams")
 
 
-def ViT_debug_patch16_224(**kwargs):
-    model = VisionTransformer(
-        patch_size=16,
-        embed_dim=24,
-        depth=2,
-        num_heads=12,
-        mlp_ratio=4,
-        qkv_bias=True,
-        epsilon=1e-6,
-        **kwargs)
-    return model
-
-
 def ViT_base_patch16_224(**kwargs):
     model = VisionTransformer(
         patch_size=16,
@@ -418,6 +426,7 @@ def ViT_base_patch16_224(**kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         epsilon=1e-6,
+        representation_size=768,
         **kwargs)
     return model
 
@@ -432,6 +441,7 @@ def ViT_base_patch16_384(**kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         epsilon=1e-6,
+        representation_size=None,
         **kwargs)
     return model
 
@@ -445,6 +455,7 @@ def ViT_base_patch32_224(**kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         epsilon=1e-6,
+        representation_size=768,
         **kwargs)
     return model
 
@@ -459,6 +470,7 @@ def ViT_base_patch32_384(**kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         epsilon=1e-6,
+        representation_size=None,
         **kwargs)
     return model
 
@@ -472,6 +484,7 @@ def ViT_large_patch16_224(**kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         epsilon=1e-6,
+        representation_size=1024,
         **kwargs)
     return model
 
@@ -486,6 +499,7 @@ def ViT_large_patch16_384(**kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         epsilon=1e-6,
+        representation_size=None,
         **kwargs)
     return model
 
@@ -499,6 +513,7 @@ def ViT_large_patch32_224(**kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         epsilon=1e-6,
+        representation_size=1024,
         **kwargs)
     return model
 
@@ -513,6 +528,7 @@ def ViT_large_patch32_384(**kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         epsilon=1e-6,
+        representation_size=None,
         **kwargs)
     return model
 
@@ -524,6 +540,7 @@ def ViT_huge_patch14_224(**kwargs):
         depth=32,
         num_heads=16,
         mlp_ratio=4,
+        representation_size=1280,
         **kwargs)
     return model
 
@@ -536,6 +553,7 @@ def ViT_huge_patch14_384(**kwargs):
         depth=32,
         num_heads=16,
         mlp_ratio=4,
+        representation_size=None,
         **kwargs)
     return model
 
@@ -550,6 +568,7 @@ def ViT_g_patch14_224(**kwargs):
         mlp_ratio=4.364,
         qkv_bias=True,
         epsilon=1e-6,
+        representation_size=1408,
         **kwargs)
     return model
 
@@ -564,6 +583,7 @@ def ViT_G_patch14_224(**kwargs):
         mlp_ratio=4.9231,
         qkv_bias=True,
         epsilon=1e-6,
+        representation_size=1664,
         **kwargs)
     return model
 
@@ -578,5 +598,6 @@ def ViT_6B_patch14_224(**kwargs):
         mlp_ratio=4.955,
         qkv_bias=True,
         epsilon=1e-6,
+        representation_size=2320,
         **kwargs)
     return model

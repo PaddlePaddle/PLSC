@@ -29,7 +29,6 @@ Model:
   name: ViT_base_patch16_224
   class_num: 1000
   drop_rate: 0.1
-  representation_size: 768
  
 # loss function config for traing/eval process
 Loss:
