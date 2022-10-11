@@ -88,13 +88,7 @@ class ClipGradByGlobalNorm(object):
             if param.grad.dtype == paddle.float16:
                 clip_coef = clip_coef_fp32.astype("float16")
 
-            # inplace calculate
-            paddle.fluid.framework._dygraph_tracer().trace_op(
-                type="elementwise_mul",
-                inputs={'X': param.grad,
-                        'Y': clip_coef},
-                outputs={'Out': param.grad},
-                attrs={'axis': -1})
+            param.grad.detach().scale_(clip_coef)
 
 
 @paddle.no_grad()
@@ -141,10 +135,5 @@ def clip_grad_norm_(parameters,
     clip_coef = max_norm / (total_norm + 1e-6)
     clip_coef_clamped = paddle.clip(clip_coef, max=1.0)
     for p in parameters:
-        paddle.fluid.framework._dygraph_tracer().trace_op(
-            type="elementwise_mul",
-            inputs={'X': p.grad,
-                    'Y': clip_coef_clamped},
-            outputs={'Out': p.grad},
-            attrs={'axis': -1})
+        p.grad.detach().scale_(clip_coef_clamped)
     return total_norm
