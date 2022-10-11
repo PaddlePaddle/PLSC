@@ -36,8 +36,7 @@ def grad_sync(param_groups, comm_group=None, grad_avg=True):
             if grad is None:
                 continue
 
-            paddle.distributed.all_reduce(
-                grad, use_calc_stream=True, group=comm_group)
+            paddle.distributed.all_reduce(grad, sync_op=True, group=comm_group)
             if grad_avg:
                 p.grad.detach().scale_(1.0 / nranks)
 
@@ -65,6 +64,6 @@ def param_sync(model, src_rank=0, comm_group=None):
             continue
 
         paddle.distributed.broadcast(
-            param, src=src_rank, group=comm_group, use_calc_stream=True)
+            param, src=src_rank, group=comm_group, sync_op=True)
 
     return None
