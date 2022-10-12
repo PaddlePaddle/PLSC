@@ -17,6 +17,9 @@
 
 [PLSC](https://github.com/PaddlePaddle/PLSC) is an open source repo for a collection of Paddle Large Scale Classification Tools, which supports large-scale classification model pre-training as well as finetune for downstream tasks.
 
+## Available Models
+* [ViT](./task/classification/vit/)
+
 ## Top News 🔥
 
 **Update (2022-07-18):** PLSC v2.3 is released, a new upgrade, more modular and highly extensible. Support more tasks, such as [ViT](https://arxiv.org/abs/2010.11929), [DeiT](https://arxiv.org/abs/2012.12877). The ``static`` graph mode will no longer be maintained as of this release.
@@ -47,8 +50,6 @@ See more [tutorials](./tutorials/README.md).
 
 See [documentation](./docs/README.md) for the usage of more APIs or modules.
 
-## Model Zoo
-To download more useful pre-trained models see [model zoo](./docs/model_zoo.md).
 
 ## License
 
