@@ -1,10 +1,7 @@
 # Vision Transformer
 
 ## Introduction
-We use PaddlePaddle to reproduce the experimental results as much as possible according to the official ViT implementation.
-
-
-by Alexey Dosovitskiy\*†, Lucas Beyer\*, Alexander Kolesnikov\*, Dirk
+PaddlePaddle reimplementation of [Google's repository for the ViT model](https://github.com/google-research/vision_transformer) that was released with the paper [An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale](https://arxiv.org/abs/2010.11929) by Alexey Dosovitskiy\*†, Lucas Beyer\*, Alexander Kolesnikov\*, Dirk
 Weissenborn\*, Xiaohua Zhai\*, Thomas Unterthiner, Mostafa Dehghani, Matthias
 Minderer, Georg Heigold, Sylvain Gelly, Jakob Uszkoreit and Neil Houlsby\*†.
 
@@ -82,3 +79,15 @@ We provide more directly runnable configurations, see [ViT Configurations](../..
 | ------------ | -------- | ------------ | --------- | ------- | -------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | ViT-B_16_224 | pretrain | ImageNet2012 | A100*N1C8 | 3583    | 0.75196  | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.pdparams) | -                                                            | [log](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.log) |
 | ViT-B_16_224 | finetune | ImageNet2012 | A100*N1C8 | 719     | 0.77972  | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.pdparams) | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-384.pdparams) | [log](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-384.log) |
+
+
+## Citations
+
+```bibtex
+@article{dosovitskiy2020,
+  title={An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale},
+  author={Dosovitskiy, Alexey and Beyer, Lucas and Kolesnikov, Alexander and Weissenborn, Dirk and Zhai, Xiaohua and Unterthiner, Thomas and  Dehghani, Mostafa and Minderer, Matthias and Heigold, Georg and Gelly, Sylvain and Uszkoreit, Jakob and Houlsby, Neil},
+  journal={arXiv preprint arXiv:2010.11929},
+  year={2020}
+}
+```
