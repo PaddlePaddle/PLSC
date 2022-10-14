@@ -178,7 +178,9 @@ class Optimizer(object):
         for k, v in state_dict['state'].items():
             if k in param_name_map:
                 param = param_name_map[k]
-                state[param] = cast(param, v)
+                # TODO(GuoxiaWang): fix type cast
+                # state[k] = cast(param, v)
+                state[k] = v
             else:
                 state[k] = v
 
