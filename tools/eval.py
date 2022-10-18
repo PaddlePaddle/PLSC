@@ -15,22 +15,23 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-import os
-import sys
-__dir__ = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.abspath(os.path.join(__dir__, '../')))
-
-from plsc.utils import config
-from plsc.engine.engine import Engine
 
 import paddle
 paddle.disable_static()
 
-if __name__ == "__main__":
-    args = config.parse_args()
-    config = config.get_config(
+from plsc.utils import config as cfg_util
+from plsc.engine.engine import Engine
+
+
+def main():
+    args = cfg_util.parse_args()
+    config = cfg_util.get_config(
         args.config, overrides=args.override, show=False)
     config.profiler_options = args.profiler_options
     engine = Engine(config, mode="eval")
     ret = engine.eval()
     print(ret)
+
+
+if __name__ == "__main__":
+    main()
