@@ -53,4 +53,11 @@ setup(
     download_url='https://github.com/PaddlePaddle/PLSC.git',
     packages=find_packages(),
     zip_safe=False,
+    entry_points={
+        "console_scripts": [
+            "plsc-train = tools.train:main",
+            "plsc-eval = tools.eval:main",
+            "plsc-export = tools.export:main",
+        ],
+    },
     install_requires=requirements, )

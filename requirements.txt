@@ -2,12 +2,12 @@ opencv-python
 pillow
 numpy
 easydict
+scikit-image
 scipy
 sklearn
 requests
 prettytable
 tqdm
-Pillow
 visualdl
 scikit-learn==0.23.2
 opencv-python==4.4.0.46
