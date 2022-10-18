@@ -59,7 +59,7 @@ class AllGather(paddle.autograd.PyLayer):
         for _op in dist_ops:
             _op.wait()
 
-        #grad_out *= len(grad_list)  # cooperate with distributed loss function
+        grad_out *= len(grad_list)  # cooperate with distributed loss function
         return grad_out
 
 
@@ -192,8 +192,8 @@ class PartialFC(nn.Layer):
         else:
             self.sub_weight = self.weight
 
-        norm_feature = paddle.nn.functional.normalize(total_feature, axis=1)
-        norm_weight = paddle.nn.functional.normalize(self.sub_weight, axis=0)
+        norm_feature = paddle.fluid.layers.l2_normalize(total_feature, axis=1)
+        norm_weight = paddle.fluid.layers.l2_normalize(self.sub_weight, axis=0)
 
         local_logit = paddle.matmul(norm_feature, norm_weight)
         return local_logit, total_label

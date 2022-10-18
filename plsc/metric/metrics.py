@@ -103,7 +103,7 @@ class LFWAcc(nn.Layer):
         self.nrof_folds = nrof_folds
         self.pca = pca
 
-    def forward(self, embeddings, actual_issame, flip_test=False):
+    def forward(self, embeddings, actual_issame):
 
         metric_dict = dict()
 
@@ -147,7 +147,7 @@ class LFWAcc(nn.Layer):
 
         metric_dict["std"] = std2
         metric_dict["xnorm"] = _xnorm
-        if flip_test:
+        if self.flip_test:
             metric_dict["accuracy-flip"] = acc2
         else:
             metric_dict["accuracy"] = acc2
