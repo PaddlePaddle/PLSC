@@ -22,7 +22,8 @@ from plsc.data import sampler
 from plsc.data import utils
 
 
-def build_dataloader(config, mode, device, use_dali=False):
+def build_dataloader(config, mode, device, use_dali=False,
+                     worker_init_fn=None):
     assert mode in ['Train', 'Eval', 'Test'
                     ], "Dataset mode should be Train, Eval, Test"
 
@@ -59,7 +60,8 @@ def build_dataloader(config, mode, device, use_dali=False):
         return_list=True,
         use_shared_memory=use_shared_memory,
         batch_sampler=batch_sampler,
-        collate_fn=collate_fn)
+        collate_fn=collate_fn,
+        worker_init_fn=worker_init_fn)
 
     logger.debug("build data_loader({}) success...".format(data_loader))
     return data_loader

@@ -78,6 +78,11 @@ class Engine(object):
             np.random.seed(seed)
             random.seed(seed)
 
+            def worker_init_fn(worker_id):
+                """ set seed in subproces for dataloader when num_workers > 0"""
+                np.random.seed(seed + worker_id)
+                random.seed(seed + worker_id)
+
         RELATED_FLAGS_SETTING = {}
         RELATED_FLAGS_SETTING['FLAGS_cudnn_exhaustive_search'] = 1
         RELATED_FLAGS_SETTING['FLAGS_cudnn_batchnorm_spatial_persistent'] = 1
@@ -127,11 +132,13 @@ class Engine(object):
         # build dataloader
         if self.mode == 'train':
             self.train_dataloader = build_dataloader(
-                self.config["DataLoader"], "Train", self.device, self.use_dali)
+                self.config["DataLoader"], "Train", self.device, self.use_dali,
+                worker_init_fn)
         if self.mode == "eval" or (self.mode == "train" and
                                    self.config["Global"]["eval_during_train"]):
             self.eval_dataloader = build_dataloader(
-                self.config["DataLoader"], "Eval", self.device, self.use_dali)
+                self.config["DataLoader"], "Eval", self.device, self.use_dali,
+                worker_init_fn)
 
         # build loss
         if self.mode == "train":
