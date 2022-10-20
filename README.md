@@ -44,6 +44,8 @@ See [Quick Run Recognition](./tutorials/get_started/quick_run_recognition.md) fo
 
 ## Tutorials
 
+* [Configuration](./tutorials/basic/config.md)
+
 See more [tutorials](./tutorials/README.md).
 
 ## Documentation
