@@ -38,7 +38,7 @@ python -m paddle.distributed.launch \
     --nnodes=$PADDLE_NNODES \
     --master=$PADDLE_MASTER \
     --devices=$CUDA_VISIBLE_DEVICES \
-    tools/train.py \
+    plsc-train \
     -c ./plsc/configs/VisionTransformer/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.yaml
 ```
 
@@ -64,7 +64,7 @@ python -m paddle.distributed.launch \
     --nnodes=$PADDLE_NNODES \
     --master=$PADDLE_MASTER \
     --devices=$CUDA_VISIBLE_DEVICES \
-    tools/train.py \
+    plsc-train \
     -c ./plsc/configs/VisionTransformer/ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2.yaml \
     -o Global.pretrained_model=./pretrained/vit/ViT_base_patch16_224/imagenet2012-ViT-B_16-224.pdparams \
 ```
