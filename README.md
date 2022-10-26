@@ -19,6 +19,7 @@
 
 ## Available Models
 * [ViT](./task/classification/vit/)
+* [Face Recognition](./task/recognition/face/)
 
 ## Top News 🔥
 
