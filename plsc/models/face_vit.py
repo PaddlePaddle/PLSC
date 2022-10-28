@@ -502,8 +502,6 @@ def FaceViT_tiny_patch9_112(**kwargs):
         depth=12,
         num_heads=8,
         mlp_ratio=4,
-        drop_path_rate=0.1,
-        mask_ratio=0.1,
         **kwargs)
     return model
 
@@ -516,8 +514,6 @@ def FaceViT_small_patch9_112(**kwargs):
         depth=12,
         num_heads=8,
         mlp_ratio=4,
-        drop_path_rate=0.1,
-        mask_ratio=0.1,
         **kwargs)
     return model
 
@@ -530,8 +526,6 @@ def FaceViT_base_patch9_112(**kwargs):
         depth=24,
         num_heads=8,
         mlp_ratio=4,
-        drop_path_rate=0.1,
-        mask_ratio=0.1,
         **kwargs)
     return model
 
@@ -544,7 +538,5 @@ def FaceViT_large_patch9_112(**kwargs):
         depth=24,
         num_heads=8,
         mlp_ratio=4,
-        drop_path_rate=0.05,
-        mask_ratio=0.05,
         **kwargs)
     return model
