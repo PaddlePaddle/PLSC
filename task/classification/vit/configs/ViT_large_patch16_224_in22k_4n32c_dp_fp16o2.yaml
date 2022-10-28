@@ -1,8 +1,7 @@
 # global configs
 Global:
   checkpoint: null
-  finetune: True
-  pretrained_model: ./pretrained/ViT_large_patch16_224/best_model
+  pretrained_model: null
   output_dir: ./output/
   device: gpu
   save_interval: 1
@@ -11,14 +10,14 @@ Global:
   eval_interval: 1
   eval_unit: "epoch"
   accum_steps: 1
-  epochs: 8
+  epochs: 90
   print_batch_step: 10
   use_visualdl: False
   seed: 2021
   
 # FP16 setting
 FP16:
-  level: O0
+  level: O2
   GradScaler:
     init_loss_scaling: 65536.0
   
@@ -27,50 +26,49 @@ DistributedStrategy:
 
 # model architecture
 Model:
-  name: ViT_large_patch16_384
-  class_num: 1000
+  name: ViT_large_patch16_224
+  class_num: 18576
   drop_rate: 0.1
  
 # loss function config for traing/eval process
 Loss:
   Train:
     - ViTCELoss:
-        type: softmax
         weight: 1.0
+        epsilon: 0.0001
   Eval:
     - CELoss:
         weight: 1.0
 
 LRScheduler:
   name: ViTLRScheduler
-  learning_rate: 0.03
-  decay_type: cosine
-  warmup_steps: 500
+  learning_rate: 1e-3
+  decay_type: linear
+  warmup_steps: 10000
 
 Optimizer:
-  name: Momentum
-  momentum: 0.9
-  weight_decay: 0.0001
-  grad_clip:
-    name: ClipGradByGlobalNorm
-    clip_norm: 1.0
+  name: AdamW
+  betas: (0.9, 0.999)
+  epsilon: 1e-6
+  weight_decay: 0.15
+  exp_avg_force_fp32: True
 
 # data loader for train and eval
 DataLoader:
   Train:
     dataset:
       name: ImageNetDataset
-      image_root: ./dataset/ILSVRC2012/
-      class_num: 1000
-      cls_label_path: ./dataset/ILSVRC2012/train_list.txt
+      image_root: ./dataset/ImageNet22K/
+      multi_label: True
+      class_num: 18576
+      cls_label_path: ./dataset/ImageNet22K/filter_train_list.txt
       transform_ops:
         - DecodeImage:
             to_rgb: True
             channel_first: False
         - RandCropImage:
-            size: 384
-            scale: [0.05, 1.0]
-            interpolation: bilinear
+            size: 224
+            interpolation: bicubic
             backend: pil
         - RandFlipImage:
             flip_code: 1
@@ -80,10 +78,9 @@ DataLoader:
             std: [0.5, 0.5, 0.5]
             order: ''
         - ToCHWImage:
-
     sampler:
       name: DistributedBatchSampler
-      batch_size: 16 # total batchsize 512
+      batch_size: 128
       drop_last: True
       shuffle: True
     loader:
@@ -93,16 +90,18 @@ DataLoader:
   Eval:
     dataset: 
       name: ImageNetDataset
-      image_root: ./dataset/ILSVRC2012/
-      cls_label_path: ./dataset/ILSVRC2012/val_list.txt
+      image_root: ./dataset/ImageNet22K/
+      cls_label_path: ./dataset/ImageNet22K/filter_val_list.txt
       transform_ops:
         - DecodeImage:
             to_rgb: True
             channel_first: False
         - ResizeImage:
-            size: 384
-            interpolation: bilinear
+            resize_short: 256
+            interpolation: bicubic
             backend: pil
+        - CenterCropImage:
+            size: 224
         - NormalizeImage:
             scale: 1.0/255.0
             mean: [0.5, 0.5, 0.5]
@@ -126,4 +125,4 @@ Metric:
 
 Export:
   export_type: paddle
-  input_shape: [None, 3, 384, 384]
+  input_shape: [None, 3, 224, 224]
