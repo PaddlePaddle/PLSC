@@ -83,7 +83,8 @@ class ParamStorage(object):
                 value = np.zeros(size, dtype=np.float32)
 
             if in_dygraph_mode():
-                self.buffer = core.eager.Tensor(value=value, place=core.CPUPlace())
+                self.buffer = core.eager.Tensor(
+                    value=value, place=core.CPUPlace())
             else:
                 self.buffer = core.VarBase(value=value, place=core.CPUPlace())
         else:
@@ -221,7 +222,8 @@ class ParamStorage(object):
                 self._convert_buffer(p, p.shape,
                                      self.param2align[p.name])  # modify
             else:
-                self._convert_buffer(p, p.shape, self.param2align[p.name])  # modify
+                self._convert_buffer(p, p.shape,
+                                     self.param2align[p.name])  # modify
 
 
 class GradStorage(object):
@@ -257,7 +259,8 @@ class GradStorage(object):
             else:
                 value = np.zeros(size, dtype=np.float32)
             if in_dygraph_mode():
-                self.buffer = core.eager.Tensor(value=value, place=core.CPUPlace())
+                self.buffer = core.eager.Tensor(
+                    value=value, place=core.CPUPlace())
             else:
                 self.buffer = core.VarBase(value=value, place=core.CPUPlace())
         else:
@@ -395,7 +398,8 @@ class GradStorage(object):
                         self.buffer._slice(self._fill, grad_end))
                     tmp_var.get_tensor()._set_dims(param.shape)
                 else:
-                    tmp_var = core.VarBase(self.buffer._slice(self._fill, grad_end))
+                    tmp_var = core.VarBase(
+                        self.buffer._slice(self._fill, grad_end))
                     tmp_var.value().get_tensor()._set_dims(param.shape)
                 param._copy_gradient_from(tmp_var)
 
@@ -405,7 +409,8 @@ class GradStorage(object):
                     self.buffer._slice(self._fill, grad_end))
                 tmp_var.get_tensor()._set_dims(param.shape)
             else:
-                tmp_var = core.VarBase(self.buffer._slice(self._fill, grad_end))
+                tmp_var = core.VarBase(
+                    self.buffer._slice(self._fill, grad_end))
                 tmp_var.value().get_tensor()._set_dims(param.shape)
             param._copy_gradient_from(tmp_var)
 
