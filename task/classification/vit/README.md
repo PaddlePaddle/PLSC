@@ -1,6 +1,5 @@
 # Vision Transformer
 
-## Introduction
 PaddlePaddle reimplementation of [Google's repository for the ViT model](https://github.com/google-research/vision_transformer) that was released with the paper [An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale](https://arxiv.org/abs/2010.11929) by Alexey Dosovitskiy\*†, Lucas Beyer\*, Alexander Kolesnikov\*, Dirk
 Weissenborn\*, Xiaohua Zhai\*, Thomas Unterthiner, Mostafa Dehghani, Matthias
 Minderer, Georg Heigold, Sylvain Gelly, Jakob Uszkoreit and Neil Houlsby\*†.
@@ -15,14 +14,9 @@ vectors to a standard Transformer encoder. In order to perform classification,
 we use the standard approach of adding an extra learnable "classification token"
 to the sequence.
 
-## Installation
-- See [installation.md](../../../tutorials/get_started/installation.md)
-
-Note: All commands are executed in the PLSC root directory.
-
-```bash
-cd /path/to/PLSC
-```
+## Requirements
+To enjoy some new features, PaddlePaddle 2.4 is required. For more installation tutorials 
+refer to [installation.md](../../../tutorials/get_started/installation.md)
 
 ## How to Train
 
@@ -39,7 +33,7 @@ python -m paddle.distributed.launch \
     --master=$PADDLE_MASTER \
     --devices=$CUDA_VISIBLE_DEVICES \
     plsc-train \
-    -c ./plsc/configs/VisionTransformer/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.yaml
+    -c ./configs/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.yaml
 ```
 
 ## How to Finetune
@@ -47,7 +41,7 @@ python -m paddle.distributed.launch \
 ```bash
 # [Optional] Download checkpoint
 mkdir -p pretrained/vit/ViT_base_patch16_224/
-wget -O ./pretrained/vit/imagenet2012-ViT-B_16-224.pdparams https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.pdparams
+wget -O ./pretrained/vit/ViT_base_patch16_224/imagenet2012-ViT-B_16-224.pdparams https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.pdparams
 
 ```
 
@@ -65,20 +59,22 @@ python -m paddle.distributed.launch \
     --master=$PADDLE_MASTER \
     --devices=$CUDA_VISIBLE_DEVICES \
     plsc-train \
-    -c ./plsc/configs/VisionTransformer/ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2.yaml \
+    -c ./configs/ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2.yaml \
     -o Global.pretrained_model=./pretrained/vit/ViT_base_patch16_224/imagenet2012-ViT-B_16-224.pdparams \
 ```
 
 ## Other Configurations
-We provide more directly runnable configurations, see [ViT Configurations](../../../plsc/configs/VisionTransformer).
+We provide more directly runnable configurations, see [ViT Configurations](./configs/).
 
 
 ## Models
 
-| Model        | Phase    | Dataset      | GPUs      | Img/sec | Top1 Acc | Pre-trained checkpoint                                       | Fine-tuned checkpoint                                        | Log                                                          |
-| ------------ | -------- | ------------ | --------- | ------- | -------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| ViT-B_16_224 | pretrain | ImageNet2012 | A100*N1C8 | 3583    | 0.75196  | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.pdparams) | -                                                            | [log](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.log) |
-| ViT-B_16_224 | finetune | ImageNet2012 | A100*N1C8 | 719     | 0.77972  | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.pdparams) | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-384.pdparams) | [log](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-384.log) |
+| Model        | Phase    | Dataset      | Configs                                                      | GPUs       | Img/sec | Top1 Acc | Pre-trained checkpoint                                       | Fine-tuned checkpoint                                        | Log                                                          |
+| ------------ | -------- | ------------ | ------------------------------------------------------------ | ---------- | ------- | -------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ViT-B_16_224 | pretrain | ImageNet2012 | [config](./configs/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.yaml) | A100*N1C8  | 3583    | 0.75196  | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.pdparams) | -                                                            | [log](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.log) |
+| ViT-B_16_384 | finetune | ImageNet2012 | [config](./configs/ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2.yaml) | A100*N1C8  | 719     | 0.77972  | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.pdparams) | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-384.pdparams) | [log](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-384.log) |
+| ViT-L_16_224 | pretrain | ImageNet21K  | [config](./configs/ViT_large_patch16_224_in22k_4n32c_dp_fp16o2.yaml) | A100*N4C32 | 5256    | -        | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet21k-ViT-L_16-224.pdparams) | -                                                            | [log](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet21k-ViT-L_16-224.log) |
+| ViT-L_16_384 | finetune | ImageNet2012 | [config](./configs/ViT_large_patch16_384_in1k_ft_4n32c_dp_fp16o2.yaml) | A100*N4C32 | 934     | 0.84926  | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet21k-ViT-L_16-224.pdparams) | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet21k%2Bimagenet2012-ViT-L_16-384.pdparams) | [log](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet21k%2Bimagenet2012-ViT-L_16-384.log) |
 
 
 ## Citations

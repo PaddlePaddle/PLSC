@@ -19,6 +19,8 @@
 
 ## Available Models
 * [ViT](./task/classification/vit/)
+* [DeiT](./task/classification/deit/)
+* [Face Recognition](./task/recognition/face/)
 
 ## Top News 🔥
 
