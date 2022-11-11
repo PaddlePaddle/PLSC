@@ -124,8 +124,8 @@ class Engine(object):
         # set device
         assert self.config["Global"]["device"] in ["cpu", "gpu", "xpu", "npu"]
         self.device = paddle.set_device(self.config["Global"]["device"])
-        logger.info('train with paddle {} and device {}'.format(
-            paddle.__version__, self.device))
+        logger.info('train with paddle {}, commit id {} and device {}'.format(
+            paddle.__version__, paddle.__git_commit__[:8], self.device))
 
         class_num = config["Model"].get("class_num", None)
         self.config["DataLoader"].update({"class_num": class_num})
