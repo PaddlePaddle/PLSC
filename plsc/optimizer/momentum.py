@@ -102,31 +102,48 @@ class Momentum(Optimizer):
                 if getattr(p, 'has_sparse_grad', None):
                     index = getattr(p, 'index', None)
                     axis = getattr(p, 'axis', None)
+                    assert axis == 0, 'Only support axis=0 now!'
                     assert index is not None
                     assert axis is not None
-                    _, _, _ = _C_ops.sparse_momentum(
-                        p,
-                        grad,
-                        exp_avg,
-                        index,
-                        paddle.to_tensor(
-                            lr, dtype='float32'),
-                        master_param,
-                        p,
-                        exp_avg,
-                        master_param,
-                        'mu',
-                        momentum,
-                        'use_nesterov',
-                        False,
-                        'regularization_method',
-                        'l2_decay',
-                        'regularization_coeff',
-                        group['weight_decay'],
-                        'axis',
-                        axis,
-                        'multi_precision',
-                        master_param is not None)
+                    sub_p = paddle.gather(p, index, axis=axis)
+                    sub_exp_avg = paddle.gather(exp_avg, index, axis=axis)
+
+                    if group['weight_decay'] != 0.0:
+                        grad = (grad + group['weight_decay'] * sub_p
+                                ).astype(grad.dtype)
+
+                    if initialized is False:
+                        sub_exp_avg.copy_(grad, False)
+                    else:
+                        sub_exp_avg.copy_(sub_exp_avg * momentum + grad, False)
+                    sub_p.copy_(sub_p - lr * sub_exp_avg, False)
+
+                    p.scatter_(index, sub_p)
+                    exp_avg.scatter_(index, sub_exp_avg)
+
+                    # _, _, _ = _C_ops.sparse_momentum(
+                    #     p,
+                    #     grad,
+                    #     exp_avg,
+                    #     index,
+                    #     paddle.to_tensor(
+                    #         lr, dtype='float32'),
+                    #     master_param,
+                    #     p,
+                    #     exp_avg,
+                    #     master_param,
+                    #     'mu',
+                    #     momentum,
+                    #     'use_nesterov',
+                    #     False,
+                    #     'regularization_method',
+                    #     'l2_decay',
+                    #     'regularization_coeff',
+                    #     group['weight_decay'],
+                    #     'axis',
+                    #     axis,
+                    #     'multi_precision',
+                    #     master_param is not None)
                 else:
                     p_fp32 = p
                     if group['use_master_param'] and p.dtype in {

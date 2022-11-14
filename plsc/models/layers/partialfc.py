@@ -123,13 +123,14 @@ class PartialFC(nn.Layer):
         if not self.model_parallel:
             self.group = False
 
-        self.num_local: int = (num_classes + world_size - 1) // world_size
-        if num_classes % world_size != 0 and rank == world_size - 1:
-            self.num_local = num_classes % self.num_local
-        self.num_sample: int = int(self.sample_ratio * self.num_local)
-
         self.rank = rank
         self.world_size = world_size
+
+        self.num_local: int = num_classes // self.world_size + int(
+            self.rank < num_classes % self.world_size)
+        self.class_start: int = num_classes // self.world_size * self.rank + min(
+            self.rank, num_classes % self.world_size)
+        self.num_sample: int = int(self.sample_ratio * self.num_local)
 
         if model_parallel and world_size > 0:
             if name is None:
@@ -140,13 +141,14 @@ class PartialFC(nn.Layer):
             if name is None:
                 name = 'partialfc.w'
 
-        stddev = math.sqrt(2.0 / (self.embedding_size + self.num_local))
         param_attr = paddle.ParamAttr(
-            name=name, initializer=paddle.nn.initializer.Normal(std=stddev))
+            name=name,
+            initializer=paddle.nn.initializer.Normal(
+                mean=0, std=0.01))
 
         self.index = None
         self.weight = self.create_parameter(
-            shape=[self.embedding_size, self.num_local],
+            shape=[self.num_local, self.embedding_size],
             attr=param_attr,
             is_bias=False)
         self.weight.is_distributed = self.model_parallel
@@ -157,6 +159,31 @@ class PartialFC(nn.Layer):
             setattr(self.weight, 'has_sparse_grad', True)
             self.weight.stop_gradient = True
         self.sub_weight = None
+
+    @paddle.no_grad()
+    def class_center_sample(self, labels):
+
+        labels = labels.reshape((-1, 1))
+        index_positive = (self.class_start <= labels) & (
+            labels < self.class_start + self.num_local)
+
+        local_label = labels[index_positive] - self.class_start
+
+        positive = paddle.unique(local_label)
+        if self.num_sample - positive.shape[0] >= 0:
+            perm = paddle.rand([self.num_local])
+            perm[positive] = 2.0
+            index = paddle.topk(perm, k=self.num_sample)[1]
+            index = paddle.sort(index)
+        else:
+            index = positive
+
+        local_sampled_ids = index + self.class_start
+        sampled_ids = all_gather(local_sampled_ids, axis=0)
+
+        labels = paddle.searchsorted(sampled_ids, labels)
+
+        return labels, index
 
     def forward(self, feature, label):
         if self.model_parallel:
@@ -170,11 +197,10 @@ class PartialFC(nn.Layer):
 
         if self.sample_ratio < 1.0:
             # partial fc sample process
-            total_label, self.index = paddle.nn.functional.class_center_sample(
-                total_label, self.num_local, self.num_sample, group=self.group)
+            total_label, self.index = self.class_center_sample(total_label)
             total_label.stop_gradient = True
             self.index.stop_gradient = True
-            self.sub_weight = paddle.gather(self.weight, self.index, axis=1)
+            self.sub_weight = paddle.gather(self.weight, self.index, axis=0)
 
             # NOTE(GuoxiaWang): stop generate the full gradient 
             # when use partial fc in model parallel,
@@ -184,7 +210,7 @@ class PartialFC(nn.Layer):
 
                 def sparse_grad_hook_fn():
                     setattr(self.weight, 'index', self.index)
-                    setattr(self.weight, 'axis', 1)
+                    setattr(self.weight, 'axis', 0)
                     self.weight._set_grad_ivar(self.sub_weight.grad)
 
                 self.sub_weight._register_backward_hook(sparse_grad_hook_fn)
@@ -193,7 +219,8 @@ class PartialFC(nn.Layer):
             self.sub_weight = self.weight
 
         norm_feature = paddle.fluid.layers.l2_normalize(total_feature, axis=1)
-        norm_weight = paddle.fluid.layers.l2_normalize(self.sub_weight, axis=0)
+        norm_weight = paddle.fluid.layers.l2_normalize(self.sub_weight, axis=1)
 
-        local_logit = paddle.matmul(norm_feature, norm_weight)
+        local_logit = paddle.matmul(
+            norm_feature, norm_weight, transpose_y=True)
         return local_logit, total_label
