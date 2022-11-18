@@ -11,6 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .basic_transforms import DecodeImage, ResizeImage, CenterCropImage, RandCropImage, RandFlipImage, NormalizeImage, ToCHWImage, ColorJitter, RandomErasing
+from .basic_transforms import Compose, DecodeImage, ResizeImage, CenterCropImage, RandCropImage, RandFlipImage, NormalizeImage, ToCHWImage, ColorJitter, RandomErasing
 from .batch_transforms import Mixup, Cutmix, TransformOpSampler
 from .timm_autoaugment import TimmAutoAugment

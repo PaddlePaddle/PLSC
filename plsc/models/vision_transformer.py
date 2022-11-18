@@ -303,7 +303,13 @@ class VisionTransformer(Model):
                 epsilon=epsilon) for i in range(depth)
         ])
 
-        self.norm = eval(norm_layer)(embed_dim, epsilon=epsilon)
+        if isinstance(norm_layer, str):
+            self.norm = eval(norm_layer)(embed_dim, epsilon=epsilon)
+        elif isinstance(norm_layer, Callable):
+            self.norm = norm_layer(embed_dim)
+        else:
+            raise TypeError(
+                "The norm_layer must be str or paddle.nn.layer.Layer class")
 
         # Classifier head
         if self.representation_size is not None:
