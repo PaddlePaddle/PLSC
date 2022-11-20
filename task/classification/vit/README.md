@@ -86,6 +86,10 @@ ViT official paper and repository also do not give "cleaned" `<image, label>` tr
 According to various information and conjectures (thanks @lucasb-eyer), we got the accuracy given by ViT official repository. 
 If you want to pre-train ViT-Large on ImageNet 21K from scratch, you can process the data according to the following steps:
 
+**Since ImageNet21K does not have an officially divided verification set, we use all the images as the training set. 
+We construct the dummy verification set not for parameter adjustment and evaluation, but for the convenience of 
+observing whether the training is ok.**
+
 (1) Calculate the md5 value of each image
 
 ```
