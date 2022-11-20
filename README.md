@@ -52,6 +52,8 @@ See more [tutorials](./tutorials/README.md).
 
 ## Documentation
 
+* [Data Augmentation](./docs/data_augmentation.md)
+
 See [documentation](./docs/README.md) for the usage of more APIs or modules.
 
 
