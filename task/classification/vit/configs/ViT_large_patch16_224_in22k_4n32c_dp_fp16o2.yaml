@@ -27,7 +27,7 @@ DistributedStrategy:
 # model architecture
 Model:
   name: ViT_large_patch16_224
-  class_num: 18576
+  class_num: 21841
   drop_rate: 0.1
  
 # loss function config for traing/eval process
@@ -60,8 +60,8 @@ DataLoader:
       name: ImageNetDataset
       image_root: ./dataset/ImageNet22K/
       multi_label: True
-      class_num: 18576
-      cls_label_path: ./dataset/ImageNet22K/filter_train_list.txt
+      class_num: 21841
+      cls_label_path: ./dataset/ImageNet22K/image_all_list.txt
       transform_ops:
         - DecodeImage:
             to_rgb: True
@@ -91,7 +91,7 @@ DataLoader:
     dataset: 
       name: ImageNetDataset
       image_root: ./dataset/ImageNet22K/
-      cls_label_path: ./dataset/ImageNet22K/filter_val_list.txt
+      cls_label_path: ./dataset/ImageNet22K/image_dummy_val_list.txt
       transform_ops:
         - DecodeImage:
             to_rgb: True
