@@ -58,10 +58,10 @@ DataLoader:
   Train:
     dataset:
       name: ImageNetDataset
-      image_root: ./dataset/ImageNet22K/
+      image_root: ./dataset/ImageNet21K/
       multi_label: True
       class_num: 21841
-      cls_label_path: ./dataset/ImageNet22K/image_all_list.txt
+      cls_label_path: ./dataset/ImageNet21K/image_all_list.txt
       transform_ops:
         - DecodeImage:
             to_rgb: True
@@ -90,8 +90,8 @@ DataLoader:
   Eval:
     dataset: 
       name: ImageNetDataset
-      image_root: ./dataset/ImageNet22K/
-      cls_label_path: ./dataset/ImageNet22K/image_dummy_val_list.txt
+      image_root: ./dataset/ImageNet21K/
+      cls_label_path: ./dataset/ImageNet21K/image_dummy_val_list.txt
       transform_ops:
         - DecodeImage:
             to_rgb: True

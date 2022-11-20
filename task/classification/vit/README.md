@@ -74,7 +74,7 @@ We provide more directly runnable configurations, see [ViT Configurations](./con
 | ------------ | -------- | ------------ | ------------------------------------------------------------ | ---------- | ------- | -------- | -------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | ViT-B_16_224 | pretrain | ImageNet2012 | [config](./configs/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.yaml) | A100*N1C8  | 3583    | 0.75196  | 0.7479   | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.pdparams) | -                                                            | [log](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.log) |
 | ViT-B_16_384 | finetune | ImageNet2012 | [config](./configs/ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2.yaml) | A100*N1C8  | 719     | 0.77972  | 0.7791   | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.pdparams) | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-384.pdparams) | [log](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-384.log) |
-| ViT-L_16_224 | pretrain | ImageNet21K  | [config](./configs/ViT_large_patch16_224_in22k_4n32c_dp_fp16o2.yaml) | A100*N4C32 | 5256    | -        | -        | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet21k-ViT-L_16-224.pdparams) | -                                                            | [log](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet21k-ViT-L_16-224.log) |
+| ViT-L_16_224 | pretrain | ImageNet21K  | [config](./configs/ViT_large_patch16_224_in21k_4n32c_dp_fp16o2.yaml) | A100*N4C32 | 5256    | -        | -        | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet21k-ViT-L_16-224.pdparams) | -                                                            | [log](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet21k-ViT-L_16-224.log) |
 | ViT-L_16_384 | finetune | ImageNet2012 | [config](./configs/ViT_large_patch16_384_in1k_ft_4n32c_dp_fp16o2.yaml) | A100*N4C32 | 934     | 0.85030  | 0.8505   | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet21k-ViT-L_16-224.pdparams) | [download](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet21k%2Bimagenet2012-ViT-L_16-384.pdparams) | [log](https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet21k%2Bimagenet2012-ViT-L_16-384.log) |
 
 ## ImageNet21K data preparation
@@ -89,7 +89,8 @@ If you want to pre-train ViT-Large on ImageNet 21K from scratch, you can process
 (1) Calculate the md5 value of each image
 
 ```
-ImageNet22K/
+# 21841 classes
+ImageNet21K/
 └── images
     ├── n00004475/
     ├── n02087122/
@@ -98,7 +99,7 @@ ImageNet22K/
 ```
 
 ```bash
-find /data/ImageNet22K/images/ -type f -print0 | xargs --null md5sum > md5sum.txt
+find /data/ImageNet21K/images/ -type f -print0 | xargs --null md5sum > md5sum.txt
 ```
 
 (2) Reassign multi-label based on md5 value
@@ -108,8 +109,8 @@ from collections import defaultdict
 lines = []
 with open('md5sum.txt', 'r') as f:
     for line in f:
-        # 35c1efae521b76e423cdd07a00d963c9  /data/ImageNet22K/images/n00004475/n00004475_54295.JPEG
-        line = line.replace('/data/ImageNet22K/', '')
+        # 35c1efae521b76e423cdd07a00d963c9  /data/ImageNet21K/images/n00004475/n00004475_54295.JPEG
+        line = line.replace('/data/ImageNet21K/', '')
         lines.append(line)
 
 ret = defaultdict(list)
