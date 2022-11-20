@@ -53,7 +53,7 @@ Optimizer:
   weight_decay: 0.0001
   grad_clip:
     name: ClipGradByGlobalNorm
-    clip_norm: 1.2
+    clip_norm: 1.5
 
 # data loader for train and eval
 DataLoader:
