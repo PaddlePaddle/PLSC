@@ -30,6 +30,10 @@ from plsc.utils import logger
 
 def defualt_train_one_epoch(engine, epoch_id):
     tic = time.time()
+
+    if hasattr(engine.train_dataloader.batch_sampler, "set_epoch"):
+        engine.train_dataloader.batch_sampler.set_epoch(epoch_id)
+
     for iter_id, batch in enumerate(engine.train_dataloader):
 
         if iter_id >= engine.max_iter:

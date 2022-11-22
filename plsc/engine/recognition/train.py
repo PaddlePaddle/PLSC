@@ -31,10 +31,13 @@ from plsc.utils import logger
 
 def defualt_train_one_epoch(engine, epoch_id):
     tic = time.time()
-    dev_id = paddle.distributed.ParallelEnv().dev_id
+
+    if hasattr(engine.train_dataloader.batch_sampler, "set_epoch"):
+        engine.train_dataloader.batch_sampler.set_epoch(epoch_id)
+
     for iter_id, batch in enumerate(engine.train_dataloader):
         for i in range(len(batch)):
-            batch[i] = batch[i].cuda(dev_id)
+            batch[i] = batch[i].cuda()
 
         if iter_id >= engine.max_iter:
             break
