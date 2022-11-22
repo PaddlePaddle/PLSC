@@ -159,34 +159,37 @@ def save_checkpoint(net,
 
     keep_prefixs = ['best', 'latest']
 
-    if all(p not in prefix for p in keep_prefixs) and max_num_checkpoint >= 0:
-        pdstates_list = glob.glob(os.path.join(model_dir, '*.pdstates'))
+    if local_rank == 0:
+        if all(p not in prefix
+               for p in keep_prefixs) and max_num_checkpoint >= 0:
+            pdstates_list = glob.glob(os.path.join(model_dir, '*.pdstates'))
 
-        timestamp_to_path = {}
-        for path in pdstates_list:
-            if any(p in path for p in keep_prefixs):
-                continue
-            metric_dict = paddle.load(path)
-            timestamp_to_path[metric_dict['timestamp']] = path[:-9]
+            timestamp_to_path = {}
+            for path in pdstates_list:
+                if any(p in path for p in keep_prefixs):
+                    continue
+                metric_dict = paddle.load(path)
+                timestamp_to_path[metric_dict['timestamp']] = path[:-9]
 
-        # sort by ascend
-        timestamps = list(timestamp_to_path.keys())
-        timestamps.sort()
+            # sort by ascend
+            timestamps = list(timestamp_to_path.keys())
+            timestamps.sort()
 
-        if max_num_checkpoint > 0:
-            to_remove = timestamps[:-max_num_checkpoint]
-        else:
-            to_remove = timestamps
-        for timestamp in to_remove:
-            model_prefix = timestamp_to_path[timestamp]
-            for ext in ['.pdparams', '.pdopt', '.pdlr', '.pdstates']:
-                path = model_prefix + ext
-                _remove_if_exist(path)
+            if max_num_checkpoint > 0:
+                to_remove = timestamps[:-max_num_checkpoint]
+            else:
+                to_remove = timestamps
+            for timestamp in to_remove:
+                model_prefix = timestamp_to_path[timestamp]
+                for ext in ['.pdparams', '.pdopt', '.pdlr', '.pdstates']:
+                    path = model_prefix + ext
+                    _remove_if_exist(path)
 
-                if ext in ['.pdparams', '.pdopt']:
-                    for rank_id in range(world_size):
-                        path = model_prefix + "_rank{}".format(rank_id) + ext
-                        _remove_if_exist(path)
+                    if ext in ['.pdparams', '.pdopt']:
+                        for rank_id in range(world_size):
+                            path = model_prefix + "_rank{}".format(
+                                rank_id) + ext
+                            _remove_if_exist(path)
 
 
 def export(config, net, path):

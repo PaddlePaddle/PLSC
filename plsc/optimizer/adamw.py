@@ -101,13 +101,42 @@ class AdamW(Optimizer):
                         paddle.float16, paddle.bfloat16
                 }:
                     master_param = state['master_param']
-                _, _, _, _, _, _ = _C_ops.adamw(
-                    p, grad,
-                    paddle.to_tensor(lr), exp_avg, exp_avg_sq, beta1_pow,
-                    beta2_pow, master_param, p, exp_avg, exp_avg_sq, beta1_pow,
-                    beta2_pow, master_param, 'epsilon', group['eps'],
-                    'lazy_mode', False, 'min_row_size_to_use_multithread',
-                    1000, 'beta1', beta1, 'beta2', beta2, "with_decay",
-                    with_decay, 'coeff', group['weight_decay'],
-                    'multi_precision', master_param is not None, 'lr_ratio',
-                    1.0)
+
+                if getattr(p, 'has_sparse_grad', None):
+                    index = getattr(p, 'index', None)
+                    axis = getattr(p, 'axis', None)
+                    assert axis == 0, 'Only support axis=0 now!'
+                    assert index is not None
+                    assert axis is not None
+
+                    sub_p = paddle.gather(p, index, axis=axis)
+                    sub_exp_avg = paddle.gather(exp_avg, index, axis=axis)
+                    sub_exp_avg_sq = paddle.gather(
+                        exp_avg_sq, index, axis=axis)
+
+                    _, _, _, _, _, _ = _C_ops.adamw(
+                        sub_p, grad,
+                        paddle.to_tensor(lr), sub_exp_avg, sub_exp_avg_sq,
+                        beta1_pow, beta2_pow, master_param, sub_p, sub_exp_avg,
+                        sub_exp_avg_sq, beta1_pow, beta2_pow, master_param,
+                        'epsilon', group['eps'], 'lazy_mode', False,
+                        'min_row_size_to_use_multithread', 1000, 'beta1',
+                        beta1, 'beta2', beta2, "with_decay", with_decay,
+                        'coeff', group['weight_decay'], 'multi_precision',
+                        master_param is not None, 'lr_ratio', 1.0)
+
+                    p.scatter_(index, sub_p)
+                    exp_avg.scatter_(index, sub_exp_avg)
+                    exp_avg_sq.scatter_(index, sub_exp_avg_sq)
+
+                else:
+                    _, _, _, _, _, _ = _C_ops.adamw(
+                        p, grad,
+                        paddle.to_tensor(lr), exp_avg, exp_avg_sq, beta1_pow,
+                        beta2_pow, master_param, p, exp_avg, exp_avg_sq,
+                        beta1_pow, beta2_pow, master_param, 'epsilon',
+                        group['eps'], 'lazy_mode', False,
+                        'min_row_size_to_use_multithread', 1000, 'beta1',
+                        beta1, 'beta2', beta2, "with_decay", with_decay,
+                        'coeff', group['weight_decay'], 'multi_precision',
+                        master_param is not None, 'lr_ratio', 1.0)
