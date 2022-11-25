@@ -60,6 +60,8 @@ Global:
 * `print_batch_step`: How many steps to print log once.
 * `use_visualdl`: Whether to enable visualdl.
 * `seed`: Random number seed.
+* `max_train_step`: Maximum training step. When the current number of training steps is greater than the set maximum number of training steps, the training will be stopped early. The default is not set, then ignore this function.
+* `flags`: The type is a dictionary representing the FLAGS that need to be set. For example `FLAGS_cudnn_exhaustive_search=0`. The default is not set, then only enable `FLAGS_cudnn_exhaustive_search=1`, `FLAGS_cudnn_batchnorm_spatial_persistent=1`, `FLAGS_max_inplace_grad_add=8`.
 
 ## FP16
 

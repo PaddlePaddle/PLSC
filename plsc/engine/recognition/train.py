@@ -36,6 +36,13 @@ def defualt_train_one_epoch(engine, epoch_id):
         engine.train_dataloader.batch_sampler.set_epoch(epoch_id)
 
     for iter_id, batch in enumerate(engine.train_dataloader):
+
+        if engine.max_train_step is not None and engine.global_step >= engine.max_train_step:
+            logger.info(
+                f'global_step({engine.global_step}) >= max_train_step({engine.max_train_step}), training stops early.'
+            )
+            exit(0)
+
         for i in range(len(batch)):
             batch[i] = batch[i].cuda()
 
