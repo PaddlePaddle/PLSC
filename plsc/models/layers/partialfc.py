@@ -65,6 +65,9 @@ class AllGather(paddle.autograd.PyLayer):
 
 def all_gather(tensor, axis=0, group=None):
 
+    if not dist.is_initialized() or dist.get_world_size() == 1:
+        return tensor
+
     group = dist.collective._get_default_group() if group is None else group
 
     if not tensor.stop_gradient:
