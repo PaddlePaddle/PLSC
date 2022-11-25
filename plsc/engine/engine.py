@@ -60,6 +60,10 @@ class Engine(object):
             "accum_steps must be int dtype and greater than 0"
 
         # global iter counter
+        self.max_train_step = self.config["Global"].get("max_train_step", None)
+        assert self.max_train_step is None or (
+            isinstance(self.max_train_step, int) and self.max_train_step > 0
+        ), "max_train_step must be int dtype and greater than 0"
         self.global_step = 0
 
         # init distribution env
@@ -87,6 +91,10 @@ class Engine(object):
         RELATED_FLAGS_SETTING['FLAGS_cudnn_exhaustive_search'] = 1
         RELATED_FLAGS_SETTING['FLAGS_cudnn_batchnorm_spatial_persistent'] = 1
         RELATED_FLAGS_SETTING['FLAGS_max_inplace_grad_add'] = 8
+
+        related_flags_setting = self.config["Global"].get(
+            "flags", RELATED_FLAGS_SETTING)
+        RELATED_FLAGS_SETTING.update(related_flags_setting)
         paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
 
         # init logger

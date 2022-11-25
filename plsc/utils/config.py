@@ -30,8 +30,28 @@ class AttrDict(dict):
         else:
             self[key] = value
 
-    def __deepcopy__(self, content):
-        return copy.deepcopy(dict(self))
+    def __copy__(self):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        result.__dict__.update(self.__dict__)
+        return result
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            setattr(result, k, copy.deepcopy(v, memo))
+        for k, v in self.items():
+            setattr(result, k, copy.deepcopy(v, memo))
+        return result
+
+    def setdefault(self, k, default=None):
+        if k not in self or self[k] is None:
+            self[k] = default
+            return default
+        else:
+            return self[k]
 
 
 def create_attr_dict(yaml_config):
@@ -115,6 +135,8 @@ def override(dl, ks, v):
                 print('A new filed ({}) detected!'.format(ks[0], dl))
             dl[ks[0]] = str2num(v)
         else:
+            if ks[0] not in dl:
+                dl[ks[0]] = AttrDict()
             override(dl[ks[0]], ks[1:], v)
 
 

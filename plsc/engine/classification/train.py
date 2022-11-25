@@ -36,6 +36,12 @@ def defualt_train_one_epoch(engine, epoch_id):
 
     for iter_id, batch in enumerate(engine.train_dataloader):
 
+        if engine.max_train_step is not None and engine.global_step >= engine.max_train_step:
+            logger.info(
+                f'global_step({engine.global_step}) >= max_train_step({engine.max_train_step}), training stops early.'
+            )
+            exit(0)
+
         if iter_id >= engine.max_iter:
             break
         profiler.add_profiler_step(engine.config["profiler_options"])
