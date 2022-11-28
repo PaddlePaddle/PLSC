@@ -15,6 +15,6 @@
 #!/usr/bin/env bash
 set -e
 
-bash ./tests/CI/before_hook.sh
-bash ./tests/CI/case.sh
-bash ./tests/CI/end_hook.sh
+bash ./before_hook.sh
+bash ./case.sh
+bash ./end_hook.sh

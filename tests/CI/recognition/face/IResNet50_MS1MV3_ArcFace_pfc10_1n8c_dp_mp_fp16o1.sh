@@ -21,7 +21,7 @@ python -m paddle.distributed.launch \
     --master=$PADDLE_MASTER \
     --devices=$CUDA_VISIBLE_DEVICES \
     plsc-train \
-    -c task/recognition/face/configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml \
+    -c ../../task/recognition/face/configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml \
     -o Global.print_batch_step=1 \
     -o Global.max_train_step=200 \
     -o Global.flags.FLAGS_cudnn_exhaustive_search=0 \

@@ -15,7 +15,7 @@
 #!/usr/bin/env bash
 set -e
 
-export plsc_path=/paddle/PLSC
+export plsc_path=/paddle/PLSC/tests/CI
 export data_path=/plsc_data
 export log_path=/paddle/log_plsc
 mkdir -p ${log_path}
@@ -29,9 +29,9 @@ function before_hook() {
     echo ---------- install plsc ----------
     export http_proxy=${proxy};
     export https_proxy=${proxy};
-    python -m pip install -r ./requirements.txt --force-reinstall
+    python -m pip install -r ../../requirements.txt --force-reinstall
     python -m pip install protobuf==3.20 --force-reinstall
-    python ./setup.py develop
+    python ../../setup.py develop
 
     
     echo ---------- ln plsc_data start ----------

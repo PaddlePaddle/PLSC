@@ -15,7 +15,7 @@
 #!/usr/bin/env bash
 set -e
 
-export plsc_path=/paddle/PLSC
+export plsc_path=/paddle/PLSC/tests/CI
 export log_path=/paddle/log_plsc
 plsc_gpu_model_list=( \
     IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1 \
@@ -24,7 +24,7 @@ plsc_gpu_model_list=( \
 function IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1() {
     cd ${plsc_path}
     rm -rf log
-    bash ./tests/CI/recognition/face/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.sh
+    bash ./recognition/face/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/5059" | cut -d " " -f12 `
     check_diff 45.00194 ${loss%?} ${FUNCNAME}_loss
