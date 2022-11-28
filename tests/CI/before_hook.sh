@@ -39,7 +39,7 @@ function before_hook() {
     rm -rf dataset && mkdir dataset
     ln -s ${data_path}/MS1M_v3 ./dataset/MS1M_v3
     ln -s ${data_path}/ILSVRC2012 ./dataset/ILSVRC2012
-    echo ---------- ln plsc_data done ---------- 
+    echo ---------- ln plsc_data done ----------
 }
 
 main() {
