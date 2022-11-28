@@ -25,16 +25,17 @@ function before_hook() {
     python -c "import paddle;print(paddle.__git_commit__)"
 
     # install requirements
-    cd ${plsc_path}
+    cd /paddle/PLSC/
     echo ---------- install plsc ----------
     export http_proxy=${proxy};
     export https_proxy=${proxy};
-    python -m pip install -r ../../requirements.txt --force-reinstall
+    python -m pip install -r requirements.txt --force-reinstall
     python -m pip install protobuf==3.20 --force-reinstall
-    python ../../setup.py develop
+    python setup.py develop
 
     
     echo ---------- ln plsc_data start ----------
+    cd ${plsc_path}
     rm -rf dataset && mkdir dataset
     ln -s ${data_path}/MS1M_v3 ./dataset/MS1M_v3
     ln -s ${data_path}/ILSVRC2012 ./dataset/ILSVRC2012
