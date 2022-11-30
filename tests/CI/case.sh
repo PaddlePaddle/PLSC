@@ -19,6 +19,10 @@ export plsc_path=/paddle/PLSC/tests/CI
 export log_path=/paddle/log_plsc
 plsc_gpu_model_list=( \
     IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1 \
+    FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1 \
+    FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c_dp_mp_fp16o1 \
+    FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n8c_dp_mp_fp16o1 \
+    IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1 \
 )
 
 function IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1() {
@@ -28,6 +32,42 @@ function IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1() {
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/5059" | cut -d " " -f12 `
     check_diff 45.00194 ${loss%?} ${FUNCNAME}_loss
+}
+
+function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./recognition/face/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "199/2530" | cut -d " " -f12 `
+    check_diff 38.36615 ${loss%?} ${FUNCNAME}_loss
+}
+
+function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c_dp_mp_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./recognition/face/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c_dp_mp_fp16o1.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "199/2530" | cut -d " " -f12 `
+    check_diff 37.72491 ${loss%?} ${FUNCNAME}_loss
+}
+
+function FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n8c_dp_mp_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./recognition/face/FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n8c_dp_mp_fp16o1.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "199/5059" | cut -d " " -f12 `
+    check_diff 38.86674 ${loss%?} ${FUNCNAME}_loss
+}
+
+function IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./recognition/face/IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "199/40465" | cut -d " " -f12 `
+    check_diff 45.50187 ${loss%?} ${FUNCNAME}_loss
 }
 
 
