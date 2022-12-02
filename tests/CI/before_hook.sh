@@ -17,6 +17,7 @@ set -e
 
 export plsc_path=/paddle/PLSC/tests/CI
 export data_path=/plsc_data
+export pretrained_path=/plsc_pretrained
 export log_path=/paddle/log_plsc
 mkdir -p ${log_path}
 
@@ -36,10 +37,15 @@ function before_hook() {
     
     echo ---------- ln plsc_data start ----------
     cd ${plsc_path}
-    rm -rf dataset && mkdir dataset
-    ln -s ${data_path}/MS1M_v3 ./dataset/MS1M_v3
-    ln -s ${data_path}/ILSVRC2012 ./dataset/ILSVRC2012
+    rm -rf dataset
+    ln -s ${data_path} ./dataset
     echo ---------- ln plsc_data done ---------- 
+
+    echo ---------- ln plsc_pretrained start ----------
+    cd ${plsc_path}
+    rm -rf pretrained
+    ln -s ${pretrained_path} ./pretrained
+    echo ---------- ln plsc_pretrained done ----------
 }
 
 main() {
