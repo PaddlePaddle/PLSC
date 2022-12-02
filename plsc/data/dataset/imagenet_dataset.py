@@ -51,4 +51,5 @@ class ImageNetDataset(CommonDataset):
                     self.labels.append(l[1])
                 else:
                     self.labels.append(np.int32(l[1]))
-                assert os.path.exists(self.images[-1])
+                assert os.path.exists(self.images[
+                    -1]), f"{self.images[-1]} is not exists."
