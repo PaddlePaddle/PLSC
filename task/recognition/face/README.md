@@ -15,6 +15,7 @@ Function has supported:
 Backbone includes:
 * IResNet
 * FaceViT
+* MobileFaceNet
 
 ## Requirements
 To enjoy some new features, PaddlePaddle 2.4 is required. For more installation tutorials 
@@ -106,6 +107,7 @@ python onnx_ijbc.py \
 |  Datasets  | Backbone                | Config                                                       | Devices   | PFC  | IJB-C(1E-4) | IJB-C(1E-5) | checkpoint                                                   | log                                                          |
 | :--------: | :---------------------- | ------------------------------------------------------------ | --------- | ---- | ----------- | :---------- | :----------------------------------------------------------- | ------------------------------------------------------------ |
 |   MS1MV3   | IRes50                  | [config](./configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml) | N1C8*A100 | 1.0  | 96.43       | 94.43       | [download](https://plsc.bj.bcebos.com/models/face/v2.4/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.pdparams) | [download](https://plsc.bj.bcebos.com/models/face/v2.4/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.log) |
+| WebFace42M | MobileFaceNet_base      | [config](./configs/MobileFaceNet_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1.yaml) | N1C8*A100 | 0.2  | 95.22       | 92.48       | [download](https://plsc.bj.bcebos.com/models/face/v2.4/MobileFaceNet_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1.pdparams) | [download](https://plsc.bj.bcebos.com/models/face/v2.4/MobileFaceNet_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1.log) |
 | WebFace42M | IRes100                 | [config](./configs/IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1.yaml) | N1C8*A100 | 0.2  | 97.78       | 96.46       | [download](https://plsc.bj.bcebos.com/models/face/v2.4/IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1.pdparams) | [download](https://plsc.bj.bcebos.com/models/face/v2.4/IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1.log) |
 | WebFace42M | FaceViT_tiny_patch9_112 | [config](./configs/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1.yaml) | N1C8*A100 | 1.0  | 97.24       | 95.79       | [download](https://plsc.bj.bcebos.com/models/face/v2.4/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1.pdparams) | [download](https://plsc.bj.bcebos.com/models/face/v2.4/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1.log) |
 | WebFace42M | FaceViT_tiny_patch9_112 | [config](./configs/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c_dp_mp_fp16o1.yaml) | N1C8*A100 | 0.2  | 97.28       | 95.79       | [download](https://plsc.bj.bcebos.com/models/face/v2.4/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c_dp_mp_fp16o1.pdparams) | [download](https://plsc.bj.bcebos.com/models/face/v2.4/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c_dp_mp_fp16o1.log) |
