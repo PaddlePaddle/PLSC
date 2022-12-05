@@ -20,321 +20,196 @@ import os
 import collections
 import numpy as np
 import paddle
-from paddle import ParamAttr
 import paddle.nn as nn
-import paddle.nn.functional as F
-from paddle.nn import Conv2D, BatchNorm, Linear, Dropout, PReLU
-from paddle.nn import AdaptiveAvgPool2D, MaxPool2D, AvgPool2D
-from paddle.nn.initializer import XavierNormal, Constant
 
 from .layers import PartialFC
-from plsc.models.layers import Model
+from .layers import Model
 
 import math
 
 __all__ = ["IResNet18", "IResNet34", "IResNet50", "IResNet100", "IResNet200"]
 
 
-class ConvBNLayer(nn.Layer):
-    def __init__(self,
-                 num_channels,
-                 num_filters,
-                 filter_size,
-                 stride=1,
-                 groups=1,
-                 act=None,
-                 name=None,
-                 data_format="NCHW"):
-        super(ConvBNLayer, self).__init__()
-
-        self._conv = Conv2D(
-            in_channels=num_channels,
-            out_channels=num_filters,
-            kernel_size=filter_size,
-            stride=stride,
-            padding=(filter_size - 1) // 2,
-            groups=groups,
-            weight_attr=ParamAttr(name=name + "_weights"),
-            bias_attr=False,
-            data_format=data_format)
-        if name == "conv1":
-            bn_name = "bn_" + name
-        else:
-            bn_name = "bn" + name[3:]
-        self._batch_norm = BatchNorm(
-            num_filters,
-            act=act,
-            epsilon=1e-05,
-            param_attr=ParamAttr(name=bn_name + "_scale"),
-            bias_attr=ParamAttr(bn_name + "_offset"),
-            moving_mean_name=bn_name + "_mean",
-            moving_variance_name=bn_name + "_variance",
-            data_layout=data_format)
-
-    def forward(self, inputs):
-        y = self._conv(inputs)
-        y = self._batch_norm(y)
-        return y
+@paddle.no_grad()
+def constant_(x, val):
+    temp_value = paddle.full(x.shape, val, x.dtype)
+    if temp_value.dtype != x.dtype:
+        temp_value = temp_value.astype(x.dtype)
+    x.copy_(temp_value, False)
+    return x
 
 
-class BasicBlock(nn.Layer):
-    def __init__(self,
-                 num_channels,
-                 num_filters,
-                 stride,
-                 shortcut=True,
-                 name=None,
-                 data_format="NCHW"):
-        super(BasicBlock, self).__init__()
-        self.stride = stride
-        bn_name = "bn_" + name[3:] + "_before"
-        self._batch_norm = BatchNorm(
-            num_channels,
-            act=None,
-            epsilon=1e-05,
-            param_attr=ParamAttr(name=bn_name + "_scale"),
-            bias_attr=ParamAttr(bn_name + "_offset"),
-            moving_mean_name=bn_name + "_mean",
-            moving_variance_name=bn_name + "_variance",
-            data_layout=data_format)
+@paddle.no_grad()
+def normal_(x, mean=0., std=1.):
+    temp_value = paddle.normal(mean, std, shape=x.shape)
+    if temp_value.dtype != x.dtype:
+        temp_value = temp_value.astype(x.dtype)
+    x.copy_(temp_value, False)
+    return x
 
-        self.conv0 = ConvBNLayer(
-            num_channels=num_channels,
-            num_filters=num_filters,
-            filter_size=3,
+
+def conv3x3(in_planes,
+            out_planes,
             stride=1,
-            act=None,
-            name=name + "_branch2a",
-            data_format=data_format)
-        self.prelu = PReLU(
-            num_parameters=num_filters,
-            data_format=data_format,
-            name=name + "_branch2a_prelu")
-        self.conv1 = ConvBNLayer(
-            num_channels=num_filters,
-            num_filters=num_filters,
-            filter_size=3,
-            stride=stride,
-            act=None,
-            name=name + "_branch2b",
-            data_format=data_format)
-
-        if shortcut:
-            self.short = ConvBNLayer(
-                num_channels=num_channels,
-                num_filters=num_filters,
-                filter_size=1,
-                stride=stride,
-                act=None,
-                name=name + "_branch1",
-                data_format=data_format)
-
-        self.shortcut = shortcut
-
-    def forward(self, inputs):
-        y = self._batch_norm(inputs)
-        y = self.conv0(y)
-        y = self.prelu(y)
-        conv1 = self.conv1(y)
-
-        if self.shortcut:
-            short = self.short(inputs)
-        else:
-            short = inputs
-        y = paddle.add(x=short, y=conv1)
-        return y
+            groups=1,
+            dilation=1,
+            data_format="NCHW"):
+    """3x3 convolution with padding"""
+    return nn.Conv2D(
+        in_planes,
+        out_planes,
+        kernel_size=3,
+        stride=stride,
+        padding=dilation,
+        groups=groups,
+        dilation=dilation,
+        bias_attr=False,
+        data_format=data_format)
 
 
-class FC(nn.Layer):
-    def __init__(self,
-                 bn_channels,
-                 num_channels,
-                 num_classes,
-                 fc_type,
-                 dropout=0.4,
-                 name=None,
-                 data_format="NCHW"):
-        super(FC, self).__init__()
-        self.p = dropout
-        self.fc_type = fc_type
-        self.num_channels = num_channels
+def conv1x1(in_planes, out_planes, stride=1, data_format="NCHW"):
+    """1x1 convolution"""
+    return nn.Conv2D(
+        in_planes,
+        out_planes,
+        kernel_size=1,
+        stride=stride,
+        bias_attr=False,
+        data_format=data_format)
 
-        bn_name = "bn_" + name
-        if fc_type == "Z":
-            self._batch_norm_1 = BatchNorm(
-                bn_channels,
-                act=None,
-                epsilon=1e-05,
-                param_attr=ParamAttr(name=bn_name + "_1_scale"),
-                bias_attr=ParamAttr(bn_name + "_1_offset"),
-                moving_mean_name=bn_name + "_1_mean",
-                moving_variance_name=bn_name + "_1_variance",
-                data_layout=data_format)
-            if self.p > 0:
-                self.dropout = Dropout(p=self.p, name=name + '_dropout')
 
-        elif fc_type == "E":
-            self._batch_norm_1 = BatchNorm(
-                bn_channels,
-                act=None,
-                epsilon=1e-05,
-                param_attr=ParamAttr(name=bn_name + "_1_scale"),
-                bias_attr=ParamAttr(bn_name + "_1_offset"),
-                moving_mean_name=bn_name + "_1_mean",
-                moving_variance_name=bn_name + "_1_variance",
-                data_layout=data_format)
-            if self.p > 0:
-                self.dropout = Dropout(p=self.p, name=name + '_dropout')
-            self.fc = Linear(
-                num_channels,
-                num_classes,
-                weight_attr=ParamAttr(
-                    initializer=XavierNormal(fan_in=0.0), name=name + ".w_0"),
-                bias_attr=ParamAttr(
-                    initializer=Constant(), name=name + ".b_0"))
-            self._batch_norm_2 = BatchNorm(
-                num_classes,
-                act=None,
-                epsilon=1e-05,
-                param_attr=ParamAttr(name=bn_name + "_2_scale"),
-                bias_attr=ParamAttr(bn_name + "_2_offset"),
-                moving_mean_name=bn_name + "_2_mean",
-                moving_variance_name=bn_name + "_2_variance",
-                data_layout=data_format)
+class IBasicBlock(nn.Layer):
+    expansion = 1
 
-        elif fc_type == "FC":
-            self._batch_norm_1 = BatchNorm(
-                bn_channels,
-                act=None,
-                epsilon=1e-05,
-                param_attr=ParamAttr(name=bn_name + "_1_scale"),
-                bias_attr=ParamAttr(bn_name + "_1_offset"),
-                moving_mean_name=bn_name + "_1_mean",
-                moving_variance_name=bn_name + "_1_variance",
-                data_layout=data_format)
-            self.fc = Linear(
-                num_channels,
-                num_classes,
-                weight_attr=ParamAttr(
-                    initializer=XavierNormal(fan_in=0.0), name=name + ".w_0"),
-                bias_attr=ParamAttr(
-                    initializer=Constant(), name=name + ".b_0"))
-            self._batch_norm_2 = BatchNorm(
-                num_classes,
-                act=None,
-                epsilon=1e-05,
-                param_attr=ParamAttr(name=bn_name + "_2_scale"),
-                bias_attr=ParamAttr(bn_name + "_2_offset"),
-                moving_mean_name=bn_name + "_2_mean",
-                moving_variance_name=bn_name + "_2_variance",
-                data_layout=data_format)
+    def __init__(self, inplanes, planes, stride=1, downsample=None, groups=\
+        1, base_width=64, dilation=1, data_format="NCHW"):
+        super(IBasicBlock, self).__init__()
+        if groups != 1 or base_width != 64:
+            raise ValueError(
+                'BasicBlock only supports groups=1 and base_width=64')
+        if dilation > 1:
+            raise NotImplementedError(
+                'Dilation > 1 not supported in BasicBlock')
+        self.bn1 = nn.BatchNorm2D(
+            inplanes, epsilon=1e-05, data_format=data_format)
+        self.conv1 = conv3x3(inplanes, planes, data_format=data_format)
+        self.bn2 = nn.BatchNorm2D(
+            planes, epsilon=1e-05, data_format=data_format)
+        self.prelu = nn.PReLU(planes, data_format=data_format)
+        self.conv2 = conv3x3(planes, planes, stride, data_format=data_format)
+        self.bn3 = nn.BatchNorm2D(
+            planes, epsilon=1e-05, data_format=data_format)
+        self.downsample = downsample
+        self.stride = stride
 
-    def forward(self, inputs):
-        if self.fc_type == "Z":
-            y = self._batch_norm_1(inputs)
-            y = paddle.reshape(y, shape=[-1, self.num_channels])
-            if self.p > 0:
-                y = self.dropout(y)
+    def forward_impl(self, x):
+        identity = x
+        out = self.bn1(x)
+        out = self.conv1(out)
+        out = self.bn2(out)
+        out = self.prelu(out)
+        out = self.conv2(out)
+        out = self.bn3(out)
+        if self.downsample is not None:
+            identity = self.downsample(x)
+        out += identity
+        return out
 
-        elif self.fc_type == "E":
-            y = self._batch_norm_1(inputs)
-            y = paddle.reshape(y, shape=[-1, self.num_channels])
-            if self.p > 0:
-                y = self.dropout(y)
-            y = self.fc(y)
-            y = self._batch_norm_2(y)
-
-        elif self.fc_type == "FC":
-            y = self._batch_norm_1(inputs)
-            y = paddle.reshape(y, shape=[-1, self.num_channels])
-            y = self.fc(y)
-            y = self._batch_norm_2(y)
-
-        return y
+    def forward(self, x):
+        return self.forward_impl(x)
 
 
 class IResNet(Model):
     def __init__(self,
-                 layers=50,
+                 block,
+                 layers,
+                 dropout=0,
                  num_features=512,
+                 zero_init_residual=False,
+                 groups=1,
+                 width_per_group=64,
+                 replace_stride_with_dilation=None,
                  class_num=93431,
                  pfc_config={"model_parallel": True,
                              "sample_ratio": 1.0},
-                 fc_type='E',
-                 dropout=0.0,
                  input_image_channel=3,
                  input_image_width=112,
                  input_image_height=112,
                  data_format="NCHW"):
-
         super(IResNet, self).__init__()
 
         self.layers = layers
         self.data_format = data_format
         self.input_image_channel = input_image_channel
 
-        supported_layers = [18, 34, 50, 100, 200]
-        assert layers in supported_layers, \
-            "supported layers are {} but input layer is {}".format(
-                supported_layers, layers)
-
-        if layers == 18:
-            units = [2, 2, 2, 2]
-        elif layers == 34:
-            units = [3, 4, 6, 3]
-        elif layers == 50:
-            units = [3, 4, 14, 3]
-        elif layers == 100:
-            units = [3, 13, 30, 3]
-        elif layers == 200:
-            units = [6, 26, 60, 6]
-
-        num_channels = [64, 64, 128, 256]
-        num_filters = [64, 128, 256, 512]
-
-        self.conv = ConvBNLayer(
-            num_channels=self.input_image_channel,
-            num_filters=64,
-            filter_size=3,
-            stride=1,
-            act=None,
-            name="conv1",
-            data_format=self.data_format)
-        self.prelu = PReLU(
-            num_parameters=64, data_format=self.data_format, name="prelu1")
-
-        self.block_list = paddle.nn.LayerList()
-        for block in range(len(units)):
-            shortcut = True
-            for i in range(units[block]):
-                conv_name = "res" + str(block + 2) + "_" + str(i + 1)
-                basic_block = self.add_sublayer(
-                    conv_name,
-                    BasicBlock(
-                        num_channels=num_channels[block]
-                        if i == 0 else num_filters[block],
-                        num_filters=num_filters[block],
-                        stride=2 if shortcut else 1,
-                        shortcut=shortcut,
-                        name=conv_name,
-                        data_format=self.data_format))
-                self.block_list.append(basic_block)
-                shortcut = False
-
         assert input_image_width % 16 == 0
         assert input_image_height % 16 == 0
         feat_w = input_image_width // 16
         feat_h = input_image_height // 16
-        self.fc_channels = num_filters[-1] * feat_w * feat_h
-        #NOTE(GuoxiaWang): don't use NHWC for last fc,
-        # thus we can train using NHWC and test using NCHW
-        self.fc = FC(num_filters[-1],
-                     self.fc_channels,
-                     num_features,
-                     fc_type,
-                     dropout,
-                     name='fc',
-                     data_format="NCHW")
+        self.fc_scale = feat_w * feat_h
+
+        self.inplanes = 64
+        self.dilation = 1
+        if replace_stride_with_dilation is None:
+            replace_stride_with_dilation = [False, False, False]
+        if len(replace_stride_with_dilation) != 3:
+            raise ValueError(
+                'replace_stride_with_dilation should be None or a 3-element tuple, got {}'
+                .format(replace_stride_with_dilation))
+        self.groups = groups
+        self.base_width = width_per_group
+        self.conv1 = nn.Conv2D(
+            self.input_image_channel,
+            self.inplanes,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias_attr=False,
+            data_format=data_format)
+        self.bn1 = nn.BatchNorm2D(
+            self.inplanes, epsilon=1e-05, data_format=data_format)
+        self.prelu = nn.PReLU(self.inplanes, data_format=data_format)
+        self.layer1 = self._make_layer(
+            block, 64, layers[0], stride=2, data_format=data_format)
+        self.layer2 = self._make_layer(
+            block,
+            128,
+            layers[1],
+            stride=2,
+            dilate=replace_stride_with_dilation[0],
+            data_format=data_format)
+        self.layer3 = self._make_layer(
+            block,
+            256,
+            layers[2],
+            stride=2,
+            dilate=replace_stride_with_dilation[1],
+            data_format=data_format)
+        self.layer4 = self._make_layer(
+            block,
+            512,
+            layers[3],
+            stride=2,
+            dilate=replace_stride_with_dilation[2],
+            data_format=data_format)
+        self.bn2 = nn.BatchNorm2D(
+            512 * block.expansion, epsilon=1e-05, data_format=data_format)
+        self.dropout = nn.Dropout(p=dropout)
+        self.fc = nn.Linear(512 * block.expansion * self.fc_scale,
+                            num_features)
+        self.features = nn.BatchNorm1D(num_features, epsilon=1e-05)
+        # self.features = nn.BatchNorm1D(num_features, epsilon=1e-05, weight_attr=False)
+
+        for m in self.sublayers():
+            if isinstance(m, paddle.nn.Conv2D):
+                normal_(m.weight, 0, 0.1)
+            elif isinstance(m, (paddle.nn.BatchNorm2D, paddle.nn.GroupNorm)):
+                constant_(m.weight, 1)
+                constant_(m.bias, 0)
+        if zero_init_residual:
+            for m in self.sublayers():
+                if isinstance(m, IBasicBlock):
+                    constant_(m.bn2.weight, 0)
 
         pfc_config.update({
             'num_classes': class_num,
@@ -343,7 +218,60 @@ class IResNet(Model):
         })
         self.head = PartialFC(**pfc_config)
 
+    def _make_layer(self,
+                    block,
+                    planes,
+                    blocks,
+                    stride=1,
+                    dilate=False,
+                    data_format="NCHW"):
+        downsample = None
+        previous_dilation = self.dilation
+        if dilate:
+            self.dilation *= stride
+            stride = 1
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                conv1x1(
+                    self.inplanes,
+                    planes * block.expansion,
+                    stride,
+                    data_format=data_format),
+                nn.BatchNorm2D(
+                    planes * block.expansion,
+                    epsilon=1e-05,
+                    data_format=data_format))
+        layers = []
+        layers.append(
+            block(
+                self.inplanes,
+                planes,
+                stride,
+                downsample,
+                self.groups,
+                self.base_width,
+                previous_dilation,
+                data_format=data_format))
+        self.inplanes = planes * block.expansion
+        for _ in range(1, blocks):
+            layers.append(
+                block(
+                    self.inplanes,
+                    planes,
+                    groups=self.groups,
+                    base_width=self.base_width,
+                    dilation=self.dilation,
+                    data_format=data_format))
+        return nn.Sequential(*layers)
+
     def forward(self, inputs):
+
+        if self.training:
+            with paddle.no_grad():
+                # Note(GuoxiaWang)
+                # self.features = nn.BatchNorm1D(num_features, epsilon=1e-05, weight_attr=False)
+                self.features.weight.fill_(1.0)
+
         if isinstance(inputs, dict):
             x = inputs['data']
         else:
@@ -353,28 +281,38 @@ class IResNet(Model):
         if self.data_format == "NHWC":
             x = paddle.tensor.transpose(x, [0, 2, 3, 1])
 
-        y = self.conv(x)
-        y = self.prelu(y)
-        for block in self.block_list:
-            y = block(y)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.prelu(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.bn2(x)
+
         if self.data_format == "NHWC":
-            y = paddle.tensor.transpose(y, [0, 3, 1, 2])
-        y = self.fc(y)
+            x = paddle.tensor.transpose(x, [0, 3, 1, 2])
+
+        x = paddle.flatten(x, 1)
+        x = self.dropout(x)
+
+        x = self.fc(x)
+        x = self.features(x)
 
         if not self.training:
             # return embedding feature
             if isinstance(inputs, dict):
-                res = {'logits': y}
+                res = {'logits': x}
                 if 'targets' in inputs:
                     res['targets'] = inputs['targets']
             else:
-                res = y
+                res = x
             return res
 
         assert isinstance(inputs, dict) and 'targets' in inputs
-        y, targets = self.head(y, inputs['targets'])
+        x, targets = self.head(x, inputs['targets'])
 
-        return {'logits': y, 'targets': targets}
+        return {'logits': x, 'targets': targets}
 
     def load_pretrained(self, path, rank=0, finetune=False):
         if not os.path.exists(path + '.pdparams'):
@@ -412,26 +350,26 @@ class IResNet(Model):
                         path + "_rank{}.pdparams".format(rank))
 
 
-def IResNet18(**args):
-    model = IResNet(layers=18, **args)
+def IResNet18(**kwargs):
+    model = IResNet(IBasicBlock, [2, 2, 2, 2], **kwargs)
     return model
 
 
-def IResNet34(**args):
-    model = IResNet(layers=34, **args)
+def IResNet34(**kwargs):
+    model = IResNet(IBasicBlock, [3, 4, 6, 3], **kwargs)
     return model
 
 
-def IResNet50(**args):
-    model = IResNet(layers=50, **args)
+def IResNet50(**kwargs):
+    model = IResNet(IBasicBlock, [3, 4, 14, 3], **kwargs)
     return model
 
 
-def IResNet100(**args):
-    model = IResNet(layers=100, **args)
+def IResNet100(**kwargs):
+    model = IResNet(IBasicBlock, [3, 13, 30, 3], **kwargs)
     return model
 
 
-def IResNet200(**args):
-    model = IResNet(layers=200, **args)
+def IResNet200(**kwargs):
+    model = IResNet(IBasicBlock, [6, 26, 60, 6], **kwargs)
     return model

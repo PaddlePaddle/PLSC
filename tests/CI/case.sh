@@ -22,6 +22,7 @@ plsc_gpu_model_list=( \
     FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1 \
     FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c_dp_mp_fp16o1 \
     FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n8c_dp_mp_fp16o1 \
+    IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1 \
     IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1 \
     ViT_base_patch16_224_in1k_1n8c_dp_fp16o2 \
     ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2 \
@@ -35,7 +36,16 @@ function IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1() {
     bash ./recognition/face/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/5059" | cut -d " " -f12 `
-    check_diff 45.00194 ${loss%?} ${FUNCNAME}_loss
+    check_diff 44.48089 ${loss%?} ${FUNCNAME}_loss
+}
+
+function IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./recognition/face/IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "199/40465" | cut -d " " -f12 `
+    check_diff 41.22209 ${loss%?} ${FUNCNAME}_loss
 }
 
 function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1() {
@@ -71,7 +81,7 @@ function IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1() {
     bash ./recognition/face/IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/40465" | cut -d " " -f12 `
-    check_diff 45.50187 ${loss%?} ${FUNCNAME}_loss
+    check_diff 46.32475 ${loss%?} ${FUNCNAME}_loss
 }
 
 ###### ViT ######
