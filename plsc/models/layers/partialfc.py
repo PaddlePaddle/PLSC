@@ -182,7 +182,11 @@ class PartialFC(nn.Layer):
             index = positive
 
         local_sampled_ids = index + self.class_start
-        sampled_ids = all_gather(local_sampled_ids, axis=0)
+
+        if self.model_parallel:
+            sampled_ids = all_gather(local_sampled_ids, axis=0)
+        else:
+            sampled_ids = local_sampled_ids
 
         labels = paddle.searchsorted(sampled_ids, labels)
 
