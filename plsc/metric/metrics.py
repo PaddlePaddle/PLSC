@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
+import warnings
+warnings.simplefilter(action='ignore', category=DeprecationWarning)
+
 import sklearn
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F

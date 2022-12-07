@@ -35,23 +35,36 @@ _HPARAMS_DEFAULT = dict(
     translate_const=250,
     img_mean=_FILL, )
 
-_RANDOM_INTERPOLATION = (Image.BILINEAR, Image.BICUBIC)
+if hasattr(Image, "Resampling"):
+    BICUBIC = Image.Resampling.BICUBIC
+    BILINEAR = Image.Resampling.BILINEAR
+    HAMMING = Image.Resampling.HAMMING
+    LANCZOS = Image.Resampling.LANCZOS
+    AFFINE = Image.Transform.AFFINE
+else:
+    BICUBIC = Image.BICUBIC
+    BILINEAR = Image.BILINEAR
+    HAMMING = Image.HAMMING
+    LANCZOS = Image.LANCZOS
+    AFFINE = Image.AFFINE
+
+_RANDOM_INTERPOLATION = (BILINEAR, BICUBIC)
 
 
 def _pil_interp(method):
     if method == 'bicubic':
-        return Image.BICUBIC
+        return BICUBIC
     elif method == 'lanczos':
-        return Image.LANCZOS
+        return LANCZOS
     elif method == 'hamming':
-        return Image.HAMMING
+        return HAMMING
     else:
         # default bilinear, do we want to allow nearest?
-        return Image.BILINEAR
+        return BILINEAR
 
 
 def _interpolation(kwargs):
-    interpolation = kwargs.pop('resample', Image.BILINEAR)
+    interpolation = kwargs.pop('resample', BILINEAR)
     if isinstance(interpolation, (list, tuple)):
         return random.choice(interpolation)
     else:
@@ -66,40 +79,34 @@ def _check_args_tf(kwargs):
 
 def shear_x(img, factor, **kwargs):
     _check_args_tf(kwargs)
-    return img.transform(img.size, Image.AFFINE, (1, factor, 0, 0, 1, 0),
-                         **kwargs)
+    return img.transform(img.size, AFFINE, (1, factor, 0, 0, 1, 0), **kwargs)
 
 
 def shear_y(img, factor, **kwargs):
     _check_args_tf(kwargs)
-    return img.transform(img.size, Image.AFFINE, (1, 0, 0, factor, 1, 0),
-                         **kwargs)
+    return img.transform(img.size, AFFINE, (1, 0, 0, factor, 1, 0), **kwargs)
 
 
 def translate_x_rel(img, pct, **kwargs):
     pixels = pct * img.size[0]
     _check_args_tf(kwargs)
-    return img.transform(img.size, Image.AFFINE, (1, 0, pixels, 0, 1, 0),
-                         **kwargs)
+    return img.transform(img.size, AFFINE, (1, 0, pixels, 0, 1, 0), **kwargs)
 
 
 def translate_y_rel(img, pct, **kwargs):
     pixels = pct * img.size[1]
     _check_args_tf(kwargs)
-    return img.transform(img.size, Image.AFFINE, (1, 0, 0, 0, 1, pixels),
-                         **kwargs)
+    return img.transform(img.size, AFFINE, (1, 0, 0, 0, 1, pixels), **kwargs)
 
 
 def translate_x_abs(img, pixels, **kwargs):
     _check_args_tf(kwargs)
-    return img.transform(img.size, Image.AFFINE, (1, 0, pixels, 0, 1, 0),
-                         **kwargs)
+    return img.transform(img.size, AFFINE, (1, 0, pixels, 0, 1, 0), **kwargs)
 
 
 def translate_y_abs(img, pixels, **kwargs):
     _check_args_tf(kwargs)
-    return img.transform(img.size, Image.AFFINE, (1, 0, 0, 0, 1, pixels),
-                         **kwargs)
+    return img.transform(img.size, AFFINE, (1, 0, 0, 0, 1, pixels), **kwargs)
 
 
 def rotate(img, degrees, **kwargs):
@@ -129,7 +136,7 @@ def rotate(img, degrees, **kwargs):
                                          matrix)
         matrix[2] += rotn_center[0]
         matrix[5] += rotn_center[1]
-        return img.transform(img.size, Image.AFFINE, matrix, **kwargs)
+        return img.transform(img.size, AFFINE, matrix, **kwargs)
     else:
         return img.rotate(degrees, resample=kwargs['resample'])
 
