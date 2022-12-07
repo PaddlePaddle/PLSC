@@ -23,8 +23,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import numpy as np
+import warnings
+warnings.simplefilter(action='ignore', category=DeprecationWarning)
 import sklearn
+
+import numpy as np
 from scipy import interpolate
 from sklearn.decomposition import PCA
 from sklearn.model_selection import KFold

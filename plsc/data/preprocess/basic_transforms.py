@@ -22,10 +22,30 @@ import math
 import random
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter, ImageOps
 from paddle.vision.transforms import ColorJitter as PPColorJitter
 
 from plsc.utils import logger
+
+__all__ = [
+    "Compose",
+    "DecodeImage",
+    "RandomApply",
+    "ResizeImage",
+    "CenterCropImage",
+    "RandCropImage",
+    "RandomResizedCrop",
+    "RandFlipImage",
+    "RandomHorizontalFlip",
+    "NormalizeImage",
+    "ToCHWImage",
+    "ColorJitter",
+    "RandomErasing",
+    "RandomGrayscale",
+    "SimCLRGaussianBlur",
+    "BYOLSolarize",
+    "MAERandCropImage",
+]
 
 
 class OperatorParamError(ValueError):
@@ -88,14 +108,24 @@ class UnifiedResize(object):
             'bicubic': cv2.INTER_CUBIC,
             'lanczos': cv2.INTER_LANCZOS4
         }
-        _pil_interp_from_str = {
-            'nearest': Image.NEAREST,
-            'bilinear': Image.BILINEAR,
-            'bicubic': Image.BICUBIC,
-            'box': Image.BOX,
-            'lanczos': Image.LANCZOS,
-            'hamming': Image.HAMMING
-        }
+        if hasattr(Image, "Resampling"):
+            _pil_interp_from_str = {
+                'nearest': Image.Resampling.NEAREST,
+                'bilinear': Image.Resampling.BILINEAR,
+                'bicubic': Image.Resampling.BICUBIC,
+                'box': Image.Resampling.BOX,
+                'lanczos': Image.Resampling.LANCZOS,
+                'hamming': Image.Resampling.HAMMING
+            }
+        else:
+            _pil_interp_from_str = {
+                'nearest': Image.NEAREST,
+                'bilinear': Image.BILINEAR,
+                'bicubic': Image.BICUBIC,
+                'box': Image.BOX,
+                'lanczos': Image.LANCZOS,
+                'hamming': Image.HAMMING
+            }
 
         def _pil_resize(src, size, resample):
             pil_img = Image.fromarray(src)
@@ -227,6 +257,42 @@ class RandCropImage(object):
         return self._resize_func(img, size)
 
 
+class RandomResizedCrop(RandCropImage):
+    """ only rename """
+    pass
+
+
+class MAERandCropImage(RandCropImage):
+    """
+    RandomResizedCrop for matching TF/TPU implementation: no for-loop is used.
+    This may lead to results different with torchvision's version.
+    Following BYOL's TF code:
+    https://github.com/deepmind/deepmind-research/blob/master/byol/utils/dataset.py#L206
+    """
+
+    def __call__(self, img):
+        size = self.size
+
+        img_h, img_w = img.shape[:2]
+
+        target_area = img_w * img_h * np.random.uniform(*self.scale)
+        log_ratio = tuple(math.log(x) for x in self.ratio)
+        aspect_ratio = math.exp(np.random.uniform(*log_ratio))
+
+        w = int(round(math.sqrt(target_area * aspect_ratio)))
+        h = int(round(math.sqrt(target_area / aspect_ratio)))
+
+        w = min(w, img_w)
+        h = min(h, img_h)
+
+        i = random.randint(0, img_w - w)
+        j = random.randint(0, img_h - h)
+
+        img = img[j:j + h, i:i + w, :]
+
+        return self._resize_func(img, size)
+
+
 class RandFlipImage(object):
     """ random flip image
         flip_code:
@@ -243,6 +309,17 @@ class RandFlipImage(object):
     def __call__(self, img):
         if random.randint(0, 1) == 1:
             return cv2.flip(img, self.flip_code)
+        else:
+            return img
+
+
+class RandomHorizontalFlip(object):
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, img):
+        if np.random.rand() < self.p:
+            return cv2.flip(img, 1)
         else:
             return img
 
@@ -314,16 +391,18 @@ class ColorJitter(PPColorJitter):
     """ColorJitter.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, p=1.0, *args, **kwargs):
+        self.p = p
         super().__init__(*args, **kwargs)
 
     def __call__(self, img):
-        if not isinstance(img, Image.Image):
-            img = np.ascontiguousarray(img)
-            img = Image.fromarray(img)
-        img = super()._apply_image(img)
-        if isinstance(img, Image.Image):
-            img = np.asarray(img)
+        if random.random() < self.p:
+            if not isinstance(img, Image.Image):
+                img = np.ascontiguousarray(img)
+                img = Image.fromarray(img)
+            img = super()._apply_image(img)
+            if isinstance(img, Image.Image):
+                img = np.asarray(img)
         return img
 
 
@@ -393,4 +472,79 @@ class RandomErasing(object):
                 else:
                     img[x1:x1 + h, y1:y1 + w, 0] = pixels[0]
                 return img
+        return img
+
+
+class RandomApply(object):
+    def __init__(self, transforms, p=0.5):
+        self.transforms = transforms
+        self.p = p
+
+    def __call__(self, img):
+        if self.p < np.random.rand():
+            return img
+        for t in self.transforms:
+            img = t(img)
+        return img
+
+
+class RandomGrayscale(object):
+    def __init__(self, p=0.1):
+        self.p = p
+
+    def __call__(self, img):
+        _, _, num_output_channels = img.shape
+
+        if np.random.rand() < self.p:
+
+            if not isinstance(img, Image.Image):
+                img = np.ascontiguousarray(img)
+                img = Image.fromarray(img)
+
+            if num_output_channels == 1:
+                img = img.convert("L")
+                img = np.array(img, dtype=np.uint8)
+            elif num_output_channels == 3:
+                img = img.convert("L")
+                img = np.array(img, dtype=np.uint8)
+                img = np.dstack([img, img, img])
+            else:
+                raise ValueError("num_output_channels should be either 1 or 3")
+
+        return img
+
+
+class SimCLRGaussianBlur(object):
+    """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
+
+    def __init__(self, sigma=[.1, 2.], p=1.0):
+        self.p = p
+        self.sigma = sigma
+
+    def __call__(self, img):
+        if random.random() < self.p:
+            if not isinstance(img, Image.Image):
+                img = np.ascontiguousarray(img)
+                img = Image.fromarray(img)
+            sigma = random.uniform(self.sigma[0], self.sigma[1])
+            img = img.filter(ImageFilter.GaussianBlur(radius=sigma))
+            if isinstance(img, Image.Image):
+                img = np.asarray(img)
+        return img
+
+
+class BYOLSolarize(object):
+    """Solarize augmentation from BYOL: https://arxiv.org/abs/2006.07733"""
+
+    def __init__(self, p=1.0):
+        self.p = p
+
+    def __call__(self, img):
+        if random.random() < self.p:
+            if not isinstance(img, Image.Image):
+                img = np.ascontiguousarray(img)
+                img = Image.fromarray(img)
+            img = ImageOps.solarize(x)
+            if isinstance(img, Image.Image):
+                img = np.asarray(img)
         return img
