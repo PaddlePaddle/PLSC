@@ -79,7 +79,10 @@ class Optimizer(object):
                     "parameter group didn't specify a value of required optimization parameter "
                     + name)
             else:
-                param_group.setdefault(name, default)
+                if name == 'lr':
+                    param_group.setdefault(name, deepcopy(default))
+                else:
+                    param_group.setdefault(name, default)
 
         params = param_group['params']
         if len(params) != len(set(params)):
@@ -200,6 +203,22 @@ class Optimizer(object):
             for p in group['params']:
                 if p.grad is not None:
                     p.clear_gradient(set_to_zero)
+
+    @paddle.no_grad()
+    def lr_step(self, step=None):
+        for group in self.param_groups:
+            lr = group['lr']
+            if isinstance(lr, paddle.optimizer.lr.LRScheduler):
+                lr.step()
+            elif 'lr_func' in group and callable(group['lr_func']):
+                group['lr_func'](group, step)
+
+    @paddle.no_grad()
+    def get_lr(self, group_id=0):
+        lr = self.param_groups[group_id]['lr']
+        if isinstance(lr, paddle.optimizer.lr.LRScheduler):
+            lr = lr.get_lr()
+        return lr
 
     @paddle.no_grad()
     def step(self):

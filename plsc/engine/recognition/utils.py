@@ -41,8 +41,7 @@ def update_loss(trainer, loss_dict, batch_size):
 
 def log_info(trainer, batch_size, epoch_id, iter_id):
     lr_msg = "lr: none"
-    if trainer.lr_scheduler is not None:
-        lr_msg = "lr: {:.6f}".format(trainer.lr_scheduler.get_lr())
+    lr_msg = "lr: {:.6f}".format(trainer.optimizer.get_lr())
 
     metric_msg = ", ".join([
         "{}: {:.5f}".format(key, trainer.output_info[key].avg)
@@ -65,12 +64,11 @@ def log_info(trainer, batch_size, epoch_id, iter_id):
         len(trainer.train_dataloader), lr_msg, metric_msg, time_msg, ips_msg,
         eta_msg))
 
-    if trainer.lr_scheduler is not None:
-        logger.scaler(
-            name="lr",
-            value=trainer.lr_scheduler.get_lr(),
-            step=trainer.global_step,
-            writer=trainer.vdl_writer)
+    logger.scaler(
+        name="lr",
+        value=trainer.optimizer.get_lr(),
+        step=trainer.global_step,
+        writer=trainer.vdl_writer)
     for key in trainer.output_info:
         logger.scaler(
             name="train_{}".format(key),

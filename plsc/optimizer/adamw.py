@@ -27,6 +27,7 @@ class AdamW(Optimizer):
     def __init__(self,
                  params,
                  lr=0.001,
+                 lr_func=None,
                  betas=(0.9, 0.999),
                  eps=1e-8,
                  weight_decay=0.0,
@@ -37,12 +38,14 @@ class AdamW(Optimizer):
 
         defaults = dict(
             lr=lr,
+            lr_func=lr_func,
             betas=betas,
             eps=eps,
             weight_decay=weight_decay,
             use_master_param=use_master_param,
             exp_avg_force_fp32=exp_avg_force_fp32,
-            grad_clip=grad_clip, )
+            grad_clip=grad_clip,
+            **args)
         super(AdamW, self).__init__(params, defaults)
 
     @staticmethod
