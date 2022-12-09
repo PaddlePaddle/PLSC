@@ -51,7 +51,7 @@ def _remove_if_exist(path):
         pass
 
 
-def load_checkpoint(checkpoint_path, net, optimizer, lr_scheduler):
+def load_checkpoint(checkpoint_path, net, optimizer, loss_scaler):
     """
     load model from checkpoint
     """
@@ -71,6 +71,8 @@ def load_checkpoint(checkpoint_path, net, optimizer, lr_scheduler):
         "Optimizer checkpoint path {} does not exists.".format(opt_path)
     opt_dict = paddle.load(opt_path)
 
+    scaler_dict = opt_dict.pop('scaler_state', {})
+
     dist_opt_path = checkpoint_path + "_rank{}.pdopt".format(rank)
     if os.path.exists(dist_opt_path):
         dist_opt_dict = paddle.load(dist_opt_path)
@@ -83,13 +85,9 @@ def load_checkpoint(checkpoint_path, net, optimizer, lr_scheduler):
 
     optimizer.set_state_dict(opt_dict)
 
-    # load lr scheduler
-    if lr_scheduler is not None:
-        lr_path = checkpoint_path + '.pdlr'
-        assert os.path.exists(lr_path), \
-            "Learning rate scheduler checkpoint path {} does not exists.".format(lr_path)
-        lr_dict = paddle.load(lr_path)
-        lr_scheduler.set_state_dict(lr_dict)
+    # load loss scaler
+    if len(scaler_dict) > 0 and loss_scaler is not None:
+        loss_scaler.load_state_dict(scaler_dict)
 
     # load metric state
     metric_path = checkpoint_path + '.pdstates'
@@ -116,7 +114,7 @@ def _optimizer_state_dict_split(state_dict):
 
 def save_checkpoint(net,
                     optimizer,
-                    lr_scheduler,
+                    loss_scaler,
                     metric_info,
                     model_path,
                     model_name="",
@@ -145,15 +143,13 @@ def save_checkpoint(net,
         opt_state_dict)
 
     if local_rank == 0:
+        if loss_scaler is not None:
+            opt_state_dict['scaler_state'] = loss_scaler.state_dict()
         paddle.save(opt_state_dict, model_prefix + ".pdopt")
+        paddle.save(metric_info, model_prefix + ".pdstates")
     if len(dist_opt_state_dict['state']) > 0:
         paddle.save(dist_opt_state_dict,
                     model_prefix + "_rank{}.pdopt".format(rank))
-
-    if local_rank == 0:
-        if lr_scheduler is not None:
-            paddle.save(lr_scheduler.state_dict(), model_prefix + ".pdlr")
-        paddle.save(metric_info, model_prefix + ".pdstates")
 
     logger.info("Already save {} model in {}".format(prefix, model_dir))
 
@@ -181,7 +177,7 @@ def save_checkpoint(net,
                 to_remove = timestamps
             for timestamp in to_remove:
                 model_prefix = timestamp_to_path[timestamp]
-                for ext in ['.pdparams', '.pdopt', '.pdlr', '.pdstates']:
+                for ext in ['.pdparams', '.pdopt', '.pdstates']:
                     path = model_prefix + ext
                     _remove_if_exist(path)
 

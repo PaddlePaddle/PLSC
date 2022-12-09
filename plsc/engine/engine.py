@@ -305,7 +305,7 @@ class Engine(object):
         if self.config["Global"]["checkpoint"] is not None:
             metric_info = io.load_checkpoint(
                 self.config["Global"]["checkpoint"], self.model,
-                self.optimizer, self.lr_scheduler)
+                self.optimizer, self.scaler)
             if metric_info is not None:
                 self.best_metric.update(metric_info)
             if "global_step" in metric_info:
@@ -319,8 +319,8 @@ class Engine(object):
             # for one epoch train
             self.train_epoch_func(self, epoch_id)
 
-            if self.lr_scheduler is not None and self.lr_decay_unit == 'epoch':
-                self.lr_scheduler.step()
+            if self.lr_decay_unit == 'epoch':
+                self.optimizer.lr_step(epoch_id)
 
             if self.use_dali:
                 self.train_dataloader.reset()
@@ -348,7 +348,7 @@ class Engine(object):
                     io.save_checkpoint(
                         self.model,
                         self.optimizer,
-                        self.lr_scheduler,
+                        self.scaler,
                         self.best_metric,
                         self.output_dir,
                         model_name=self.config["Model"]["name"],
@@ -370,7 +370,7 @@ class Engine(object):
                     io.save_checkpoint(
                         self.model,
                         self.optimizer,
-                        self.lr_scheduler,
+                        self.scaler,
                         eval_metric_info,
                         self.output_dir,
                         model_name=self.config["Model"]["name"],
@@ -381,7 +381,7 @@ class Engine(object):
                 io.save_checkpoint(
                     self.model,
                     self.optimizer,
-                    self.lr_scheduler,
+                    self.scaler,
                     eval_metric_info,
                     self.output_dir,
                     model_name=self.config["Model"]["name"],

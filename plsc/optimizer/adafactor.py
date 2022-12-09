@@ -21,6 +21,7 @@ class Adafactor(Optimizer):
     def __init__(self,
                  params,
                  lr=None,
+                 lr_func=None,
                  eps=1e-30,
                  eps_scale=1e-3,
                  clip_threshold=1.0,
@@ -32,7 +33,9 @@ class Adafactor(Optimizer):
                  use_master_param=True,
                  no_weight_decay_name=[],
                  one_dim_param_no_weight_decay=False,
-                 grad_clip=None):
+                 grad_clip=None,
+                 **args):
+
         relative_step = not lr
         if warmup_init and not relative_step:
             raise ValueError('warmup_init requires relative_step=True')
@@ -41,6 +44,7 @@ class Adafactor(Optimizer):
             0]  # make it compat with standard betas arg
         defaults = dict(
             lr=lr,
+            lr_func=lr_func,
             eps=eps,
             eps_scale=eps_scale,
             clip_threshold=clip_threshold,
@@ -53,7 +57,8 @@ class Adafactor(Optimizer):
             use_master_param=use_master_param,
             no_weight_decay_name=no_weight_decay_name,
             one_dim_param_no_weight_decay=one_dim_param_no_weight_decay,
-            grad_clip=grad_clip)
+            grad_clip=grad_clip,
+            **args)
         super(Adafactor, self).__init__(params, defaults)
 
     @staticmethod

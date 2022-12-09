@@ -72,8 +72,8 @@ def defualt_train_one_epoch(engine, epoch_id):
         # clear gradients
         engine.optimizer.clear_grad()
 
-        if engine.lr_scheduler is not None and engine.lr_decay_unit == 'step':
-            engine.lr_scheduler.step()
+        if engine.lr_decay_unit == 'step':
+            engine.optimizer.lr_step(engine.global_step)
 
         # below code just for logging
         # update metric_for_logger
@@ -98,7 +98,7 @@ def defualt_train_one_epoch(engine, epoch_id):
                 io.save_checkpoint(
                     engine.model,
                     engine.optimizer,
-                    engine.lr_scheduler,
+                    engine.scaler,
                     engine.best_metric,
                     engine.output_dir,
                     model_name=engine.config["Model"]["name"],

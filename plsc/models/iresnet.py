@@ -22,30 +22,14 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 
+from plsc.nn import init
+
 from .layers import PartialFC
 from .layers import Model
 
 import math
 
 __all__ = ["IResNet18", "IResNet34", "IResNet50", "IResNet100", "IResNet200"]
-
-
-@paddle.no_grad()
-def constant_(x, val):
-    temp_value = paddle.full(x.shape, val, x.dtype)
-    if temp_value.dtype != x.dtype:
-        temp_value = temp_value.astype(x.dtype)
-    x.copy_(temp_value, False)
-    return x
-
-
-@paddle.no_grad()
-def normal_(x, mean=0., std=1.):
-    temp_value = paddle.normal(mean, std, shape=x.shape)
-    if temp_value.dtype != x.dtype:
-        temp_value = temp_value.astype(x.dtype)
-    x.copy_(temp_value, False)
-    return x
 
 
 def conv3x3(in_planes,
@@ -202,14 +186,14 @@ class IResNet(Model):
 
         for m in self.sublayers():
             if isinstance(m, paddle.nn.Conv2D):
-                normal_(m.weight, 0, 0.1)
+                init.normal_(m.weight, 0, 0.1)
             elif isinstance(m, (paddle.nn.BatchNorm2D, paddle.nn.GroupNorm)):
-                constant_(m.weight, 1)
-                constant_(m.bias, 0)
+                init.constant_(m.weight, 1)
+                init.constant_(m.bias, 0)
         if zero_init_residual:
             for m in self.sublayers():
                 if isinstance(m, IBasicBlock):
-                    constant_(m.bn2.weight, 0)
+                    init.constant_(m.bn2.weight, 0)
 
         pfc_config.update({
             'num_classes': class_num,

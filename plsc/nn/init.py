@@ -34,8 +34,9 @@ def constant_(x, value):
 
 @paddle.no_grad()
 def normal_(x, mean=0., std=1.):
-    temp_value = paddle.normal(mean, std, shape=x.shape)
-    x.set_value(temp_value)
+    temp_value = paddle.tensor.random.gaussian(
+        shape=x.shape, mean=mean, std=std, dtype=x.dtype)
+    x.copy_(temp_value, False)
     return x
 
 
