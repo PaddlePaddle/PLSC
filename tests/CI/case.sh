@@ -37,7 +37,7 @@ function IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1() {
     bash ./recognition/face/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/5059" | cut -d " " -f12 `
-    check_diff 44.48089 ${loss%?} ${FUNCNAME}_loss
+    check_diff 44.58809 ${loss%?} ${FUNCNAME}_loss
 }
 
 function IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1() {
@@ -46,7 +46,7 @@ function IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1() {
     bash ./recognition/face/IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/40465" | cut -d " " -f12 `
-    check_diff 41.22209 ${loss%?} ${FUNCNAME}_loss
+    check_diff 40.74793 ${loss%?} ${FUNCNAME}_loss
 }
 
 function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1() {
@@ -82,7 +82,7 @@ function IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1() {
     bash ./recognition/face/IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/40465" | cut -d " " -f12 `
-    check_diff 46.32475 ${loss%?} ${FUNCNAME}_loss
+    check_diff 46.27080 ${loss%?} ${FUNCNAME}_loss
 }
 
 function IResNet50_MS1MV3_ArcFace_pfc01_1n8c_dp8_fp16o1() {
@@ -91,7 +91,7 @@ function IResNet50_MS1MV3_ArcFace_pfc01_1n8c_dp8_fp16o1() {
     bash ./recognition/face/IResNet50_MS1MV3_ArcFace_pfc01_1n8c_dp8_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/5059" | cut -d " " -f12 `
-    check_diff 41.84674 ${loss%?} ${FUNCNAME}_loss
+    check_diff 41.70836 ${loss%?} ${FUNCNAME}_loss
 }
 
 #function MobileFaceNet_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1() {
