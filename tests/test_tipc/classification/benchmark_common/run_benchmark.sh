@@ -22,19 +22,17 @@ function _set_params(){
     global_batch_size=${3:-"128"}    # （必选）global_batch_size
     run_mode=${4:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP2-MP8-PP2|DP1-MP8-PP4|DP4-MP8-PP1
     device_num=${5:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
-    yaml_path=${6:-"./task/recognition/face/configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml"}
+    yaml_path=${6:-"./task/classification/vit/configs/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.yaml"}
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
     model_repo="PLSC"          # (必选) 模型套件的名字
     speed_unit="images/sec"         # (必选)速度指标单位
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
     keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
-    max_iter=${7:-600}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
-    eval_interval=20000            # （可选）保障模型训练结束前不执行eval
+    max_iter=${7:-150}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
     num_workers=0                  # (可选)
     base_batch_size=$global_batch_size
-    sample_ratio=${8:-1.0}
-    model_parallel=${9:-"True"}
+    pretrained_model=${8:-null}
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -73,15 +71,7 @@ function _train(){
                -o Global.max_train_step=${max_iter} \
                -o Global.flags.FLAGS_cudnn_exhaustive_search=0 \
                -o Global.flags.FLAGS_cudnn_deterministic=1 \
-               -o Model.pfc_config.sample_ratio=${sample_ratio} \
-               -o Model.pfc_config.model_parallel=${model_parallel} \
-               -o Loss.Train.0.MarginLoss.model_parallel=${model_parallel} \
-               -o Model.class_num=93431 \
-               -o DataLoader.Train.sampler.batch_size=${global_batch_size} \
-               -o DataLoader.Train.dataset.image_root=./dataset/MS1M_v3/ \
-               -o DataLoader.Train.dataset.cls_label_path=./dataset/MS1M_v3/label.txt \
-               -o DataLoader.Eval.dataset.image_root=./dataset/MS1M_v3/agedb_30/ \
-               -o DataLoader.Eval.dataset.cls_label_path=./dataset/MS1M_v3/agedb_30/label.txt \
+               -o Global.pretrained_model=${pretrained_model} \
                "
     if [ ${PADDLE_TRAINER_ID} ]
     then

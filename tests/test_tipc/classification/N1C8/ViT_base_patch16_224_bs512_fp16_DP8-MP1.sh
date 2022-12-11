@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-model_item=IResNet50_ratio10
+model_item=ViT_base_patch16_224
 fp_item=fp16
-bs_item=128
-run_mode=DP8_MP1
+bs_item=512
+run_mode=DP8-MP1
 device_num=N1C8
-yaml_path=./plsc/configs/FaceRecognition/IResNet50_MS1MV3_ArcFace_1.0_1n8c_dp_fp16o2.yaml
-epochs=20
+yaml_path=./task/classification/vit/configs/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.yaml
+max_iter=150
 
-bash ./tests/test_tipc/recognition/benchmark_common/prepare.sh
+bash ./tests/test_tipc/classification/benchmark_common/prepare.sh
 # run
-bash ./tests/test_tipc/recognition/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${bs_item} ${run_mode} ${device_num} ${yaml_path} ${epochs} 2>&1;
+bash ./tests/test_tipc/classification/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${bs_item} ${run_mode} ${device_num} ${yaml_path} \
+${max_iter} 2>&1;

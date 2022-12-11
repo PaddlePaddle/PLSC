@@ -20,7 +20,12 @@ python setup.py develop
 # dataset
 mkdir dataset && cd dataset
 python ${BENCHMARK_ROOT}/paddlecloud/file_upload_download.py \
-    --remote-path ./plsc_data/MS1M_v3/ \
+    --remote-path ./plsc_data/ILSVRC2012/ \
     --local-path ./ \
     --mode download
+cd -
+
+# pretrained
+mkdir -p pretrained/ViT_base_patch16_224 && cd pretrained/ViT_base_patch16_224
+wget https://plsc.bj.bcebos.com/models/vit/v2.4/imagenet2012-ViT-B_16-224.pdparams
 cd -
