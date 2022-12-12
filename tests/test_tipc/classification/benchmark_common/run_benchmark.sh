@@ -66,13 +66,18 @@ function _train(){
         add_options=""
         log_file=${train_log_file}
     fi
+        
+    if [[ ${model_item} =~ "ft" ]];then # finetune 
+        pretrained=" -o Global.pretrained_model=${pretrained_model} "
+    else
+        pretrained=""
+    fi
 
     train_cmd="-o Global.print_batch_step=1 \
                -o Global.max_train_step=${max_iter} \
                -o Global.flags.FLAGS_cudnn_exhaustive_search=0 \
                -o Global.flags.FLAGS_cudnn_deterministic=1 \
-               -o Global.pretrained_model=${pretrained_model} \
-               "
+               ${pretrained} "
     if [ ${PADDLE_TRAINER_ID} ]
     then
         PADDLE_RANK_OPTION=" --rank ${PADDLE_TRAINER_ID}"
