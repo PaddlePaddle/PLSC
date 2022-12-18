@@ -28,7 +28,11 @@ def create_preprocess_operators(params):
     Args:
         params(list): a dict list, used to create some operators
     """
-    assert isinstance(params, list), ('operator config should be a list')
+    assert params is None or isinstance(params, list), (
+        'operator config should be a list or None')
+    if params is None:
+        return None
+
     ops = []
     for operator in params:
         assert isinstance(operator,
@@ -38,4 +42,6 @@ def create_preprocess_operators(params):
         op = getattr(preprocess, op_name)(**param)
         ops.append(op)
 
-    return ops
+    if len(ops) > 0:
+        return preprocess.Compose(ops)
+    return None
