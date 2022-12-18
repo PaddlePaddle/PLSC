@@ -16,6 +16,10 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import numbers
+from collections.abc import Sequence
+from typing import Any, List, Optional, Tuple, Union
+
 from functools import partial
 import six
 import math
@@ -24,20 +28,26 @@ import cv2
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 from paddle.vision.transforms import ColorJitter as PPColorJitter
+from paddle.vision.transforms import ToTensor, Normalize
 
 from plsc.utils import logger
 
 __all__ = [
     "Compose",
+    "ToTensor",
     "DecodeImage",
     "RandomApply",
     "ResizeImage",
+    "Resize",
     "CenterCropImage",
+    "CenterCrop",
     "RandCropImage",
     "RandomResizedCrop",
+    "RandomResizedCropAndInterpolation",
     "RandFlipImage",
     "RandomHorizontalFlip",
     "NormalizeImage",
+    "Normalize",
     "ToCHWImage",
     "ColorJitter",
     "RandomErasing",
@@ -99,58 +109,76 @@ class DecodeImage(object):
         return img
 
 
+def _is_pil_image(img):
+    return isinstance(img, Image.Image)
+
+
+_cv2_interp_from_str = {
+    'nearest': cv2.INTER_NEAREST,
+    'bilinear': cv2.INTER_LINEAR,
+    'area': cv2.INTER_AREA,
+    'bicubic': cv2.INTER_CUBIC,
+    'lanczos': cv2.INTER_LANCZOS4
+}
+
+if hasattr(Image, "Resampling"):
+    _pil_interp_from_str = {
+        'nearest': Image.Resampling.NEAREST,
+        'bilinear': Image.Resampling.BILINEAR,
+        'bicubic': Image.Resampling.BICUBIC,
+        'box': Image.Resampling.BOX,
+        'lanczos': Image.Resampling.LANCZOS,
+        'hamming': Image.Resampling.HAMMING
+    }
+else:
+    _pil_interp_from_str = {
+        'nearest': Image.NEAREST,
+        'bilinear': Image.BILINEAR,
+        'bicubic': Image.BICUBIC,
+        'box': Image.BOX,
+        'lanczos': Image.LANCZOS,
+        'hamming': Image.HAMMING
+    }
+
+
+def _pil_resize(src, size, resample):
+    pil_img = src
+    if not _is_pil_image(pil_img):
+        pil_img = Image.fromarray(pil_img)
+    pil_img = pil_img.resize(size, resample)
+    return pil_img
+
+
+def resize(img, size, interpolation=None, backend="cv2"):
+    assert backend.lower() in ['cv2', 'pil']
+    if backend.lower() == "cv2":
+        if isinstance(interpolation, str):
+            interpolation = _cv2_interp_from_str[interpolation.lower()]
+        # compatible with opencv < version 4.4.0
+        elif interpolation is None:
+            interpolation = cv2.INTER_LINEAR
+        return cv2.resize(img, size, interpolation=interpolation)
+    elif backend.lower() == "pil":
+        if isinstance(interpolation, str):
+            interpolation = _pil_interp_from_str[interpolation.lower()]
+        return _pil_resize(img, size, resample=interpolation)
+
+
+_RANDOM_INTERPOLATION = ('bilinear', 'bicubic')
+
+
 class UnifiedResize(object):
     def __init__(self, interpolation=None, backend="cv2"):
-        _cv2_interp_from_str = {
-            'nearest': cv2.INTER_NEAREST,
-            'bilinear': cv2.INTER_LINEAR,
-            'area': cv2.INTER_AREA,
-            'bicubic': cv2.INTER_CUBIC,
-            'lanczos': cv2.INTER_LANCZOS4
-        }
-        if hasattr(Image, "Resampling"):
-            _pil_interp_from_str = {
-                'nearest': Image.Resampling.NEAREST,
-                'bilinear': Image.Resampling.BILINEAR,
-                'bicubic': Image.Resampling.BICUBIC,
-                'box': Image.Resampling.BOX,
-                'lanczos': Image.Resampling.LANCZOS,
-                'hamming': Image.Resampling.HAMMING
-            }
-        else:
-            _pil_interp_from_str = {
-                'nearest': Image.NEAREST,
-                'bilinear': Image.BILINEAR,
-                'bicubic': Image.BICUBIC,
-                'box': Image.BOX,
-                'lanczos': Image.LANCZOS,
-                'hamming': Image.HAMMING
-            }
+        if interpolation == 'random':
+            self.interpolation = _RANDOM_INTERPOLATION
+        self.interpolation = interpolation
+        self.backend = backend
 
-        def _pil_resize(src, size, resample):
-            pil_img = Image.fromarray(src)
-            pil_img = pil_img.resize(size, resample)
-            return np.asarray(pil_img)
-
-        if backend.lower() == "cv2":
-            if isinstance(interpolation, str):
-                interpolation = _cv2_interp_from_str[interpolation.lower()]
-            # compatible with opencv < version 4.4.0
-            elif interpolation is None:
-                interpolation = cv2.INTER_LINEAR
-            self.resize_func = partial(cv2.resize, interpolation=interpolation)
-        elif backend.lower() == "pil":
-            if isinstance(interpolation, str):
-                interpolation = _pil_interp_from_str[interpolation.lower()]
-            self.resize_func = partial(_pil_resize, resample=interpolation)
-        else:
-            logger.warning(
-                f"The backend of Resize only support \"cv2\" or \"PIL\". \"f{backend}\" is unavailable. Use \"cv2\" instead."
-            )
-            self.resize_func = cv2.resize
-
-    def __call__(self, src, size):
-        return self.resize_func(src, size)
+    def __call__(self, img, size):
+        interpolation = self.interpolation
+        if isinstance(self.interpolation, (tuple, list)):
+            interpolation = random.choice(self.interpolation)
+        return resize(img, size, interpolation, self.backend)
 
 
 class ResizeImage(object):
@@ -188,6 +216,79 @@ class ResizeImage(object):
         return self._resize_func(img, (w, h))
 
 
+class Resize(object):
+    def __init__(self,
+                 size,
+                 interpolation='bilinear',
+                 max_size=None,
+                 antialias=None,
+                 backend="cv2"):
+        if not isinstance(size, (int, Sequence)):
+            raise TypeError(
+                f"Size should be int or sequence. Got {type(size)}")
+        if isinstance(size, Sequence) and len(size) not in (1, 2):
+            raise ValueError(
+                "If size is a sequence, it should have 1 or 2 values")
+
+        if isinstance(size, (list, tuple)):
+            if len(size) not in [1, 2]:
+                raise ValueError(
+                    f"Size must be an int or a 1 or 2 element tuple/list, not a {len(size)} element tuple/list"
+                )
+            if max_size is not None and len(size) != 1:
+                raise ValueError(
+                    "max_size should only be passed if size specifies the length of the smaller edge, "
+                    "i.e. size should be an int or a sequence of length 1 in torchscript mode."
+                )
+
+        if isinstance(size, int):
+            size = [size]
+
+        self.size = size
+        self.max_size = max_size
+
+        self.interpolation = interpolation
+        self.antialias = antialias
+
+        self._resize_func = UnifiedResize(
+            interpolation=interpolation, backend=backend)
+
+    def _compute_resized_output_size(
+            self,
+            image_size: Tuple[int, int],
+            size: List[int],
+            max_size: Optional[int]=None) -> List[int]:
+        if len(size) == 1:  # specified size only for the smallest edge
+            h, w = image_size
+            short, long = (w, h) if w <= h else (h, w)
+            requested_new_short = size if isinstance(size, int) else size[0]
+
+            new_short, new_long = requested_new_short, int(
+                requested_new_short * long / short)
+
+            if max_size is not None:
+                if max_size <= requested_new_short:
+                    raise ValueError(
+                        f"max_size = {max_size} must be strictly greater than the requested "
+                        f"size for the smaller edge size = {size}")
+                if new_long > max_size:
+                    new_short, new_long = int(max_size * new_short /
+                                              new_long), max_size
+
+            new_w, new_h = (new_short, new_long) if w <= h else (new_long,
+                                                                 new_short)
+        else:  # specified both h and w
+            new_w, new_h = size[1], size[0]
+        return [new_h, new_w]
+
+    def __call__(self, img):
+        _, img_h, img_w = get_dimensions(img)
+
+        h, w = self._compute_resized_output_size((img_h, img_w), self.size,
+                                                 self.max_size)
+        return self._resize_func(img, (w, h))
+
+
 class CenterCropImage(object):
     """ crop image """
 
@@ -206,6 +307,53 @@ class CenterCropImage(object):
         w_end = w_start + w
         h_end = h_start + h
         return img[h_start:h_end, w_start:w_end, :]
+
+
+class CenterCrop(object):
+    """ center crop image, align torchvision """
+
+    def __init__(self, size):
+        self.size = self._setup_size(
+            size,
+            error_msg="Please provide only two dimensions (h, w) for size.")
+
+    def _setup_size(self, size, error_msg):
+
+        if isinstance(size, numbers.Number):
+            return int(size), int(size)
+
+        if isinstance(size, Sequence) and len(size) == 1:
+            return size[0], size[0]
+
+        if len(size) != 2:
+            raise ValueError(error_msg)
+
+        return size
+
+    def __call__(self, img):
+        _, image_height, image_width = get_dimensions(img)
+        crop_height, crop_width = self.size
+
+        if crop_width > image_width or crop_height > image_height:
+            padding_ltrb = [
+                (crop_width - image_width) // 2
+                if crop_width > image_width else 0,
+                (crop_height - image_height) // 2
+                if crop_height > image_height else 0,
+                (crop_width - image_width + 1) // 2
+                if crop_width > image_width else 0,
+                (crop_height - image_height + 1) // 2
+                if crop_height > image_height else 0,
+            ]
+            # TODO(GuoxiaWang): implement pad function
+            img = pad(img, padding_ltrb, fill=0)  # PIL uses fill value 0
+            image_height, image_width = img.shape[:2]
+            if crop_width == image_width and crop_height == image_height:
+                return img
+
+        crop_top = int(round((image_height - crop_height) / 2.0))
+        crop_left = int(round((image_width - crop_width) / 2.0))
+        return crop(img, crop_top, crop_left, crop_height, crop_width)
 
 
 class RandCropImage(object):
@@ -257,7 +405,148 @@ class RandCropImage(object):
         return self._resize_func(img, size)
 
 
-class RandomResizedCrop(RandCropImage):
+def _setup_size(size, error_msg):
+    if isinstance(size, numbers.Number):
+        return int(size), int(size)
+
+    if isinstance(size, Sequence) and len(size) == 1:
+        return size[0], size[0]
+
+    if len(size) != 2:
+        raise ValueError(error_msg)
+
+    return size
+
+
+def get_dimensions(img: Any) -> List[int]:
+    if _is_pil_image(img):
+        if hasattr(img, "getbands"):
+            channels = len(img.getbands())
+        else:
+            channels = img.channels
+        width, height = img.size
+        return [channels, height, width]
+    else:
+        height, width = img.shape[:2]
+        if len(img.shape) == 2:
+            channels = 1
+        else:
+            channels = img.shape[-1]
+        return [channels, height, width]
+
+
+def crop(img, top: int, left: int, height: int, width: int):
+    if not _is_pil_image(img):
+        return img[top:top + height, left:left + width, :]
+
+    return img.crop((left, top, left + width, top + height))
+
+
+def resized_crop(
+        img,
+        top: int,
+        left: int,
+        height: int,
+        width: int,
+        size: List[int],
+        interpolation: str="bilinear",
+        antialias: Optional[bool]=None, ):
+    img = crop(img, top, left, height, width)
+    img = resize(img, size, interpolation=interpolation, backend="pil")
+    return img
+
+
+class RandomResizedCrop(object):
+    def __init__(
+            self,
+            size,
+            scale=(0.08, 1.0),
+            ratio=(3.0 / 4.0, 4.0 / 3.0),
+            interpolation="bilinear",
+            antialias: Optional[bool]=None, ):
+        super().__init__()
+        self.size = _setup_size(
+            size,
+            error_msg="Please provide only two dimensions (h, w) for size.")
+
+        if not isinstance(scale, Sequence):
+            raise TypeError("Scale should be a sequence")
+        if not isinstance(ratio, Sequence):
+            raise TypeError("Ratio should be a sequence")
+        if (scale[0] > scale[1]) or (ratio[0] > ratio[1]):
+            warnings.warn("Scale and ratio should be of kind (min, max)")
+
+        self.interpolation = interpolation
+        self.antialias = antialias
+        self.scale = scale
+        self.ratio = ratio
+
+    @staticmethod
+    def get_params(img, scale: List[float],
+                   ratio: List[float]) -> Tuple[int, int, int, int]:
+        """Get parameters for ``crop`` for a random sized crop.
+
+        Args:
+            img (PIL Image or Tensor): Input image.
+            scale (list): range of scale of the origin size cropped
+            ratio (list): range of aspect ratio of the origin aspect ratio cropped
+
+        Returns:
+            tuple: params (i, j, h, w) to be passed to ``crop`` for a random
+            sized crop.
+        """
+        _, height, width = get_dimensions(img)
+        area = height * width
+
+        log_ratio = (math.log(ratio[0]), math.log(ratio[1]))
+        for _ in range(10):
+            target_area = area * random.uniform(scale[0], scale[1])
+            aspect_ratio = math.exp(random.uniform(log_ratio[0], log_ratio[1]))
+
+            w = int(round(math.sqrt(target_area * aspect_ratio)))
+            h = int(round(math.sqrt(target_area / aspect_ratio)))
+
+            if 0 < w <= width and 0 < h <= height:
+                i = random.randint(0, height - h + 1)
+                j = random.randint(0, width - w + 1)
+                return i, j, h, w
+
+        # Fallback to central crop
+        in_ratio = float(width) / float(height)
+        if in_ratio < min(ratio):
+            w = width
+            h = int(round(w / min(ratio)))
+        elif in_ratio > max(ratio):
+            h = height
+            w = int(round(h * max(ratio)))
+        else:  # whole image
+            w = width
+            h = height
+        i = (height - h) // 2
+        j = (width - w) // 2
+        return i, j, h, w
+
+    def __call__(self, img):
+        """
+        Args:
+            img (PIL Image or Tensor): Image to be cropped and resized.
+
+        Returns:
+            PIL Image or Tensor: Randomly cropped and resized image.
+        """
+        i, j, h, w = self.get_params(img, self.scale, self.ratio)
+        return resized_crop(
+            img,
+            i,
+            j,
+            h,
+            w,
+            self.size,
+            self.interpolation,
+            antialias=self.antialias)
+
+
+class RandomResizedCropAndInterpolation(RandCropImage):
     """ only rename """
     pass
 
@@ -319,7 +608,7 @@ class RandomHorizontalFlip(object):
 
     def __call__(self, img):
         if np.random.rand() < self.p:
-            return cv2.flip(img, 1)
+            return img.transpose(0)  # FLIP_LEFT_RIGHT = 0, FLIP_TOP_BOTTOM = 1
         else:
             return img
 
@@ -352,7 +641,7 @@ class NormalizeImage(object):
         self.std = np.array(std).reshape(shape).astype('float32')
 
     def __call__(self, img):
-        if isinstance(img, Image.Image):
+        if _is_pil_image(img):
             img = np.array(img)
 
         assert isinstance(img,
@@ -381,7 +670,7 @@ class ToCHWImage(object):
         pass
 
     def __call__(self, img):
-        if isinstance(img, Image.Image):
+        if _is_pil_image(img):
             img = np.array(img)
 
         return img.transpose((2, 0, 1))
@@ -397,11 +686,11 @@ class ColorJitter(PPColorJitter):
 
     def __call__(self, img):
         if random.random() < self.p:
-            if not isinstance(img, Image.Image):
+            if not _is_pil_image(img):
                 img = np.ascontiguousarray(img)
                 img = Image.fromarray(img)
             img = super()._apply_image(img)
-            if isinstance(img, Image.Image):
+            if _is_pil_image(img):
                 img = np.asarray(img)
         return img
 
@@ -497,7 +786,7 @@ class RandomGrayscale(object):
 
         if np.random.rand() < self.p:
 
-            if not isinstance(img, Image.Image):
+            if not _is_pil_image(img):
                 img = np.ascontiguousarray(img)
                 img = Image.fromarray(img)
 
@@ -523,12 +812,12 @@ class SimCLRGaussianBlur(object):
 
     def __call__(self, img):
         if random.random() < self.p:
-            if not isinstance(img, Image.Image):
+            if not _is_pil_image(img):
                 img = np.ascontiguousarray(img)
                 img = Image.fromarray(img)
             sigma = random.uniform(self.sigma[0], self.sigma[1])
             img = img.filter(ImageFilter.GaussianBlur(radius=sigma))
-            if isinstance(img, Image.Image):
+            if _is_pil_image(img):
                 img = np.asarray(img)
         return img
 
@@ -541,10 +830,10 @@ class BYOLSolarize(object):
 
     def __call__(self, img):
         if random.random() < self.p:
-            if not isinstance(img, Image.Image):
+            if not _is_pil_image(img):
                 img = np.ascontiguousarray(img)
                 img = Image.fromarray(img)
             img = ImageOps.solarize(x)
-            if isinstance(img, Image.Image):
+            if _is_pil_image(img):
                 img = np.asarray(img)
         return img
