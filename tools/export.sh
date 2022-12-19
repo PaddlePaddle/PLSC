@@ -21,8 +21,8 @@ python -m paddle.distributed.launch \
     --nnodes=$PADDLE_NNODES \
     --master=$PADDLE_MASTER \
     --devices=$CUDA_VISIBLE_DEVICES \
-    tools/export.py \
-    -c ./plsc/configs/FaceRecognition/IResNet50_WebFace42M_CosFace_0.2_1n8c_dp_mp_fp16o2.yaml \
+    plsc-explore \
+    -c task/recognition/face/configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml \
     -o Global.pretrained_model=output/IResNet50_WebFace42M_CosFace_0.2_1n8c_dp_mp_fp16o1/latest \
     -o FP16.level=O0 \
     -o Model.data_format=NCHW

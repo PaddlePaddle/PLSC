@@ -27,4 +27,13 @@
 export PADDLE_NNODES=1
 export PADDLE_MASTER="127.0.0.1:12538"
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-python -m paddle.distributed.launch --nnodes=$PADDLE_NNODES --master=$PADDLE_MASTER --devices=$CUDA_VISIBLE_DEVICES tools/train.py -c ./plsc/configs/FaceRecognition/IResNet50_MS1MV3_ArcFace_0.1_1n8c_dp_mp_fp16o2.yaml
+python -m paddle.distributed.launch \
+    --nnodes=$PADDLE_NNODES \
+    --master=$PADDLE_MASTER \
+    --devices=$CUDA_VISIBLE_DEVICES \
+    plsc-train \
+    -c task/recognition/face/configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml \
+    -o DataLoader.Train.dataset.image_root=./dataset/MS1M_v3_One_Sample \
+    -o DataLoader.Train.dataset.cls_label_path=./dataset/MS1M_v3_One_Sample/label.txt \
+    -o DataLoader.Eval.dataset.image_root=./dataset/MS1M_v3_One_Sample/agedb_30 \
+    -o DataLoader.Eval.dataset.cls_label_path=./dataset/MS1M_v3_One_Sample/agedb_30/label.txt
