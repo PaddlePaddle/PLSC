@@ -79,4 +79,3 @@ python -m paddle.distributed.launch \
     -o Global.pretrained_model=output/IResNet50/latest \
     -o Model.data_format=NCHW
 ```
-
