@@ -12,7 +12,8 @@ tar -xzf MS1M_v3_One_Sample.tgz -C ./dataset/
 ```
 #### 2.2 Extract LFW Style bin Dataset to Images
 ```bash
-python plsc/data/dataset/tools/lfw_style_bin_dataset_converter.py --bin_path ./dataset/MS1M_v3_One_Sample/agedb_30.bin --out_dir ./dataset/MS1M_v3_One_Sample/agedb_30/ --flip_test
+python -m plsc.data.dataset.tools.lfw_style_bin_dataset_converter --bin_path ./dataset/MS1M_v3_One_Sample/agedb_30.bin \
+    --out_dir ./dataset/MS1M_v3_One_Sample/agedb_30/ --flip_test
 ```
 
 ### 3. Run Train Scripts
