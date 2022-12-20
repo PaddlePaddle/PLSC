@@ -4,6 +4,7 @@ See [installation](./installation.md)
 ### 2. Data Preparation 
 #### 2.1 Download Dummy Dataset and Unzip
 ``` bash
+cd task/recognition/face
 # download dummy dataset
 wget https://plsc.bj.bcebos.com/dataset/MS1M_v3_One_Sample.tgz
 # unzip
@@ -25,7 +26,7 @@ Run the script from command line.
 # Here, for simplicity, we just reuse the single node 8 gpus yaml configuration file.
 export CUDA_VISIBLE_DEVICES=0
 plsc-train \
--c task/recognition/face/configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml \
+-c configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml \
 -o DataLoader.Train.dataset.image_root=./dataset/MS1M_v3_One_Sample \
 -o DataLoader.Train.dataset.cls_label_path=./dataset/MS1M_v3_One_Sample/label.txt \
 -o DataLoader.Eval.dataset.image_root=./dataset/MS1M_v3_One_Sample/agedb_30 \
@@ -44,15 +45,11 @@ python -m paddle.distributed.launch \
     --master=$PADDLE_MASTER \
     --devices=$CUDA_VISIBLE_DEVICES 
     plsc-train \
-    -c task/recognition/face/configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml \
+    -c configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml \
     -o DataLoader.Train.dataset.image_root=./dataset/MS1M_v3_One_Sample \
     -o DataLoader.Train.dataset.cls_label_path=./dataset/MS1M_v3_One_Sample/label.txt \
     -o DataLoader.Eval.dataset.image_root=./dataset/MS1M_v3_One_Sample/agedb_30 \
     -o DataLoader.Eval.dataset.cls_label_path=./dataset/MS1M_v3_One_Sample/agedb_30/label.txt
-```
-You can also run the shell file directly,
-```bash
-sh tools/train.sh
 ```
 
 ### 4. Export Inference Model
@@ -61,7 +58,7 @@ sh tools/train.sh
 ``` bash
 export CUDA_VISIBLE_DEVICES=0
 plsc-export \
--c task/recognition/face/configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml \
+-c configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml \
 -o Global.pretrained_model=output/IResNet50/latest \
 -o Model.data_format=NCHW
 ```
@@ -78,11 +75,8 @@ python -m paddle.distributed.launch \
     --master=$PADDLE_MASTER \
     --devices=$CUDA_VISIBLE_DEVICES \
     plsc-export \
-    -c task/recognition/face/configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml \
+    -c configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml \
     -o Global.pretrained_model=output/IResNet50/latest \
     -o Model.data_format=NCHW
 ```
-You can also run the shell file directly,
-```bash
-sh tools/export.sh
-```
+

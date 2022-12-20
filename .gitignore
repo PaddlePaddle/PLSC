@@ -101,3 +101,13 @@ ENV/
 .mypy_cache/
 
 .DS_Store
+
+# logs and output
+output/
+log/
+**/ouput/
+**/log/
+
+# dataset
+dataset/
+**/dataset/
