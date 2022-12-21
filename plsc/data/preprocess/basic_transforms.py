@@ -562,7 +562,7 @@ class MAERandCropImage(RandCropImage):
     def __call__(self, img):
         size = self.size
 
-        img_h, img_w = img.shape[:2]
+        _, img_h, img_w = get_dimensions(img)
 
         target_area = img_w * img_h * np.random.uniform(*self.scale)
         log_ratio = tuple(math.log(x) for x in self.ratio)
@@ -577,8 +577,7 @@ class MAERandCropImage(RandCropImage):
         i = random.randint(0, img_w - w)
         j = random.randint(0, img_h - h)
 
-        img = img[j:j + h, i:i + w, :]
-
+        img = crop(img, j, i, h, w)
         return self._resize_func(img, size)
 
 
