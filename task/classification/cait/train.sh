@@ -24,4 +24,4 @@ python -m paddle.distributed.launch \
     --master=$PADDLE_MASTER \
     --devices=$CUDA_VISIBLE_DEVICES \
     plsc-train \
-    -c ./configs/cait_s24_224_in1k_1n8c_dp_fp16o1.yaml \
+    -c ./configs/cait_s24_224_in1k_1n8c_dp_fp16o2.yaml
