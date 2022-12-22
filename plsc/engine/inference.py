@@ -19,25 +19,12 @@ import argparse
 import numpy as np
 
 
-def default_preprocess_fn(img,
-                          scale=1.0 / 255.0,
-                          mean=0.5,
-                          std=0.5,
-                          swap_rb=True):
-    img = (img.astype('float32') * scale - mean) / std
-    if swap_rb:
-        img = img[:, :, ::-1]
-    img = img.transpose((2, 0, 1))
-    img = np.expand_dims(img, 0)
-    return img
-
-
-class Inference(object):
+class Predictor(object):
     def __init__(self,
                  model_type='paddle',
                  model_file=None,
                  params_file=None,
-                 preprocess_fn=default_preprocess_fn,
+                 preprocess_fn=None,
                  postprocess_fn=None):
 
         assert model_type in ['paddle', 'onnx']
@@ -51,12 +38,8 @@ class Inference(object):
             config = paddle_infer.Config(model_file, params_file)
             self.predictor = paddle_infer.create_predictor(config)
 
-            input_names = self.predictor.get_input_names()
-            self.input_handle = self.predictor.get_input_handle(input_names[0])
-
-            output_names = self.predictor.get_output_names()
-            self.output_handle = self.predictor.get_output_handle(output_names[
-                0])
+            self.input_names = self.predictor.get_input_names()
+            self.output_names = self.predictor.get_output_names()
 
         elif model_type == 'onnx':
             assert model_file is not None and os.path.splitext(model_file)[
@@ -81,17 +64,27 @@ class Inference(object):
     def predict(self, img):
 
         if self.preprocess_fn is not None:
-            img = self.preprocess_fn(img)
+            inputs = self.preprocess_fn(img)
+        else:
+            inputs = img
 
         if self.model_type == 'paddle':
-            self.input_handle.copy_from_cpu(img)
+            for input_name in self.input_names:
+                input_tensor = self.predictor.get_input_handle(input_name)
+                input_tensor.copy_from_cpu(inputs[input_name])
             self.predictor.run()
-            output_data = self.output_handle.copy_to_cpu()
+            outputs = []
+            for output_idx in range(len(self.output_names)):
+                output_tensor = self.predictor.get_output_handle(
+                    self.output_names[output_idx])
+                outputs.append(output_tensor.copy_to_cpu())
 
         elif self.model_type == 'onnx':
-            output_data = self.predictor.run(None, {self.input_name: img})
+            outputs = self.predictor.run(None, inputs)
 
         if self.postprocess_fn is not None:
-            output_data = self.postprocess_fn(output_data)
+            output_data = self.postprocess_fn(outputs)
+        else:
+            output_data = outputs
 
         return output_data
