@@ -28,6 +28,7 @@ from plsc.utils import logger
 from .adamw import AdamW
 from .adafactor import Adafactor
 from .momentum import Momentum
+from .momentum_lars import MomentumLARS
 
 
 def build_optimizer(config, lr_scheduler, model=None):
