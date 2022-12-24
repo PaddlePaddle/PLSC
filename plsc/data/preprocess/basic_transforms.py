@@ -596,7 +596,18 @@ class RandFlipImage(object):
 
     def __call__(self, img):
         if random.randint(0, 1) == 1:
-            return cv2.flip(img, self.flip_code)
+            # backward compatibility
+            if _is_pil_image(img):
+                if self.flip_code == 1:
+                    return img.transpose(0)
+                elif self.flip_code == 0:
+                    return img.transpose(1)
+                else:
+                    raise ValueError(
+                        "PIL.Image does not support Flipped Horizontally & Vertically"
+                    )
+            else:
+                return cv2.flip(img, self.flip_code)
         else:
             return img
 
