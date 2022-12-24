@@ -15,13 +15,6 @@
 from plsc.data import preprocess
 
 
-def transform(data, ops=[]):
-    """ transform """
-    for op in ops:
-        data = op(data)
-    return data
-
-
 def create_preprocess_operators(params):
     """
     create operators based on the config
