@@ -17,7 +17,6 @@ from __future__ import print_function
 import numpy as np
 
 from paddle.io import Dataset
-from plsc.data.utils import create_preprocess_operators, transform
 from plsc.utils import logger
 
 

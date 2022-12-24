@@ -12,5 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .transform_utils import transform, create_preprocess_operators
+from .transform_utils import create_preprocess_operators
 from .batch_collate_fn import default_collate_fn
