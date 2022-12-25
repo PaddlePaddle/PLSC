@@ -142,7 +142,7 @@ function cait_s24_224_in1k_1n8c_dp_fp16o2() {
     bash ./classification/cait/cait_s24_224_in1k_1n8c_dp_fp16o2.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "49/1251" | cut -d " " -f12 `
-    check_diff 7.03347 ${loss%?} ${FUNCNAME}_loss
+    check_diff 6.98169 ${loss%?} ${FUNCNAME}_loss
 }
 
 
