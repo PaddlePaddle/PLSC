@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-model_item=IResNet50_ratio01
-fp_item=fp32
+model_item=FaceViT_base_patch9_112_pfc03
+fp_item=fp16
 bs_item=128
-run_mode=DP1_MP1
-device_num=N1C1
-yaml_path=./plsc/configs/FaceRecognition/IResNet50_MS1MV3_ArcFace_0.1_1n8c_dp_fp32.yaml
-epochs=2
+run_mode=DP8-MP8
+device_num=N1C8
+yaml_path=./task/recognition/face/configs/FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n8c_dp_mp_fp16o1.yaml \
+max_iter=600
+sample_ratio=0.3
+model_parallel=True
 
 bash ./tests/test_tipc/recognition/benchmark_common/prepare.sh
 # run
-bash ./tests/test_tipc/recognition/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${bs_item} ${run_mode} ${device_num} ${yaml_path} ${epochs} 2>&1;
+bash ./tests/test_tipc/recognition/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${bs_item} ${run_mode} ${device_num} ${yaml_path} \
+${max_iter} ${sample_ratio} ${model_parallel} 2>&1;

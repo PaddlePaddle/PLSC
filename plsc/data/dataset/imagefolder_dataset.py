@@ -18,6 +18,8 @@ import os
 
 import paddle
 
+from plsc.data.dataset import default_loader
+
 IMG_EXTENSIONS = (".jpg", ".jpeg", ".png", ".ppm", ".bmp", ".pgm", ".tif",
                   ".tiff", ".webp")
 
@@ -53,6 +55,7 @@ class ImageFolder(paddle.io.Dataset):
                  root,
                  transform=None,
                  target_transform=None,
+                 loader=default_loader,
                  extensions=IMG_EXTENSIONS):
 
         self.root = root
@@ -69,6 +72,8 @@ class ImageFolder(paddle.io.Dataset):
 
         self.transform = transform
         self.target_transform = target_transform
+
+        self.loader = loader
 
     @staticmethod
     def make_dataset(
@@ -179,8 +184,7 @@ class ImageFolder(paddle.io.Dataset):
 
     def __getitem__(self, idx):
         path, target = self.imgs[idx]
-        with open(path, 'rb') as f:
-            sample = f.read()
+        sample = self.loader(path)
         if self.transform is not None:
             sample = self.transform(sample)
         if self.target_transform is not None:

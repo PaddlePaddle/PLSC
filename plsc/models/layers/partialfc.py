@@ -21,6 +21,7 @@ from paddle import distributed as dist
 from paddle.fluid.framework import EagerParamBase
 
 from plsc.utils import logger
+from plsc.nn.norm import l2_normalize
 
 
 def _all_gather(tensor, group=None):
@@ -225,8 +226,8 @@ class PartialFC(nn.Layer):
         else:
             self.sub_weight = self.weight
 
-        norm_feature = paddle.fluid.layers.l2_normalize(total_feature, axis=1)
-        norm_weight = paddle.fluid.layers.l2_normalize(self.sub_weight, axis=1)
+        norm_feature = l2_normalize(total_feature, axis=1)
+        norm_weight = l2_normalize(self.sub_weight, axis=1)
 
         local_logit = paddle.matmul(
             norm_feature, norm_weight, transpose_y=True)

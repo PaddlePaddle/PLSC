@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-unset http_proxy https_proxy
-python -m pip install -r requirements.txt --force-reinstall
-python -m pip install protobuf==3.20 --force-reinstall
-python setup.py develop
+model_item=DeiT_base_patch16_224
+fp_item=fp32
+bs_item=128
+run_mode=DP8-MP1
+device_num=N1C8
+yaml_path=./task/classification/deit/configs/DeiT_base_patch16_224_in1k_1n8c_dp_fp32.yaml
+max_iter=150
 
-# dataset
-mkdir dataset && cd dataset
-python ${BENCHMARK_ROOT}/paddlecloud/file_upload_download.py \
-    --remote-path ./plsc_data/MS1M_v3/ \
-    --local-path ./ \
-    --mode download
-cd -
+bash ./tests/test_tipc/classification/benchmark_common/prepare.sh
+# run
+bash ./tests/test_tipc/classification/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${bs_item} ${run_mode} ${device_num} ${yaml_path} \
+${max_iter} 2>&1;

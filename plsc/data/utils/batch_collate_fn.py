@@ -21,8 +21,6 @@ try:
 except:
     from collections import Sequence, Mapping
 
-from plsc.data.utils import create_preprocess_operators, transform
-
 
 def collate_fn(batch):
     """
@@ -79,10 +77,10 @@ def collate_fn(batch):
 
 def default_collate_fn(batch_transform=None):
     if batch_transform is not None:
-        batch_ops = create_preprocess_operators(batch_transform)
 
         def inner_collate_fn(batch):
-            batch = transform(batch, batch_ops)
+            if batch_transform is not None:
+                batch = batch_transform(batch)
             batch = collate_fn(batch)
             return batch
 
