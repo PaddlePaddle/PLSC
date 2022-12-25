@@ -17,7 +17,6 @@ from __future__ import print_function
 import numpy as np
 
 from paddle.io import Dataset
-from plsc.data.utils import create_preprocess_operators, transform
 from plsc.utils import logger
 
 
@@ -38,7 +37,7 @@ class CommonDataset(Dataset):
         self._cls_path = cls_label_path
         self.delimiter = delimiter
         if transform_ops:
-            self._transform_ops = create_preprocess_operators(transform_ops)
+            self._transform_ops = transform_ops
 
         self.images = []
         self.labels = []
@@ -52,7 +51,7 @@ class CommonDataset(Dataset):
             with open(self.images[idx], 'rb') as f:
                 img = f.read()
             if self._transform_ops:
-                img = transform(img, self._transform_ops)
+                img = self._transform_ops(img)
             if self.multi_label:
                 one_hot = np.zeros([self.classes_num], dtype=np.float32)
                 cls_idx = [int(e) for e in self.labels[idx].split(',')]

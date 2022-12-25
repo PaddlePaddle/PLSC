@@ -32,9 +32,26 @@ def build_dataloader(config, mode, device, use_dali=False,
     config_dataset = config[mode]['dataset']
     config_dataset = copy.deepcopy(config_dataset)
     dataset_name = config_dataset.pop('name')
-    batch_transform = config_dataset.pop('batch_transform_ops', None)
-    dataset = eval("dataset.{}".format(dataset_name))(**config_dataset)
+    config_transform = config_dataset.pop('transform', None)
+    if config_transform is not None:
+        config_dataset.transform = utils.create_preprocess_operators(
+            config_transform)
+    # backward compatibility
+    config_transform_ops = config_dataset.pop('transform_ops', None)
+    if config_transform_ops is not None:
+        config_dataset.transform_ops = utils.create_preprocess_operators(
+            config_transform_ops)
 
+    config_batch_transform = config_dataset.pop('batch_transform', None)
+    batch_transform = utils.create_preprocess_operators(config_batch_transform)
+    # backward compatibility
+    config_batch_transform_ops = config_dataset.pop('batch_transform_ops',
+                                                    None)
+    if config_batch_transform_ops is not None:
+        batch_transform = utils.create_preprocess_operators(
+            config_batch_transform_ops)
+
+    dataset = eval("dataset.{}".format(dataset_name))(**config_dataset)
     logger.debug("build dataset({}) success...".format(dataset))
 
     # build sampler
