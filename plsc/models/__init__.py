@@ -21,6 +21,7 @@ from .deit import *
 from .iresnet import *
 from .face_vit import *
 from .mobilefacenet import *
+from .cait import *
 
 __all__ = ["build_model"]
 
