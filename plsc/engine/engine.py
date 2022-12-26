@@ -106,7 +106,7 @@ class Engine(object):
 
         # init train_func and eval_func
         train_epoch_func_name = self.config['Global'].get(
-            "train_epoch_func", 'defualt_train_one_epoch')
+            "train_epoch_func", 'default_train_one_epoch')
         self.train_epoch_func = getattr(
             eval('{}'.format(self.task_type)), train_epoch_func_name)
 
