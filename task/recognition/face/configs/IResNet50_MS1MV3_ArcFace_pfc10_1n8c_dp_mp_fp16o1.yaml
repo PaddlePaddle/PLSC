@@ -1,7 +1,7 @@
 # global configs
 Global:
   task_type: recognition
-  train_epoch_func: defualt_train_one_epoch
+  train_epoch_func: default_train_one_epoch
   eval_func: face_verification_eval
   checkpoint: null
   pretrained_model: null

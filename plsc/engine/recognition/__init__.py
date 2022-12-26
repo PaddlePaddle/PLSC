@@ -12,5 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .train import defualt_train_one_epoch
+from .train import default_train_one_epoch
 from .evaluation import face_verification_eval
