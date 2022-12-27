@@ -13,7 +13,7 @@ Global:
   epochs: 300
   print_batch_step: 10
   use_visualdl: False
-  seed: 2021
+  seed: 42
 
 # FP16 setting
 FP16:
@@ -107,7 +107,7 @@ DataLoader:
               class_num: 1000
     sampler:
       name: RepeatedAugSampler
-      batch_size: 64
+      batch_size: 128
       drop_last: False
       shuffle: True
     loader:
