@@ -219,7 +219,7 @@ class ResizeImage(object):
             interpolation=interpolation, backend=backend)
 
     def __call__(self, img):
-        img_h, img_w = img.shape[:2]
+        _, img_h, img_w = get_dimensions(img)
         if self.resize_short is not None:
             percent = float(self.resize_short) / min(img_w, img_h)
             w = int(round(img_w * percent))
@@ -314,7 +314,7 @@ class CenterCropImage(object):
 
     def __call__(self, img):
         w, h = self.size
-        img_h, img_w = img.shape[:2]
+        _, img_h, img_w = get_dimensions(img)
         w_start = (img_w - w) // 2
         h_start = (img_h - h) // 2
 
@@ -361,7 +361,7 @@ class CenterCrop(object):
             ]
             # TODO(GuoxiaWang): implement pad function
             img = pad(img, padding_ltrb, fill=0)  # PIL uses fill value 0
-            image_height, image_width = img.shape[:2]
+            _, image_height, image_width = get_dimensions(img)
             if crop_width == image_width and crop_height == image_height:
                 return img
 
@@ -399,7 +399,7 @@ class RandCropImage(object):
         w = 1. * aspect_ratio
         h = 1. / aspect_ratio
 
-        img_h, img_w = img.shape[:2]
+        _, img_h, img_w = get_dimensions(img)
 
         bound = min((float(img_w) / img_h) / (w**2),
                     (float(img_h) / img_w) / (h**2))
