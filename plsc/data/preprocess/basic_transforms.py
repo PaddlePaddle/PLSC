@@ -34,6 +34,7 @@ from plsc.utils import logger
 
 __all__ = [
     "Compose",
+    "TwoViewsTransform",
     "ToTensor",
     "DecodeImage",
     "RandomApply",
@@ -80,6 +81,19 @@ class Compose(object):
             format_string += f"    {t}"
         format_string += "\n)"
         return format_string
+
+
+class TwoViewsTransform(object):
+    """Take two random crops of one image"""
+
+    def __init__(self, base_transform1, base_transform2):
+        self.base_transform1 = base_transform1
+        self.base_transform2 = base_transform2
+
+    def __call__(self, x):
+        im1 = self.base_transform1(x)
+        im2 = self.base_transform2(x)
+        return [im1, im2]
 
 
 class DecodeImage(object):
@@ -222,7 +236,7 @@ class Resize(object):
                  interpolation='bilinear',
                  max_size=None,
                  antialias=None,
-                 backend="cv2"):
+                 backend="pil"):
         if not isinstance(size, (int, Sequence)):
             raise TypeError(
                 f"Size should be int or sequence. Got {type(size)}")
@@ -699,9 +713,10 @@ class ColorJitter(PPColorJitter):
             if not _is_pil_image(img):
                 img = np.ascontiguousarray(img)
                 img = Image.fromarray(img)
-            img = super()._apply_image(img)
-            if _is_pil_image(img):
+                img = super()._apply_image(img)
                 img = np.asarray(img)
+            else:
+                img = super()._apply_image(img)
         return img
 
 
@@ -792,7 +807,7 @@ class RandomGrayscale(object):
         self.p = p
 
     def __call__(self, img):
-        _, _, num_output_channels = img.shape
+        num_output_channels, _, _ = get_dimensions(img)
 
         if np.random.rand() < self.p:
 
@@ -800,16 +815,27 @@ class RandomGrayscale(object):
                 img = np.ascontiguousarray(img)
                 img = Image.fromarray(img)
 
-            if num_output_channels == 1:
-                img = img.convert("L")
-                img = np.array(img, dtype=np.uint8)
-            elif num_output_channels == 3:
-                img = img.convert("L")
-                img = np.array(img, dtype=np.uint8)
-                img = np.dstack([img, img, img])
+                if num_output_channels == 1:
+                    img = img.convert("L")
+                    img = np.array(img, dtype=np.uint8)
+                elif num_output_channels == 3:
+                    img = img.convert("L")
+                    img = np.array(img, dtype=np.uint8)
+                    img = np.dstack([img, img, img])
+                else:
+                    raise ValueError(
+                        "num_output_channels should be either 1 or 3")
             else:
-                raise ValueError("num_output_channels should be either 1 or 3")
-
+                if num_output_channels == 1:
+                    img = img.convert("L")
+                elif num_output_channels == 3:
+                    img = img.convert("L")
+                    np_img = np.array(img, dtype=np.uint8)
+                    np_img = np.dstack([np_img, np_img, np_img])
+                    img = Image.fromarray(np_img, "RGB")
+                else:
+                    raise ValueError(
+                        "num_output_channels should be either 1 or 3")
         return img
 
 
@@ -822,13 +848,14 @@ class SimCLRGaussianBlur(object):
 
     def __call__(self, img):
         if random.random() < self.p:
+            sigma = random.uniform(self.sigma[0], self.sigma[1])
             if not _is_pil_image(img):
                 img = np.ascontiguousarray(img)
                 img = Image.fromarray(img)
-            sigma = random.uniform(self.sigma[0], self.sigma[1])
-            img = img.filter(ImageFilter.GaussianBlur(radius=sigma))
-            if _is_pil_image(img):
+                img = img.filter(ImageFilter.GaussianBlur(radius=sigma))
                 img = np.asarray(img)
+            else:
+                img = img.filter(ImageFilter.GaussianBlur(radius=sigma))
         return img
 
 
@@ -843,7 +870,8 @@ class BYOLSolarize(object):
             if not _is_pil_image(img):
                 img = np.ascontiguousarray(img)
                 img = Image.fromarray(img)
-            img = ImageOps.solarize(x)
-            if _is_pil_image(img):
+                img = ImageOps.solarize(img)
                 img = np.asarray(img)
+            else:
+                img = ImageOps.solarize(img)
         return img
