@@ -318,9 +318,7 @@ class CenterCropImage(object):
         w_start = (img_w - w) // 2
         h_start = (img_h - h) // 2
 
-        w_end = w_start + w
-        h_end = h_start + h
-        return img[h_start:h_end, w_start:w_end, :]
+        return crop(img, h_start, w_start, h, w)
 
 
 class CenterCrop(object):

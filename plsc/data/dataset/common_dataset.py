@@ -47,25 +47,18 @@ class CommonDataset(Dataset):
         pass
 
     def __getitem__(self, idx):
-        try:
-            with open(self.images[idx], 'rb') as f:
-                img = f.read()
-            if self._transform_ops:
-                img = self._transform_ops(img)
-            if self.multi_label:
-                one_hot = np.zeros([self.classes_num], dtype=np.float32)
-                cls_idx = [int(e) for e in self.labels[idx].split(',')]
-                for idx in cls_idx:
-                    one_hot[idx] = 1.0
-                return (img, one_hot)
-            else:
-                return (img, np.int32(self.labels[idx]))
-
-        except Exception as ex:
-            logger.error("Exception occured when parse line: {} with msg: {}".
-                         format(self.images[idx], ex))
-            rnd_idx = np.random.randint(self.__len__())
-            return self.__getitem__(rnd_idx)
+        with open(self.images[idx], 'rb') as f:
+            img = f.read()
+        if self._transform_ops:
+            img = self._transform_ops(img)
+        if self.multi_label:
+            one_hot = np.zeros([self.classes_num], dtype=np.float32)
+            cls_idx = [int(e) for e in self.labels[idx].split(',')]
+            for idx in cls_idx:
+                one_hot[idx] = 1.0
+            return (img, one_hot)
+        else:
+            return (img, np.int32(self.labels[idx]))
 
     def __len__(self):
         return len(self.images)
