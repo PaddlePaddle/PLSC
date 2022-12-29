@@ -28,6 +28,7 @@ plsc_gpu_model_list=( \
     ViT_base_patch16_224_in1k_1n8c_dp_fp16o2 \
     ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2 \
     DeiT_base_patch16_224_in1k_1n8c_dp_fp32 \
+    DeiT_base_patch16_224_in1k_1n8c_dp_fp16o2 \
     cait_s24_224_in1k_1n8c_dp_fp16o2 \
 )
 
@@ -131,7 +132,17 @@ function DeiT_base_patch16_224_in1k_1n8c_dp_fp32() {
     bash ./classification/deit/DeiT_base_patch16_224_in1k_1n8c_dp_fp32.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "49/1251" | cut -d " " -f12 `
-    check_diff 7.03347 ${loss%?} ${FUNCNAME}_loss
+    check_diff 7.03913 ${loss%?} ${FUNCNAME}_loss
+}
+
+
+function DeiT_base_patch16_224_in1k_1n8c_dp_fp16o2() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./classification/deit/DeiT_base_patch16_224_in1k_1n8c_dp_fp16o2.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "49/1251" | cut -d " " -f12 `
+    check_diff 7.04443 ${loss%?} ${FUNCNAME}_loss
 }
 
 

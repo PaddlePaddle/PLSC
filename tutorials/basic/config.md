@@ -23,7 +23,7 @@ the file, there are several sections, including:
 # example
 Global:
   task_type: recognition
-  train_epoch_func: defualt_train_one_epoch
+  train_epoch_func: default_train_one_epoch
   eval_func: face_verification_eval
   checkpoint: null
   finetune: False
@@ -43,7 +43,7 @@ Global:
 ```
 
 * `task_type`: Task type, currently supports `classification` and `recognition`. Default is `classification`.
-* `train_epoch_func`: The training function, usually defined in `plsc/engine/task_type/train.py`. Each task will define a default `defualt_train_one_epoch` function. If the provided training function cannot be satisfied, the user can add a custom training function.
+* `train_epoch_func`: The training function, usually defined in `plsc/engine/task_type/train.py`. Each task will define a default `default_train_one_epoch` function. If the provided training function cannot be satisfied, the user can add a custom training function.
 * `eval_func`: Similar to `train_epoch_func`, it is an evaluation function, usually defined in `plsc/engine/task_type/evaluation.py`. Default is `default_eval`.
 * `checkpoint`: When training is terminated midway, set the saved checkpoint prefix to resume training, e.g. `output/IResNet50/latest`. Default is `null`.
 * `pretrained_model`: Pre-trained weight path prefix, which needs to be set together with the `finetune` parameter. E.g. `output/IResNet50/best_model`. Default is `null`.
