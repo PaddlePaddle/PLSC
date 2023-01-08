@@ -53,7 +53,7 @@ Optimizer:
   betas: (0.9, 0.999)
   eps: 1e-8
   weight_decay: 0.05
-  no_weight_decay_name: ["cls_token", "pos_embed", "norm"]
+  no_weight_decay_name: ["cls_token", "pos_embed", "norm", "bias"]
   use_master_param: True
   exp_avg_force_fp32: True
 

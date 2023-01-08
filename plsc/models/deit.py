@@ -103,13 +103,13 @@ class DeitVisionTransformer(Model):
         self.head = nn.Linear(embed_dim,
                               class_num) if class_num > 0 else nn.Identity()
 
-        init.trunc_normal_(self.pos_embed, std=.02)
-        init.trunc_normal_(self.cls_token, std=.02)
+        init.trunc_normal_(self.pos_embed, std=.002)
+        init.trunc_normal_(self.cls_token, std=.002)
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            init.trunc_normal_(m.weight, std=.02)
+            init.trunc_normal_(m.weight, std=.002)
             if m.bias is not None:
                 init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
