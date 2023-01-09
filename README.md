@@ -18,10 +18,11 @@
 [PLSC](https://github.com/PaddlePaddle/PLSC) is an open source repo for a collection of Paddle Large Scale Classification Tools, which supports large-scale classification model pre-training as well as finetune for downstream tasks.
 
 ## Available Models
+* [Face Recognition](./task/recognition/face/)
 * [ViT](./task/classification/vit/)
 * [DeiT](./task/classification/deit/)
 * [CaiT](./task/classification/cait/)
-* [Face Recognition](./task/recognition/face/)
+* [MoCo v3](./task/ssl/mocov3/)
 
 ## Top News 🔥
 
