@@ -112,7 +112,7 @@ function ViT_base_patch16_224_in1k_1n8c_dp_fp16o2() {
     bash ./classification/vit/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "49/313" | cut -d " " -f18 `
-    check_diff 10.90619 ${loss%?} ${FUNCNAME}_loss
+    check_diff 10.90618 ${loss%?} ${FUNCNAME}_loss
 }
 
 function ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2() {

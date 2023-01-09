@@ -95,7 +95,7 @@ class Engine(object):
         related_flags_setting = self.config["Global"].get(
             "flags", RELATED_FLAGS_SETTING)
         RELATED_FLAGS_SETTING.update(related_flags_setting)
-        paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
+        paddle.set_flags(RELATED_FLAGS_SETTING)
 
         # init logger
         self.output_dir = self.config['Global']['output_dir']
