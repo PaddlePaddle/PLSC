@@ -226,11 +226,11 @@ class PatchEmbed(nn.Layer):
         super().__init__()
         img_size = to_2tuple(img_size)
         patch_size = to_2tuple(patch_size)
-        num_patches = (img_size[1] // patch_size[1]) * \
-            (img_size[0] // patch_size[0])
+        self.grid_size = (img_size[0] // patch_size[0],
+                          img_size[1] // patch_size[1])
         self.img_size = img_size
         self.patch_size = patch_size
-        self.num_patches = num_patches
+        self.num_patches = self.grid_size[0] * self.grid_size[1]
 
         self.proj = nn.Conv2D(
             in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)

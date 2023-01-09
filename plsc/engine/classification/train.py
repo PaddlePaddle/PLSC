@@ -28,7 +28,7 @@ from plsc.utils import profiler
 from plsc.utils import logger
 
 
-def defualt_train_one_epoch(engine, epoch_id):
+def default_train_one_epoch(engine, epoch_id):
     tic = time.time()
 
     if hasattr(engine.train_dataloader.batch_sampler, "set_epoch"):

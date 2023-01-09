@@ -95,7 +95,7 @@ class Engine(object):
         related_flags_setting = self.config["Global"].get(
             "flags", RELATED_FLAGS_SETTING)
         RELATED_FLAGS_SETTING.update(related_flags_setting)
-        paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
+        paddle.set_flags(RELATED_FLAGS_SETTING)
 
         # init logger
         self.output_dir = self.config['Global']['output_dir']
@@ -106,7 +106,7 @@ class Engine(object):
 
         # init train_func and eval_func
         train_epoch_func_name = self.config['Global'].get(
-            "train_epoch_func", 'defualt_train_one_epoch')
+            "train_epoch_func", 'default_train_one_epoch')
         self.train_epoch_func = getattr(
             eval('{}'.format(self.task_type)), train_epoch_func_name)
 
