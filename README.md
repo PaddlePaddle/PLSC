@@ -23,6 +23,7 @@
 * [DeiT](./task/classification/deit/)
 * [CaiT](./task/classification/cait/)
 * [MoCo v3](./task/ssl/mocov3/)
+* [MAE](./task/ssl/mae/)
 
 ## Top News 🔥
 
