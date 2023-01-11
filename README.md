@@ -27,7 +27,9 @@
 
 ## Top News 🔥
 
-**Update (2022-07-18):** PLSC v2.3 is released, a new upgrade, more modular and highly extensible. Support more tasks, such as [ViT](https://arxiv.org/abs/2010.11929), [DeiT](https://arxiv.org/abs/2012.12877). The ``static`` graph mode will no longer be maintained as of this release.
+**Update (2023-01-11):** PLSC v2.4 is released, we refactored the entire repository based on task types. This repository has been adapted to PaddlePaddle release 2.4. In terms of models, we have added 4 new ones, including [FaceViT](https://arxiv.org/abs/2203.15565), [CaiT](https://arxiv.org/abs/2103.17239), [MoCo v3](https://arxiv.org/abs/2104.02057), [MAE](https://arxiv.org/abs/2111.06377). At present, each model in the repository can be trained from scratch to achieve the original official accuracy, especially the training of ViT-Large on the ImageNet21K dataset. In addition, we also provide a method for ImageNet21K data preprocessing. In terms of AMP training, PLSC uses FP16 O2 training by default, which can speed up training while maintaining accuracy.
+
+**Update (2022-07-18):** PLSC v2.3 is released, a new upgrade, more modular and highly extensible. Support more tasks, such as [ViT](https://arxiv.org/abs/2010.11929), [DeiT](https://arxiv.org/abs/2012.12877). The `static` graph mode will no longer be maintained as of this release.
 
 **Update (2022-01-11):** Supported NHWC data format of FP16 to improve 10% throughtput and decreased 30% GPU memory. It supported 92 million classes on single node 8 NVIDIA V100 (32G) and has high training throughtput. Supported best checkpoint save. And we released 18 pretrained models and PLSC v2.2.
 
@@ -35,7 +37,7 @@
 
 **Update (2021-10-10):** Added FP16 training, improved throughtput and optimized GPU memory. It supported 60 million classes on single node 8 NVIDIA V100 (32G) and has high training throughtput.
 
-**Update (2021-09-10):** This repository supported both ``static`` mode and ``dynamic`` mode to use paddlepaddle v2.2, which supported 48 million classes on single node 8 NVIDIA V100 (32G). It added [PartialFC](https://arxiv.org/abs/2010.05222), SparseMomentum, and [ArcFace](https://arxiv.org/abs/1801.07698), [CosFace](https://arxiv.org/abs/1801.09414) (we refer to MarginLoss). Backbone includes IResNet and MobileNet.
+**Update (2021-09-10):** This repository supported both `static` mode and `dynamic` mode to use paddlepaddle v2.2, which supported 48 million classes on single node 8 NVIDIA V100 (32G). It added [PartialFC](https://arxiv.org/abs/2010.05222), SparseMomentum, and [ArcFace](https://arxiv.org/abs/1801.07698), [CosFace](https://arxiv.org/abs/1801.09414) (we refer to MarginLoss). Backbone includes IResNet and MobileNet.
 
 
 ## Installation
