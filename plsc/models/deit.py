@@ -141,6 +141,14 @@ class DeitVisionTransformer(Model):
 
         state_dict = self.state_dict()
         param_state_dict = paddle.load(path + ".pdparams")
+
+        # for FP16 saving pretrained weight
+        for key, value in param_state_dict.items():
+            if key in param_state_dict and key in state_dict and param_state_dict[
+                    key].dtype != state_dict[key].dtype:
+                param_state_dict[key] = param_state_dict[key].astype(
+                    state_dict[key].dtype)
+
         if not finetune:
             self.set_dict(param_state_dict)
             return
