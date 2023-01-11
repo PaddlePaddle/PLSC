@@ -24,8 +24,8 @@ import paddle.nn as nn
 
 from plsc.nn import init
 
-from .layers import PartialFC
-from .layers import Model
+from plsc.nn import PartialFC
+from plsc.models.base_model import Model
 
 import math
 

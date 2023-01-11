@@ -24,8 +24,8 @@ import math
 
 from plsc.nn import init
 
-from .layers import PartialFC
-from .layers import Model
+from plsc.nn import PartialFC
+from plsc.models.base_model import Model
 
 __all__ = ['MobileFaceNet_base', 'MobileFaceNet_large', 'MobileFaceNet']
 

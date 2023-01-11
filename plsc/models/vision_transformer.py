@@ -26,7 +26,7 @@ import paddle.nn as nn
 from paddle.nn.initializer import Constant, Normal, XavierUniform
 
 from plsc.utils import logger
-from plsc.models.layers import Model
+from plsc.models.base_model import Model
 
 __all__ = [
     'ViT_base_patch16_224',
