@@ -22,7 +22,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 
-from plsc.models.layers import Model
+from plsc.models.base_model import Model
 from plsc.nn import init
 
 from .vision_transformer import to_2tuple, Mlp, PatchEmbed, DropPath, Attention, Block

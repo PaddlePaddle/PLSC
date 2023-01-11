@@ -27,8 +27,8 @@ import paddle.nn as nn
 from paddle.nn.initializer import Constant, Normal, XavierUniform
 
 from plsc.utils import logger
-from .layers import PartialFC
-from plsc.models.layers import Model
+from plsc.nn import PartialFC
+from plsc.models.base_model import Model
 
 __all__ = [
     'FaceViT_tiny_patch9_112', 'FaceViT_small_patch9_112',

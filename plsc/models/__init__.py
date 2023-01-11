@@ -15,7 +15,7 @@
 import copy
 import importlib
 
-from .layers import Model
+from .base_model import Model
 from .vision_transformer import *
 from .deit import *
 from .iresnet import *

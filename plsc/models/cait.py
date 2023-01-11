@@ -26,7 +26,7 @@ from functools import partial
 
 from .vision_transformer import Mlp, PatchEmbed, DropPath
 
-from plsc.models.layers import Model
+from plsc.models.base_model import Model
 from plsc.nn import init
 
 __all__ = [

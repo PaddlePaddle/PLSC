@@ -23,6 +23,8 @@ from paddle.fluid.framework import EagerParamBase
 from plsc.utils import logger
 from plsc.nn.norm import l2_normalize
 
+__all__ = ['PartialFC']
+
 
 def _all_gather(tensor, group=None):
     tensor_shape = list(tensor.shape)
