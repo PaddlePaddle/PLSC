@@ -14,7 +14,7 @@
 
 from collections import defaultdict
 from paddle.amp import GradScaler as FrameworkGradScaler
-from paddle.amp import OptimizerState
+from paddle.fluid.dygraph.amp import OptimizerState
 from paddle import _legacy_C_ops as _C_ops
 import paddle
 
