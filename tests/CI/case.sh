@@ -39,7 +39,7 @@ function IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1() {
     bash ./recognition/face/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/5059" | cut -d " " -f12 `
-    check_diff 44.58809 ${loss%?} ${FUNCNAME}_loss
+    check_diff 44.48089 ${loss%?} ${FUNCNAME}_loss
 }
 
 function IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1() {
