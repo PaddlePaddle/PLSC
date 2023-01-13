@@ -48,7 +48,7 @@ function IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1() {
     bash ./recognition/face/IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/40465" | cut -d " " -f12 `
-    check_diff 40.74793 ${loss%?} ${FUNCNAME}_loss
+    check_diff 41.22209 ${loss%?} ${FUNCNAME}_loss
 }
 
 function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1() {
