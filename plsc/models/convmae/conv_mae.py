@@ -24,6 +24,8 @@ from .conv_vit import CPatchEmbed, CBlock
 from ..vision_transformer import Block
 from ..utils.pos_embed import get_2d_sincos_pos_embed
 
+__all__ = ['MaskedAutoencoderConvViT', 'convmae_convvit_base_patch16']
+
 
 class MaskedAutoencoderConvViT(Model):
     """ Masked Autoencoder with VisionTransformer backbone

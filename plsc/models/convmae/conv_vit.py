@@ -20,7 +20,9 @@ import paddle.nn as nn
 from plsc.models.base_model import Model
 from plsc.nn import init
 
-from .vision_transformer import to_2tuple, DropPath
+from ..vision_transformer import to_2tuple, DropPath
+
+__all__ = ['ConvViT', 'convvit_base_patch16']
 
 
 class CMlp(nn.Layer):
@@ -47,7 +49,7 @@ class CMlp(nn.Layer):
         return x
 
 
-class CBlock(nn.Module):
+class CBlock(nn.Layer):
     def __init__(self,
                  dim,
                  num_heads,
