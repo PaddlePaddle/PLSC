@@ -21,7 +21,8 @@ from plsc.models.base_model import Model
 from plsc.nn import init
 
 from .conv_vit import CPatchEmbed, CBlock
-from .vision_transformer import Block
+from ..vision_transformer import Block
+from ..utils.pos_embed import get_2d_sincos_pos_embed
 
 
 class MaskedAutoencoderConvViT(Model):
