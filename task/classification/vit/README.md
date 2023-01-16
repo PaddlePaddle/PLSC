@@ -61,7 +61,7 @@ python -m paddle.distributed.launch \
     --devices=$CUDA_VISIBLE_DEVICES \
     plsc-train \
     -c ./configs/ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2.yaml \
-    -o Global.pretrained_model=./pretrained/vit/ViT_base_patch16_224/imagenet2012-ViT-B_16-224.pdparams \
+    -o Global.pretrained_model=./pretrained/vit/ViT_base_patch16_224/imagenet2012-ViT-B_16-224
 ```
 
 ## Other Configurations
