@@ -71,7 +71,7 @@ python -m paddle.distributed.launch \
     --master=$PADDLE_MASTER \
     --devices=$CUDA_VISIBLE_DEVICES \
     plsc-train \
-    -c ./configs/IResNet50_MS1MV3_ArcFace_pfc01_1n8c_dp_mp_fp16o1.yaml
+    -c ./configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml
 ```
 
 ## How to Export
@@ -88,7 +88,7 @@ python -m paddle.distributed.launch \
     --master=$PADDLE_MASTER \
     --devices=$CUDA_VISIBLE_DEVICES \
     plsc-export \
-    -c ./configs/IResNet50_MS1MV3_ArcFace_pfc01_1n8c_dp_mp_fp16o1.yaml \
+    -c ./configs/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.yaml \
     -o Global.pretrained_model=./output/IResNet50/latest \
     -o FP16.level=O0 \ # export FP32 model when training with FP16
     -o Model.data_format=NCHW # IResNet required if training with NHWC 
