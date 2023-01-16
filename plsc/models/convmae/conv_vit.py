@@ -14,6 +14,8 @@
 
 # Code was heavily based on https://github.com/Alpha-VL/ConvMAE/models_convvit.py
 
+from functools import partial
+
 import paddle
 import paddle.nn as nn
 
@@ -81,18 +83,18 @@ class CBlock(nn.Layer):
             x = x + self.drop_path(
                 self.conv2(
                     self.attn(mask * self.conv1(
-                        self.norm1(x.transpose(0, 2, 3, 1)).transpose(0, 3, 1,
-                                                                      2)))))
+                        self.norm1(x.transpose((0, 2, 3, 1))).transpose((
+                            0, 3, 1, 2))))))
         else:
             x = x + self.drop_path(
                 self.conv2(
                     self.attn(
                         self.conv1(
-                            self.norm1(x.transpose(0, 2, 3, 1)).transpose(
+                            self.norm1(x.transpose((0, 2, 3, 1))).transpose(
                                 0, 3, 1, 2)))))
         x = x + self.drop_path(
             self.mlp(
-                self.norm2(x.transpose(0, 2, 3, 1)).transpose(0, 3, 1, 2)))
+                self.norm2(x.transpose((0, 2, 3, 1))).transpose((0, 3, 1, 2))))
         return x
 
 
@@ -122,7 +124,7 @@ class CPatchEmbed(nn.Layer):
             f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
 
         x = self.proj(x)
-        x = self.norm(x.transpose(0, 2, 3, 1)).transpose(0, 3, 1, 2)
+        x = self.norm(x.transpose((0, 2, 3, 1))).transpose((0, 3, 1, 2))
         x = self.act(x)
         return x
 

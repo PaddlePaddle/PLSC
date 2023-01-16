@@ -14,6 +14,8 @@
 
 # Code was heavily based on https://github.com/Alpha-VL/ConvMAE/models_convvit.py
 
+from functools import partial
+
 import paddle
 import paddle.nn as nn
 
