@@ -42,6 +42,31 @@
 
 ## Installation
 
+PLSC provides two usage methods: one is as an external third-party library, and users can use `import plsc` in their own projects; the other is to develop and use it locally based on this repository.
+
+**Note**: With the continuous iteration of the PaddlePaddle version, the PLSC `master` branch adapts to the PaddlePaddle `develop` branch, and API mismatches may occur in lower versions of PaddlePaddle.
+
+### Install plsc as a third-party library
+
+```shell
+pip install git+https://github.com/PaddlePaddle/PLSC@master
+```
+
+For stable development, you can install a previous version of plsc.
+
+```
+pip install plsc==2.4
+```
+
+### Install plsc locally
+
+```shell
+git clone https://github.com/PaddlePaddle/PLSC.git
+cd /path/to/PLSC/
+# [optional] pip install -r requirements.txt
+python setup.py develop
+```
+
 See [Installation instructions](./tutorials/get_started/installation.md).
 
 
