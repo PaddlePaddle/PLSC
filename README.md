@@ -58,7 +58,7 @@ pip install plsc==2.4
 git clone https://github.com/PaddlePaddle/PLSC.git
 cd /path/to/PLSC/
 
-git checkout -b release/2.4 origin/release/2.4
+git checkout -b release/2.4 remotes/origin/release/2.4
 
 # [optional] pip install -r requirements.txt
 python setup.py develop
