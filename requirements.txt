@@ -8,8 +8,8 @@ requests
 prettytable
 tqdm
 visualdl
-scikit-learn==0.23.2
-opencv-python==4.4.0.46
+scikit-learn>=0.23.2
+opencv-python>=4.2.0.32
 onnxruntime-gpu==1.10.0
 onnx==1.9.0
 paddle2onnx==0.9.4
