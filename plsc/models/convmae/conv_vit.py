@@ -15,6 +15,7 @@
 # Code was heavily based on https://github.com/Alpha-VL/ConvMAE/models_convvit.py
 
 from functools import partial
+import numpy as np
 
 import paddle
 import paddle.nn as nn
@@ -22,7 +23,7 @@ import paddle.nn as nn
 from plsc.models.base_model import Model
 from plsc.nn import init
 
-from ..vision_transformer import to_2tuple, DropPath
+from ..vision_transformer import to_2tuple, DropPath, Block
 
 __all__ = ['ConvViT', 'convvit_base_patch16']
 
@@ -90,8 +91,8 @@ class CBlock(nn.Layer):
                 self.conv2(
                     self.attn(
                         self.conv1(
-                            self.norm1(x.transpose((0, 2, 3, 1))).transpose(
-                                0, 3, 1, 2)))))
+                            self.norm1(x.transpose((0, 2, 3, 1))).transpose((
+                                0, 3, 1, 2))))))
         x = x + self.drop_path(
             self.mlp(
                 self.norm2(x.transpose((0, 2, 3, 1))).transpose((0, 3, 1, 2))))
@@ -275,10 +276,7 @@ class ConvViT(Model):
 
         self.global_pool = global_pool
         if self.global_pool:
-            norm_layer = kwargs['norm_layer']
-            embed_dim = kwargs['embed_dim']
             self.fc_norm = norm_layer(embed_dim[-1])
-
             del self.norm  # remove the original norm
 
     def _init_weights(self, m):
