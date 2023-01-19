@@ -70,8 +70,7 @@ def default_eval(engine, epoch_id=0):
                 for key in loss_dict:
                     if key not in output_info:
                         output_info[key] = AverageMeter(key, '7.5f')
-                    output_info[key].update(loss_dict[key].numpy()[0],
-                                            batch_size)
+                    output_info[key].update(float(loss_dict[key]), batch_size)
 
         # just for DistributedBatchSampler issue: repeat sampling
         current_samples = batch_size * paddle.distributed.get_world_size()
