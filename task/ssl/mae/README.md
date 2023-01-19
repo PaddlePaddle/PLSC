@@ -1,11 +1,18 @@
-## [Masked Autoencoders](https://github.com/facebookresearch/mae): A PaddlePaddle Re-Implementation
+## [MAE](https://github.com/facebookresearch/mae) and [ConvMAE](https://github.com/Alpha-VL/ConvMAE): A PaddlePaddle Re-Implementation
+
 
 <p align="center">
   <img src="https://user-images.githubusercontent.com/11435359/146857310-f258c86c-fde6-48e8-9cee-badd2b21bd2c.png" width="480">
+  <p style="text-align:center">MAE</p>
+</p>
+
+<p align="center">
+  <img src="https://github.com/Alpha-VL/ConvMAE/blob/main/figures/ConvMAE.png?raw=true" width="480">
+  <p style="text-align:center">ConvMAE</p>
 </p>
 
 
-This is a PaddlePaddle/GPU re-implementation of the paper [Masked Autoencoders Are Scalable Vision Learners](https://arxiv.org/abs/2111.06377)
+This is a PaddlePaddle/GPU re-implementation of the paper [Masked Autoencoders Are Scalable Vision Learners](https://arxiv.org/abs/2111.06377) and [ConvMAE: Masked Convolution Meets Masked Autoencoders](https://arxiv.org/abs/2205.03892)
 
 ## Requirements
 To enjoy some new features, PaddlePaddle 2.4 is required. For more installation tutorials 
@@ -21,7 +28,9 @@ dataset/
     └── val
 ```
 
-## Pre-Training
+## MAE
+
+### Pre-Training
 ```
 #unset PADDLE_TRAINER_ENDPOINTS
 #export PADDLE_NNODES=4
@@ -66,7 +75,7 @@ To train ViT-Base or ViT-Huge, set `--model mae_vit_base_patch16` or `--model ma
 | pre-trained checkpoint | [download](https://plsc.bj.bcebos.com/models/mae/v2.4/mae_pretrain_vit_base_1599ep.pd) | -         | -        |
 
 
-## Fine-tuning
+### Fine-tuning
 
 ```
 #unset PADDLE_TRAINER_ENDPOINTS
@@ -104,7 +113,7 @@ python -m paddle.distributed.launch \
 | this repo (Paddle/GPU)       | 83.34                                                        | -         | -        |
 | checkpoint                   | [download](https://plsc.bj.bcebos.com/models/mae/v2.4/mae_finetuned_vit_base_99ep.pd) | -         | -        |
 
-## Linear Probing
+### Linear Probing
 
 ```
 #unset PADDLE_TRAINER_ENDPOINTS
@@ -143,6 +152,110 @@ python -m paddle.distributed.launch \
 | this repo (Paddle/GPU)       | 68.08                                                        | -         | -        |
 | checkpoint                   | [download](https://plsc.bj.bcebos.com/models/mae/v2.4/mae_linprobed_vit_base_89ep.pd) | -         | -        |
 
+## ConvMAE
+
+### Pre-Training
+
+To pretrain ConvMAE-Base with multi-node distributed training, run the following on **3 nodes** with 8 GPUs each:
+
+```
+unset PADDLE_TRAINER_ENDPOINTS
+export PADDLE_NNODES=3
+export PADDLE_MASTER="10.67.228.16:12538"
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+export PADDLE_JOB_ID=ConvMAE
+
+# 3 nodes for pretrain
+ACCUM_ITER=1
+IMAGENET_DIR=./dataset/ILSVRC2012/
+python -m paddle.distributed.launch \
+    --nnodes=$PADDLE_NNODES \
+    --master=$PADDLE_MASTER \
+    --devices=$CUDA_VISIBLE_DEVICES \
+    main_pretrain.py \
+    --accum_iter $ACCUM_ITER \
+    --batch_size 128 \
+    --model convmae_convvit_base_patch16 \
+    --norm_pix_loss \
+    --mask_ratio 0.75 \
+    --epochs 1600 \
+    --warmup_epochs 40 \
+    --blr 1.5e-4 --weight_decay 0.05 \
+    --data_path ${IMAGENET_DIR}
+
+```
+
+### Fine-tuning
+
+To finetune with multi-node distributed training, run the following on **4 nodes** with 8 GPUs each:
+
+```
+#unset PADDLE_TRAINER_ENDPOINTS
+#export PADDLE_NNODES=4
+#export PADDLE_MASTER="10.67.228.16:12538"
+#export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+#export PADDLE_JOB_ID=ConvMAE
+
+# 4 nodes finetune setting
+ACCUM_ITER=1
+PRETRAIN_CHKPT='output_dir/checkpoint-1599.pd'
+IMAGENET_DIR=./dataset/ILSVRC2012/
+python -m paddle.distributed.launch \
+    --nnodes=$PADDLE_NNODES \
+    --master=$PADDLE_MASTER \
+    --devices=$CUDA_VISIBLE_DEVICES \
+    main_finetune.py \
+    --accum_iter $ACCUM_ITER \
+    --batch_size 32 \
+    --model convvit_base_patch16 \
+    --finetune ${PRETRAIN_CHKPT} \
+    --epochs 100 \
+    --blr 5e-4 --layer_decay 0.65 \
+    --weight_decay 0.05 --drop_path 0.1 --reprob 0.25 --mixup 0.8 --cutmix 1.0 \
+    --dist_eval --data_path ${IMAGENET_DIR}
+```
+
+
+### Linear Probing
+
+To finetune with multi-node distributed training, run the following on **4 nodes** with 8 GPUs each:
+
+```
+#unset PADDLE_TRAINER_ENDPOINTS
+#export PADDLE_NNODES=4
+#export PADDLE_MASTER="10.67.228.16:12538"
+#export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+#export PADDLE_JOB_ID=ConvMAE
+
+IMAGENET_DIR=./dataset/ILSVRC2012/
+
+# 4 nodes finetune setting
+ACCUM_ITER=1
+PRETRAIN_CHKPT='./output_dir/checkpoint-1599.pd'
+python -m paddle.distributed.launch \
+   --nnodes=$PADDLE_NNODES \
+   --master=$PADDLE_MASTER \
+   --devices=$CUDA_VISIBLE_DEVICES \
+   main_linprobe.py \
+   --accum_iter $ACCUM_ITER \
+   --batch_size 128 \
+   --model convvit_base_patch16 \
+   --global_pool \
+   --finetune ${PRETRAIN_CHKPT} \
+   --epochs 90 \
+   --blr 0.1 \
+   --weight_decay 0.0 \
+   --dist_eval --data_path ${IMAGENET_DIR}
+```
+
+### Models
+
+| Model        | Phase    | Dataset      | Epochs | GPUs       | Img/sec | Top1 acc@1(%) | Official | Checkpoint                                                   | Log                                                          |
+| ------------ | -------- | ------------ | ------ | ---------- | ------- | ------------- | -------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ConvMAE-Base | pretrain | ImageNet2012 | 1600   | A100*N3C24 | 4984    | -             | -        | [download](https://plsc.bj.bcebos.com/models/convmae/v2.5/convmae_convvit_base_pretrained_1599ep.pd) | [download](https://plsc.bj.bcebos.com/models/convmae/v2.5/convmae_convvit_base_pretrained_1599ep.txt) |
+| ConvViT-Base | finetune | ImageNet2012 | 100    | A100*N4C32 | 3927    | 85.0          | 85.0     | [download](https://plsc.bj.bcebos.com/models/convmae/v2.5/convvit_base_finetuned.pd) | [download](https://plsc.bj.bcebos.com/models/convmae/v2.5/convvit_base_finetuned.txt) |
+| ConvViT-Base | linprobe | ImageNet2012 | 90     | A100*N4C32 | 16732   | 71.4          | 70.9     | [download](https://plsc.bj.bcebos.com/models/convmae/v2.5/convvit_base_linprobed.pd) | [download](https://plsc.bj.bcebos.com/models/convmae/v2.5/convvit_base_linprobed.txt) |
+
 ## Citations
 
 ```
@@ -151,5 +264,12 @@ python -m paddle.distributed.launch \
   journal = {arXiv:2111.06377},
   title   = {Masked Autoencoders Are Scalable Vision Learners},
   year    = {2021},
+}
+
+@article{gao2022convmae,
+  title={ConvMAE: Masked Convolution Meets Masked Autoencoders},
+  author={Gao, Peng and Ma, Teli and Li, Hongsheng and Dai, Jifeng and Qiao, Yu},
+  journal={arXiv preprint arXiv:2205.03892},
+  year={2022}
 }
 ```
