@@ -18,33 +18,33 @@
 #export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 #export PADDLE_JOB_ID=ConvMAE
 
-# 4 nodes finetune setting
-ACCUM_ITER=1
-PRETRAIN_CHKPT='output_dir/checkpoint-1599.pd'
 IMAGENET_DIR=./dataset/ILSVRC2012/
+
+# 1 for four node, 4 for single node
+ACCUM_ITER=1
+PRETRAIN_CHKPT='./output_dir/checkpoint-1599.pd'
 python -m paddle.distributed.launch \
-    --nnodes=$PADDLE_NNODES \
-    --master=$PADDLE_MASTER \
-    --devices=$CUDA_VISIBLE_DEVICES \
-    main_finetune.py \
-    --accum_iter $ACCUM_ITER \
-    --batch_size 32 \
-    --model convvit_base_patch16 \
-    --finetune ${PRETRAIN_CHKPT} \
-    --epochs 100 \
-    --blr 5e-4 --layer_decay 0.65 \
-    --weight_decay 0.05 --drop_path 0.1 --reprob 0.25 --mixup 0.8 --cutmix 1.0 \
-    --dist_eval --data_path ${IMAGENET_DIR}
+   --nnodes=$PADDLE_NNODES \
+   --master=$PADDLE_MASTER \
+   --devices=$CUDA_VISIBLE_DEVICES \
+   main_linprobe.py \
+   --accum_iter $ACCUM_ITER \
+   --batch_size 128 \
+   --model convvit_base_patch16 \
+   --global_pool \
+   --finetune ${PRETRAIN_CHKPT} \
+   --epochs 90 \
+   --blr 0.1 \
+   --weight_decay 0.0 \
+   --dist_eval --data_path ${IMAGENET_DIR}
 
-
-# export CUDA_VISIBLE_DEVICES=0
-# python -m paddle.distributed.launch \
+#export CUDA_VISIBLE_DEVICES=0
+#python -m paddle.distributed.launch \
 #    --nnodes=$PADDLE_NNODES \
 #    --master=$PADDLE_MASTER \
 #    --devices=$CUDA_VISIBLE_DEVICES \
-#    main_finetune.py --eval \
-#    --resume output_dir/checkpoint-99.pd \
-#    --model convvit_base_patch16 \
-#    --batch_size 32 \
-#    --weight_decay 0.05 --drop_path 0.1 --reprob 0.25 --mixup 0.8 --cutmix 1.0 \
+#    main_linprobe.py --eval \
+#    --resume output_dir/checkpoint-88.pd \
+#    --model vit_base_patch16 \
+#    --batch_size 512 \
 #    --data_path ${IMAGENET_DIR}
