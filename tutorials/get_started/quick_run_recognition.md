@@ -30,7 +30,7 @@ plsc-train \
 -o DataLoader.Train.dataset.image_root=./dataset/MS1M_v3_One_Sample \
 -o DataLoader.Train.dataset.cls_label_path=./dataset/MS1M_v3_One_Sample/label.txt \
 -o DataLoader.Eval.dataset.image_root=./dataset/MS1M_v3_One_Sample/agedb_30 \
--o DataLoader.Eval.dataset.cls_label_path=./dataset/MS1M_v3_One_Sample/agedb_30/label.txt```
+-o DataLoader.Eval.dataset.cls_label_path=./dataset/MS1M_v3_One_Sample/agedb_30/label.txt
 ```
 
 #### 3.2 Single Node with 8 GPUs 

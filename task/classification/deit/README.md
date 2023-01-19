@@ -42,7 +42,7 @@ python -m paddle.distributed.launch \
   --devices=$CUDA_VISIBLE_DEVICES \
   plsc-eval \
   -c ./configs/DeiT_base_patch16_224_in1k_2n16c_dp_fp16o2.yaml \
-  -o Global.pretrained_model=pretrained/DeiT_base_patch16_224_in1k_2n16c_dp_fp16o2
+  -o Global.pretrained_model=pretrained/DeiT_base_patch16_224_in1k_2n16c_dp_fp16o2 \
   -o Global.finetune=False
 ```
 
