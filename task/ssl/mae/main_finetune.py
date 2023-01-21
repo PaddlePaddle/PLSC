@@ -36,7 +36,7 @@ import util.misc as misc
 from plsc.data import dataset as datasets
 from util.pos_embed import interpolate_pos_embed
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
-from util.init import trunc_normal_
+from plsc.nn.init import trunc_normal_
 from util.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
 
 import models_vit

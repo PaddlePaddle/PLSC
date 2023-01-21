@@ -34,7 +34,6 @@ from plsc.data import dataset as datasets
 import util.misc as misc
 from util.pos_embed import interpolate_pos_embed
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
-from util.crop import MAERandCropImage
 from plsc.nn.init import trunc_normal_
 
 import models_vit
