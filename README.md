@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./plsc-logo.png" align="middle"  width="500" />
+  <img src="./plsc-logo.png?raw=true" align="middle"  width="500" />
 </p>
 
 ------------------------------------------------------------------------------------------
