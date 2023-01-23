@@ -22,14 +22,18 @@ from functools import partial
 import paddle
 import paddle.nn as nn
 
+from plsc.models.base_model import Model
 from plsc.models.vision_transformer import PatchEmbed, Block
+from plsc.models.utils.pos_embed import get_2d_sincos_pos_embed
+from plsc.nn import init
 
-from util.pos_embed import get_2d_sincos_pos_embed
+__all__ = [
+    'MaskedAutoencoderViT', 'mae_vit_base_patch16', 'mae_vit_large_patch16',
+    'mae_vit_huge_patch14'
+]
 
-from plsc.nn.init import constant_, normal_, uniform_, xavier_uniform_, zeros_
 
-
-class MaskedAutoencoderViT(nn.Layer):
+class MaskedAutoencoderViT(Model):
     """ Masked Autoencoder with VisionTransformer backbone
     """
 
@@ -56,7 +60,7 @@ class MaskedAutoencoderViT(nn.Layer):
         num_patches = self.patch_embed.num_patches
 
         self.cls_token = self.create_parameter(shape=(1, 1, embed_dim))
-        zeros_(self.cls_token)
+        init.zeros_(self.cls_token)
         self.pos_embed = self.create_parameter(shape=(
             1, num_patches + 1, embed_dim))  # fixed sin-cos embedding
         self.pos_embed.stop_gradient = True
@@ -80,7 +84,7 @@ class MaskedAutoencoderViT(nn.Layer):
 
         self.mask_token = self.create_parameter(shape=(1, 1,
                                                        decoder_embed_dim))
-        zeros_(self.mask_token)
+        init.zeros_(self.mask_token)
 
         self.decoder_pos_embed = self.create_parameter(shape=(
             1, num_patches + 1, decoder_embed_dim))  # fixed sin-cos embedding
@@ -128,12 +132,12 @@ class MaskedAutoencoderViT(nn.Layer):
         # initialize patch_embed like nn.Linear (instead of nn.Conv2d)
         w = self.patch_embed.proj.weight.reshape(
             [self.patch_embed.proj.weight.shape[0], -1])
-        xavier_uniform_(w)
+        init.xavier_uniform_(w)
         w._share_buffer_to(self.patch_embed.proj.weight)
 
         # timm's trunc_normal_(std=.02) is effectively normal_(std=0.02) as cutoff is too big (2.)
-        normal_(self.cls_token, std=.02)
-        normal_(self.mask_token, std=.02)
+        init.normal_(self.cls_token, std=.02)
+        init.normal_(self.mask_token, std=.02)
 
         # initialize nn.Linear and nn.LayerNorm
         self.apply(self._init_weights)
@@ -141,12 +145,12 @@ class MaskedAutoencoderViT(nn.Layer):
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
             # we use xavier_uniform following official JAX ViT:
-            xavier_uniform_(m.weight)
+            init.xavier_uniform_(m.weight)
             if isinstance(m, nn.Linear) and m.bias is not None:
-                constant_(m.bias, 0)
+                init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
-            constant_(m.bias, 0)
-            constant_(m.weight, 1.0)
+            init.constant_(m.bias, 0)
+            init.constant_(m.weight, 1.0)
 
     def patchify(self, imgs):
         """

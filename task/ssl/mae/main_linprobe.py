@@ -36,7 +36,7 @@ from util.pos_embed import interpolate_pos_embed
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 from plsc.nn.init import trunc_normal_
 
-import models_vit
+from plsc.models import mae as models_mae
 from plsc.models import convmae as models_convmae
 
 from engine_finetune import train_one_epoch, evaluate
@@ -285,7 +285,7 @@ def main(args):
             num_classes=args.nb_classes,
             global_pool=args.global_pool, )
     else:
-        model = models_vit.__dict__[args.model](
+        model = models_mae.__dict__[args.model](
             num_classes=args.nb_classes,
             global_pool=args.global_pool, )
 

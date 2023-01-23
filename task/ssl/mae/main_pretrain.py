@@ -35,7 +35,7 @@ from plsc.data import dataset as datasets
 import util.optim_factory as optim_factory
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 
-import models_mae
+from plsc.models import mae as models_mae
 from plsc.models import convmae as models_convmae
 
 from engine_pretrain import train_one_epoch

@@ -25,7 +25,7 @@ import paddle.nn as nn
 import plsc.models.vision_transformer
 
 
-class VisionTransformer(plsc.models.vision_transformer.VisionTransformer):
+class MAEVisionTransformer(VisionTransformer):
     """ Vision Transformer with support for global average pooling
     """
 
@@ -63,8 +63,8 @@ class VisionTransformer(plsc.models.vision_transformer.VisionTransformer):
         return outcome
 
 
-def vit_base_patch16(**kwargs):
-    model = VisionTransformer(
+def maevit_base_patch16(**kwargs):
+    model = MAEVisionTransformer(
         patch_size=16,
         embed_dim=768,
         depth=12,
@@ -77,8 +77,8 @@ def vit_base_patch16(**kwargs):
     return model
 
 
-def vit_large_patch16(**kwargs):
-    model = VisionTransformer(
+def maevit_large_patch16(**kwargs):
+    model = MAEVisionTransformer(
         patch_size=16,
         embed_dim=1024,
         depth=24,
@@ -91,8 +91,8 @@ def vit_large_patch16(**kwargs):
     return model
 
 
-def vit_huge_patch14(**kwargs):
-    model = VisionTransformer(
+def maevit_huge_patch14(**kwargs):
+    model = MAEVisionTransformer(
         patch_size=14,
         embed_dim=1280,
         depth=32,
