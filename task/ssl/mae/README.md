@@ -3,12 +3,12 @@
 
 <p align="center">
   <img src="https://user-images.githubusercontent.com/11435359/146857310-f258c86c-fde6-48e8-9cee-badd2b21bd2c.png" width="480">
-  <p style="text-align:center">MAE</p>
+  <p align="center" style="text-align:center">MAE</p>
 </p>
 
 <p align="center">
   <img src="https://github.com/Alpha-VL/ConvMAE/blob/main/figures/ConvMAE.png?raw=true" width="480">
-  <p style="text-align:center">ConvMAE</p>
+  <p align="center" style="text-align:center">ConvMAE</p>
 </p>
 
 

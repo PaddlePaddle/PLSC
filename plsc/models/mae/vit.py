@@ -22,7 +22,7 @@ from functools import partial
 import paddle
 import paddle.nn as nn
 
-import plsc.models.vision_transformer
+from plsc.models.vision_transformer import VisionTransformer
 
 
 class MAEVisionTransformer(VisionTransformer):
