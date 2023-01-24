@@ -98,7 +98,7 @@ python -m paddle.distributed.launch \
     main_finetune.py \
     --accum_iter $ACCUM_ITER \
     --batch_size 128 \
-    --model vit_base_patch16 \
+    --model maevit_base_patch16 \
     --finetune ${PRETRAIN_CHKPT} \
     --epochs 100 \
     --blr 5e-4 --layer_decay 0.65 \
@@ -136,7 +136,7 @@ python -m paddle.distributed.launch \
    main_linprobe.py \
    --accum_iter $ACCUM_ITER \
    --batch_size 512 \
-   --model vit_base_patch16 \
+   --model maevit_base_patch16 \
    --cls_token \
    --finetune ${PRETRAIN_CHKPT} \
    --epochs 90 \
