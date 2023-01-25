@@ -29,6 +29,7 @@ class TimmCosine(lr.LRScheduler):
                  eta_min=0.0,
                  warmup_epoch=0,
                  warmup_start_lr=0.0,
+                 warmup_prefix=False,
                  verbose=False,
                  last_epoch=-1,
                  **kwargs):
@@ -49,6 +50,7 @@ class TimmCosine(lr.LRScheduler):
         self.eta_min = eta_min
         self.last_epoch = last_epoch
         self.warmup_start_lr = warmup_start_lr
+        self.warmup_prefix = warmup_prefix
 
         if not isinstance(learning_rate, (float, int)):
             raise TypeError(
@@ -66,8 +68,10 @@ class TimmCosine(lr.LRScheduler):
                 self.learning_rate - self.warmup_start_lr
             ) / float(self.warmup_steps) + self.warmup_start_lr
 
-        cur_steps = self.last_epoch - (self.T_max *
-                                       (self.last_epoch // self.T_max))
+        last_epoch = self.last_epoch
+        if self.warmup_prefix:
+            last_epoch = last_epoch - self.warmup_steps
+        cur_steps = last_epoch - (self.T_max * (last_epoch // self.T_max))
         return self.eta_min + 0.5 * (self.base_lr - self.eta_min) * (
             1 + math.cos(math.pi * cur_steps / self.T_max))
 

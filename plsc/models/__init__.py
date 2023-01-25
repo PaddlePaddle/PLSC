@@ -22,6 +22,7 @@ from .iresnet import *
 from .face_vit import *
 from .mobilefacenet import *
 from .cait import *
+from .swin_transformer import *
 
 __all__ = ["build_model"]
 
