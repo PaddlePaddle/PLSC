@@ -1,0 +1,217 @@
+# global configs
+Global:
+  checkpoint: null # current main model
+  teacher_checkpoint: output/teacher/MTLModel/model_epoch0
+  pretrained_model: null
+  output_dir: ./output/student
+  device: gpu
+  save_interval: 1
+  max_num_latest_checkpoint: 3
+  eval_during_train: True
+  eval_interval: 1
+  eval_unit: "epoch"
+  accum_steps: 1
+  epochs: 300
+  print_batch_step: 10
+  use_visualdl: False
+  seed: 2023
+  task_names: [Arched_Eyebrows, Attractive, Bags_Under_Eyes, Bald, Clock_Shadow]
+
+# FP16 setting
+FP16:
+  level: O0
+  GradScaler:
+    init_loss_scaling: 65536.0
+
+
+DistributedStrategy:
+  data_parallel: True
+#  recompute:
+#    layer_interval: 4
+#    names: []
+#    exclude_names: ["dropout", "pool", "downsample"]
+
+
+# model architecture
+Model:
+  Teacher:
+    name: MTLModel
+    backbone:
+      name: IResNet50
+      num_features: 512
+      data_format: "NHWC"
+    heads:
+      - head0: # head 类型，一个类型的head可以支持多个任务，但是每个任务有一个head实例
+          name: TaskBlock
+          task_ids: [0, 1, 2, 3, 4]
+          num_channels: 512
+          num_filters: 64
+          class_nums: [2, 10, 6, 5, 3]
+          data_format : "NHWC"
+  Student:
+    name: MTLModel
+    backbone:
+      name: IResNet18
+      num_features: 512
+      data_format: "NHWC"
+    heads:
+      - head0:
+          name: TaskBlock
+          task_ids: [ 0, 1, 2, 3, 4 ]
+          class_nums: [2, 10, 6, 5, 3]
+          num_channels: 512
+          num_filters: 64
+          data_format: "NHWC"
+
+
+Distillation:
+  Enabled: True
+  soft_weight: 0.9
+  soft_loss:
+    - MSELoss:
+        task_ids: [ 0, 1, 2, 3, 4 ]
+        weight: [ 2, 2, 2, 2, 1 ]
+        temperature: 2
+
+
+# loss function config for traing/eval process
+Loss:
+  Train:
+    - ViTCELoss:
+        task_ids: [0, 1, 2, 3, 4]
+        weight: [2, 2, 2, 2, 1]
+        epsilon: 0.0001
+  Eval:
+    - CELoss:
+        weight: 1.0
+
+LRScheduler:
+  name: ViTLRScheduler
+  learning_rate: 3e-3
+  decay_type: cosine
+  warmup_steps: 10000
+
+Optimizer:
+  name: AdamW
+  betas: (0.9, 0.999)
+  epsilon: 1e-8
+  weight_decay: 0.3
+  grad_clip:
+    name: ClipGradByGlobalNorm
+    clip_norm: 1.0
+
+# data loader for train and eval
+DataLoader:
+  Train:
+    dataset:
+      - dataset0: # dataset类型，多个任务可以共用一种类型的dataset，但每个任务有自己的dataset实例，最终会concat成为一个整体的dataset
+          name: SingleTaskDataset
+          data_root: ./datasets/
+          task_ids: [0, 1, 2, 3, 4]
+          cls_label_path: [Arched_Eyebrows_label.txt, Attractive_label.txt, Bags_Under_Eyes_label.txt, Bald_label.txt, Clock_Shadow_label.txt]
+          sample_ratio: [2, 1, 2, 20, 4]
+          transform_ops:
+            - DecodeImage:
+                to_rgb: True
+                channel_first: False
+            - RandCropImage:
+                size: 112
+                scale: [0.05, 1.0]
+                interpolation: bicubic
+                backend: pil
+            - RandFlipImage:
+                flip_code: 1
+            - NormalizeImage:
+                scale: 1.0/255.0
+                mean: [0.5, 0.5, 0.5]
+                std: [0.5, 0.5, 0.5]
+                order: ''
+            - ToCHWImage:
+
+    sampler:
+      name: DistributedBatchSampler
+      batch_size: 128
+      drop_last: False
+      shuffle: True
+    loader:
+      num_workers: 4
+      use_shared_memory: True
+  Eval:
+    dataset:
+      - dataset0:
+          name: SingleTaskDataset
+          data_root: ./datasets/
+          task_ids: [0]
+          cls_label_path: [Arched_Eyebrows_label.txt]
+          transform_ops:
+            - DecodeImage:
+                to_rgb: True
+                channel_first: False
+            - RandCropImage:
+                size: 112
+                scale: [0.05, 1.0]
+                interpolation: bicubic
+                backend: pil
+            - RandFlipImage:
+                flip_code: 1
+            - NormalizeImage:
+                scale: 1.0/255.0
+                mean: [0.5, 0.5, 0.5]
+                std: [0.5, 0.5, 0.5]
+                order: ''
+            - ToCHWImage:
+    sampler:
+      name: DistributedBatchSampler
+      batch_size: 128
+      drop_last: False
+      shuffle: False
+    loader:
+      num_workers: 4
+      use_shared_memory: True
+  Test:
+    dataset:
+      - dataset0:
+          name: MultiTaskDataset
+          data_root: ./datasets/
+          cls_label_path: [test.txt]
+          task_ids: [[0, 1, 2, 3, 4]]
+          transform_ops:
+            - DecodeImage:
+                to_rgb: True
+                channel_first: False
+            - RandCropImage:
+                size: 112
+                scale: [ 0.05, 1.0 ]
+                interpolation: bicubic
+                backend: pil
+            - RandFlipImage:
+                flip_code: 1
+            - NormalizeImage:
+                scale: 1.0/255.0
+                mean: [ 0.5, 0.5, 0.5 ]
+                std: [ 0.5, 0.5, 0.5 ]
+                order: ''
+            - ToCHWImage:
+    sampler:
+      name: DistributedBatchSampler
+      batch_size: 128
+      drop_last: False
+      shuffle: False
+    loader:
+      num_workers: 4
+      use_shared_memory: True
+
+Metric:
+  Train:
+    - TopkAcc:
+        topk: [1, 5]
+  Eval:
+    - TopkAcc:
+        topk: [1, 5]
+  Test:
+    - TopkAcc:
+        topk: [ 1, 5 ]
+
+Export:
+  export_type: paddle
+  input_shape: [None, 3, 112, 112]
