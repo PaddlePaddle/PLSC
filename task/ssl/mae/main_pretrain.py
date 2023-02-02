@@ -36,6 +36,7 @@ import util.optim_factory as optim_factory
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 
 import models_mae
+from plsc.models import convmae as models_convmae
 
 from engine_pretrain import train_one_epoch
 
@@ -232,7 +233,12 @@ def main(args):
         use_shared_memory=args.pin_mem, )
 
     # define the model
-    model = models_mae.__dict__[args.model](norm_pix_loss=args.norm_pix_loss)
+    if 'convmae' in args.model:
+        model = models_convmae.__dict__[args.model](
+            norm_pix_loss=args.norm_pix_loss)
+    else:
+        model = models_mae.__dict__[args.model](
+            norm_pix_loss=args.norm_pix_loss)
 
     model_without_ddp = model
     print("Model = %s" % str(model_without_ddp))

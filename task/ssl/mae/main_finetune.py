@@ -36,10 +36,11 @@ import util.misc as misc
 from plsc.data import dataset as datasets
 from util.pos_embed import interpolate_pos_embed
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
-from util.init import trunc_normal_
+from plsc.nn.init import trunc_normal_
 from util.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
 
 import models_vit
+from plsc.models import convmae as models_convmae
 
 from engine_finetune import train_one_epoch, evaluate
 
@@ -415,10 +416,18 @@ def main(args):
         num_workers=args.num_workers,
         use_shared_memory=args.pin_mem, )
 
-    model = models_vit.__dict__[args.model](
-        num_classes=args.nb_classes,
-        drop_path_rate=args.drop_path,
-        global_pool=args.global_pool, )
+    if 'convvit' in args.model:
+        model = models_convmae.__dict__[args.model](
+            num_classes=args.nb_classes,
+            drop_path_rate=args.drop_path,
+            global_pool=args.global_pool, )
+        num_layers = len(model.blocks3) + 1
+    else:
+        model = models_vit.__dict__[args.model](
+            num_classes=args.nb_classes,
+            drop_path_rate=args.drop_path,
+            global_pool=args.global_pool, )
+        num_layers = len(model.blocks) + 1
 
     if args.finetune and not args.eval:
         checkpoint = paddle.load(args.finetune)
@@ -433,7 +442,10 @@ def main(args):
                 del checkpoint_model[k]
 
         # interpolate position embedding
-        interpolate_pos_embed(model, checkpoint_model)
+        if 'convvit' in args.model:
+            pass
+        else:
+            interpolate_pos_embed(model, checkpoint_model)
 
         # load pre-trained model
         model.set_state_dict(checkpoint_model)
@@ -473,7 +485,8 @@ def main(args):
         model_without_ddp,
         args.weight_decay,
         no_weight_decay_list={'pos_embed', 'cls_token', 'dist_token'},
-        layer_decay=args.layer_decay)
+        layer_decay=args.layer_decay,
+        num_layers=num_layers)
     optimizer = plsc.optimizer.AdamW(param_groups, lr=args.lr)
     loss_scaler = NativeScaler()
 
