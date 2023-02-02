@@ -22,7 +22,7 @@ from collections import OrderedDict
 
 import paddle
 from paddle.nn import Layer, LayerDict, LayerList
-from plsc.models.layers.base_model import Model
+from plsc.models.base_model import Model
 from plsc.core.recompute import wrap_forward, recompute_forward
 from plsc.models.multi_task.ResNet_backbone import *
 from plsc.models.multi_task.head import *

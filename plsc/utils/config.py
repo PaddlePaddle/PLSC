@@ -188,7 +188,12 @@ def parse_args():
         '--config',
         type=str,
         default='configs/config.yaml',
-        help='config file path')
+        help='config file path.')
+    parser.add_argument(
+        '-t',
+        '--mtl',
+        action='store_true',
+        help='The option of multi-task learning.')
     parser.add_argument(
         '-o',
         '--override',

@@ -23,7 +23,7 @@ import paddle
 import paddle.nn as nn
 
 from plsc.nn import init
-from plsc.models.layers.base_model import Model
+from plsc.models.base_model import Model
 
 import math
 
