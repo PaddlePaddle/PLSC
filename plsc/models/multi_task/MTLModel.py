@@ -24,6 +24,8 @@ import paddle
 from paddle.nn import Layer, LayerDict, LayerList
 from plsc.models.layers.base_model import Model
 from plsc.core.recompute import wrap_forward, recompute_forward
+from plsc.models.multi_task.ResNet_backbone import *
+from plsc.models.multi_task.head import *
 
 
 class MTLModel(Model):
@@ -33,30 +35,62 @@ class MTLModel(Model):
     """
 
     def __init__(self,
-                 backbone: Layer,
-                 encoder_heads: Dict,
+                 task_names,
+                 backbone,
+                 heads,
                  recompute_on=False,
                  recompute_params=None):
         """
 
         Args:
-            backbone: backbone for feature extraction
-            encoder_heads: Dict<task_names: Layer>
+            task_names: task name list
+            backbone: backbone for feature extraction (or config dict)
+            encoder_heads: Dict<task_names: Layer> (or config list)
             recompute_on: if recompute is used
             recompute_params: recompute layers
         """
         super(MTLModel, self).__init__()
+        self.task_names = task_names
         if recompute_params is None:
             recompute_params = {}
-        self.backbone = backbone
+        if isinstance(backbone, Model):
+            self.backbone = backbone
+        else:
+            self.backbone = self.instances_from_cfg(backbone)
         # {task_names: Layer}
-        self.encoder_heads = LayerDict(sublayers=encoder_heads)
+        heads = self.instances_from_cfg(heads)
+        self.heads = LayerDict(sublayers=heads)
         self.recompute_on = recompute_on
         if self.recompute_on:
             self.recompute_warp(self.backbone, **recompute_params)
-            for task_name in self.encoder_heads:
-                self.recompute_warp(self.encoder_heads[task_name],
-                                    **recompute_params)
+            for task_name in self.heads:
+                self.recompute_warp(self.heads[task_name], **recompute_params)
+
+    def instances_from_cfg(self, cfg):
+        if isinstance(cfg, dict):
+            name = cfg.pop("name", None)
+            if name is not None:
+                try:
+                    module = eval(name)(**cfg)
+                except Exception as e:
+                    print("instance cfg error: ", e)
+                else:
+                    return module
+        if isinstance(cfg, list):
+            module_dic = {}
+            for item in cfg:
+                if isinstance(item, dict) and len(item) == 1:
+                    name = list(item.keys())[0]
+                    params = item[name]
+                    task_ids = params.pop("task_ids", None)
+                    class_nums = params.pop("class_nums", None)
+                    if task_ids and class_nums:
+                        for task_id, class_num in zip(task_ids, class_nums):
+                            module = eval(name)(class_num=class_num, **params)
+                            module_dic[self.task_names[task_id]] = module
+            if len(module_dic) > 0:
+                return module_dic
+        return None
 
     def recompute_warp(self,
                        model,
@@ -69,20 +103,17 @@ class MTLModel(Model):
             exclude_names = ["Dropout", "dropout", "pool"]
         for idx, (name, layer) in enumerate(model._sub_layers.items()):
             if name in exclude_names:
-                print(f"continue: {name}")
+                # print(f"continue: {name}")
                 continue
             if isinstance(layer, paddle.nn.LayerList):
                 for i, (name, sub_layer) in enumerate(layer.named_sublayers()):
                     if name in exclude_names:
-                        print(f"continue: {name}")
                         continue
                     if layer_interval >= 1 and idx % layer_interval == 0:
-                        print('recompute: ', name)
                         sub_layer.forward = wrap_forward(sub_layer.forward,
                                                          recompute_forward)
             else:
                 if layer_interval >= 1 and idx % layer_interval == 0:
-                    print('recompute: ', name)
                     layer.forward = wrap_forward(layer.forward,
                                                  recompute_forward)
 
@@ -91,10 +122,10 @@ class MTLModel(Model):
         features = self.backbone(inputs)
         if output_task_names is not None:
             for task_name in output_task_names:
-                output[task_name] = self.encoder_heads[task_name](features)
+                output[task_name] = self.heads[task_name](features)
         else:
-            for task_name in self.encoder_heads:
-                output[task_name] = self.encoder_heads[task_name](features)
+            for task_name in self.heads:
+                output[task_name] = self.heads[task_name](features)
         return output
 
     def save(self, path, local_rank=0, rank=0):

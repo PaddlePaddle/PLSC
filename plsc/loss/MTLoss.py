@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import copy
-
+from collections import Iterable
 import paddle
 import paddle.nn as nn
 
@@ -26,32 +26,37 @@ class MTLoss(nn.Layer):
     multi-task loss framework
     """
 
-    def __init__(self, task_names, cfg):
+    def __init__(self, task_names, losses, weights=1.0):
         super().__init__()
         self.loss_func = {}
-        self.loss_weight = {}
         self.task_names = task_names
+        self.instance_losses(losses)
+        self.loss_weight = {}
+        if isinstance(weights, float):
+            weights = len(self.loss_func) * [weights]
+        assert len(self.loss_func) == len(
+            weights), "Length of loss_func should be equal to weights"
+        weight_sum = sum(weights)
+        for task_id in self.loss_func:
+            self.loss_weight[task_id] = weights[task_id] / weight_sum
+
+    def instance_losses(self, losses):
+        assert isinstance(losses, Iterable) and len(losses) > 0, \
+            "losses should be iterable and length greater than 0"
+        self.loss_func = {}
         self.loss_names = {}
-        assert isinstance(cfg, list), "operator config should be a list"
-        for loss_item in cfg:
-            # more than 1 loss func, 1 loss func has more than 1 tasks
-            assert isinstance(loss_item, dict), "yaml format error"
-            loss_name = list(loss_item.keys())[0]
-            param = loss_item[loss_name]
-            task_id_list = param.pop("task_ids", [0])  # default task 0
-            assert "weight" in param, \
-                "weight must be in param, but param just contains {}".format(
-                param.keys())
-            loss_weight = param.pop("weight", 1.0)
-            if isinstance(loss_weight, float):
-                loss_weight = len(task_id_list) * [loss_weight]
-            assert len(loss_weight) == len(task_id_list), \
-                "task weights length must be equal to task number"
-            weight_sum = sum(loss_weight)
-            for task_id in task_id_list:
-                self.loss_names[task_id] = loss_name
-                self.loss_weight[task_id] = loss_weight[task_id] / weight_sum
-                self.loss_func[task_id] = eval(loss_name)(**param)
+
+        for loss_item in losses:
+            assert isinstance(loss_item, dict) and len(loss_item.keys()) == 1, \
+                "item in losses should be config dict whose length is one(loss class config)"
+            name = list(loss_item.keys())[0]
+            params = loss_item[name]
+            task_ids = params.pop("task_ids", [0])
+            if not isinstance(task_ids, list):
+                task_ids = [task_ids]
+            for task_id in task_ids:
+                self.loss_func[task_id] = eval(name)(**params)
+                self.loss_names[task_id] = name
 
     @staticmethod
     def cast_fp32(input):
@@ -59,18 +64,25 @@ class MTLoss(nn.Layer):
             input = paddle.cast(input, 'float32')
         return input
 
-    def __call__(self, input, target, task):
+    def __call__(self, input, target):
+        # target: [label, task]
         loss_dict = {}
         total_loss = 0.0
+        assert isinstance(
+            target, dict), "target shold be a dict including keys(label, task)"
+        label = target["label"]
+        task = target["task"]
         for idx in self.loss_func:
             cond = task == idx
             logits = input[self.task_names[idx]][cond]
-            if isinstance(target, dict):
-                labels = target[self.task_names[idx]][cond]
+            if isinstance(label, dict):
+                if self.task_names[idx] in label:
+                    labels = label[self.task_names[idx]][cond]
+                else:
+                    print("label should be a tensor, not dict")
             else:
-                labels = target[cond]
+                labels = label[cond]
             loss = self.loss_func[idx](logits, labels)
-            weight = self.loss_weight[idx]
             loss_dict[idx] = loss[self.loss_names[idx]]
-            total_loss += loss_dict[idx] * weight
+            total_loss += loss_dict[idx] * self.loss_weight[idx]
         return loss_dict, total_loss

@@ -39,7 +39,9 @@ class CombinedMetrics(nn.Layer):
     def __call__(self, *args, **kwargs):
         metric_dict = OrderedDict()
         for idx, metric_func in enumerate(self.metric_func_list):
-            metric_dict.update(metric_func(*args, **kwargs))
+            metric_dict[str(metric_func).replace("()", "")] = metric_func(
+                *args, **kwargs)
+            # metric_dict.update(metric_func(*args, **kwargs))
         return metric_dict
 
 

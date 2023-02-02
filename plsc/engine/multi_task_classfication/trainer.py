@@ -18,30 +18,19 @@ import numpy as np
 import os
 import random
 import time
-from typing import Dict
-from collections import defaultdict
 
 import paddle
 import paddle.distributed as dist
-from paddle.io import DataLoader, DistributedBatchSampler
-# from paddle.distributed.fleet.utils.hybrid_parallel_util
-# import fused_allreduce_gradients
 
-from plsc.engine.engine import Engine
-from plsc.utils import logger
-from plsc.utils import io
-from plsc.models.multi_task.MTLModel import MTLModel
-from plsc.loss.MTLoss import MTLoss
-from plsc.core.param_fuse import get_fused_params
-from plsc.core import recompute_warp, GradScaler, param_sync, grad_sync
-from plsc.models.multi_task.ResNet_backbone import IResNet18, IResNet50
-from plsc.models.multi_task.head import TaskBlock
-from plsc.scheduler import ViTLRScheduler
-from plsc.optimizer import AdamW, ClipGradByGlobalNorm
-from plsc.data.sampler.mtl_sampler import MTLSampler
-from plsc.metric.metrics import TopkAcc
-from plsc.data.dataset.mtl_dataset import SingleTaskDataset, \
-    MultiTaskDataset, ConcatDataset
+from plsc.utils import logger, io
+from plsc.utils.config import print_config
+from plsc.models import build_model
+from plsc.loss import build_mtl_loss
+from plsc.core import GradScaler, param_sync, grad_sync
+from plsc.optimizer import build_optimizer
+from plsc.metric import build_metrics
+from plsc.data import build_dataloader
+from plsc.scheduler import build_lr_scheduler
 
 
 class MTLEngine(object):
@@ -75,22 +64,7 @@ class MTLEngine(object):
         for key in self.config["Global"]:
             setattr(self, key, self.config["Global"][key])
 
-        # distillation and get model name
-        if self.config.get("Distillation", None):
-            student_model = self.config["Model"].get("Student", None)
-            teacher_model = self.config["Model"].get("Teacher", None)
-            assert student_model and teacher_model, "Teacher and Student model must be defined！"
-            self.model_name = student_model.get("name", None)
-
-            self.distillation = self.config["Distillation"]["Enabled"]
-            self.soft_weight = self.config["Distillation"]["soft_weight"]
-        else:
-            self.distillation = False
-            if self.config["Model"].get("Teacher", None):
-                self.model_name = self.config["Model"]["Teacher"].get("name",
-                                                                      None)
-            else:
-                self.model_name = self.config["Model"].get("name", None)
+        self.model_name = self.config["Model"].get("name", None)
         assert self.model_name, "model must be defined！"
 
         # init logger
@@ -98,6 +72,9 @@ class MTLEngine(object):
         log_file = os.path.join(self.output_dir, self.model_name,
                                 f"{self.mode}.log")
         logger.init_logger(log_file=log_file)
+
+        # record
+        print_config(self.config)
 
         # set device
         assert self.config["Global"]["device"] in ["cpu", "gpu", "xpu", "npu"]
@@ -140,226 +117,57 @@ class MTLEngine(object):
                 "fp16_custom_white_list", None)
             self.fp16_params["custom_black_list"] = cfg_fp16.get(
                 "fp16_custom_black_list", None)
-        # record
-        self.print_config()
-
-    def print_config(self):
-        def print_params_dic(params_dic):
-            for key in params_dic:
-                logger.info(f"{key}: {params_dic[key]}")
-
-        logger.info("=" * 16 + " params " + "=" * 16)
-        print_params_dic(self.config)
-        logger.info("=" * 40)
 
     def build_modules(self):
         # dataset
-        for mode in ["Train", "Eval", "Test"]:
-            self.build_mtl_dataset(mode)
-            self.build_mtl_sampler(mode)
-            self.build_mtl_loader(mode)
-            self.build_metrics(mode)
+        if self.mode == "Train":
+            for mode in ["Train", "Eval"]:
+                data_loader = build_dataloader(
+                    self.config["DataLoader"],
+                    mode,
+                    self.device,
+                    worker_init_fn=self.worker_init_fn)
+                setattr(self, f"{mode.lower()}_dataloader", data_loader)
+            self.eval_metrics = build_metrics(self.config["Metric"]["Eval"])
+        else:
+            data_loader = build_dataloader(
+                self.config["DataLoader"],
+                self.mode,
+                self.device,
+                worker_init_fn=self.worker_init_fn)
+            setattr(self, f"{self.mode.lower()}_dataloader", data_loader)
+
+            metrics = build_metrics(self.config["Metric"][self.mode])
+            setattr(self, f"{self.mode.lower()}_metrics", metrics)
 
         # build model
-        if self.distillation:
-            self.build_model(opt="Teacher")
-            self.build_model(opt="Student")
-            self.model = self.student_model
-        else:
-            self.build_model(opt="Teacher")
-            self.model = self.teacher_model
+        self.model = build_model(
+            self.config["Model"],
+            task_names=self.task_names,
+            recompute_on=self.recompute,
+            recompute_params=self.recompute_params)
+        param_size, size_unit = self.params_counts(self.model)
+        logger.info(
+            f"The number of parameters is: {param_size:.3f}{size_unit}.")
         if self.dp:
             param_sync(self.model)
-            # model = paddle.DataParallel(model, find_unused_parameters=True)
             logger.info("DDP model: sync parameters finished")
 
         # build lr, opt, loss
         if self.mode == 'Train':
-            self.build_lr_scheduler()
-            self.build_optimizer()
-            self.build_loss()
-            if self.distillation:
-                self.build_distill_loss()
+            # lr scheduler
+            lr_config = copy.deepcopy(self.config.get("LRScheduler", None))
+            self.lr_decay_unit = lr_config.get("decay_unit", "step")
+            self.lr_scheduler = None
+            if lr_config is not None:
+                self.lr_scheduler = build_lr_scheduler(
+                    lr_config, self.epochs, len(self.train_dataloader))
+            # optimizer
+            self.optimizer = build_optimizer(self.config["Optimizer"],
+                                             self.lr_scheduler, self.model)
 
-    def build_mtl_dataset(self, mode):
-        # multi-task dataset
-        cfg_ds_list = self.config["DataLoader"][mode][
-            "dataset"]  # dataset list
-        datasets = []
-        all_sample_ratio = []
-        for cfg_ds_item in cfg_ds_list:
-            dataset_name = list(cfg_ds_item.keys())[0]
-            cfg_ds = cfg_ds_item[dataset_name]
-            label_path_list = cfg_ds["cls_label_path"]
-            if not isinstance(cfg_ds["cls_label_path"], list):
-                label_path_list = [cfg_ds["cls_label_path"]]
-            assert len(label_path_list) == len(cfg_ds["task_ids"]), \
-                "lenght of label_path_list must be equal to task_names"
-
-            sample_ratio = cfg_ds.get("sample_ratio", 1.)
-            if not isinstance(sample_ratio, list):
-                sample_ratio = [sample_ratio] * len(label_path_list)
-            all_sample_ratio += sample_ratio
-
-            for i in range(len(label_path_list)):
-                st_dataset = eval(cfg_ds["name"])(
-                    cfg_ds["task_ids"][i], cfg_ds["data_root"],
-                    label_path_list[i], cfg_ds["transform_ops"])
-                datasets.append(st_dataset)
-        if len(datasets) >= 1:
-            dataset = ConcatDataset(datasets, dataset_ratio=all_sample_ratio)
-        else:
-            dataset = datasets[0]
-        setattr(self, f"{mode.lower()}_dataset", dataset)
-        logger.debug(f"Build {mode} dataset succeed.")
-
-    def build_mtl_sampler(self, mode):
-        # multi-task sampler
-        cfg_sampler = self.config["DataLoader"][mode]["sampler"]
-        sampler_name = cfg_sampler.pop("name")
-        dataset = getattr(self, f"{mode.lower()}_dataset")
-        batch_sampler = eval(sampler_name)(dataset, **cfg_sampler)
-        logger.debug("build batch_sampler({}) success...".format(sampler_name))
-        setattr(self, f"{mode.lower()}_sampler", batch_sampler)
-        logger.debug(f"Build {mode} sampler succeed.")
-
-    def build_mtl_loader(self, mode):
-        # multi-task data loader
-        config_loader = self.config["DataLoader"][mode]["loader"]
-        dataset = getattr(self, f"{mode.lower()}_dataset")
-        sampler = getattr(self, f"{mode.lower()}_sampler")
-        data_loader = DataLoader(
-            dataset=dataset,
-            places=self.device,
-            num_workers=config_loader.num_workers,
-            return_list=True,
-            use_shared_memory=config_loader.use_shared_memory,
-            batch_sampler=sampler,
-            worker_init_fn=self.worker_init_fn)
-        setattr(self, f"{mode.lower()}_dataloader", data_loader)
-        logger.debug(f"Build {mode} dataloader succeed.")
-
-    def build_model(self, opt=None):
-        model_config = copy.deepcopy(self.config["Model"])
-        if model_config.get(opt, None):
-            model_config = model_config[opt]
-        # structure
-        model_name = model_config["name"]
-        # backbone
-        config_backbone = model_config["backbone"]
-        backbone_name = config_backbone.pop("name")
-        backbone = eval(backbone_name)(**config_backbone)
-        # head
-        config_heads = model_config["heads"]
-        head_dic = {}
-        for head_item in config_heads:
-            cfg_head = copy.deepcopy(head_item[list(head_item.keys())[0]])
-            task_ids = cfg_head.pop("task_ids")
-            class_nums = cfg_head.pop("class_nums")
-            head_class = cfg_head.pop("name")
-            if not isinstance(head_class, list):
-                head_class = [head_class] * len(task_ids)
-            if not isinstance(class_nums, list):
-                class_nums = [class_nums] * len(task_ids)
-            for i, task_id in enumerate(task_ids):
-                head_dic[self.task_names[task_id]] = (eval(head_class[i])(
-                    class_num=class_nums[i], **cfg_head))
-        # merge
-        model = eval(model_name)(backbone, head_dic, self.recompute,
-                                 self.recompute_params)
-        setattr(self, f"{opt.lower()}_model", model)
-        param_size, size_unit = self.params_counts(model)
-        logger.info(
-            f"Build {opt} model succeed, the number of parameters is: {param_size:.3f}{size_unit}."
-        )
-
-    def build_loss(self):
-        cfg_loss = self.config["Loss"][self.mode]
-        self.loss_func = MTLoss(self.task_names, cfg_loss)
-        logger.debug(f"build {self.mode} loss {self.loss_func} success.")
-
-    def build_lr_scheduler(self):
-        lr_config = copy.deepcopy(self.config.get("LRScheduler", None))
-        self.lr_decay_unit = lr_config.get("decay_unit", "step")
-        lr_config.update({
-            "epochs": self.epochs,
-            "step_each_epoch": len(self.train_dataloader)
-        })
-        if "name" in lr_config:
-            lr_name = lr_config.pop("name")
-            lr = eval(lr_name)(**lr_config)
-            if isinstance(lr, paddle.optimizer.lr.LRScheduler):
-                self.lr_scheduler = lr
-            else:
-                self.lr_scheduler = lr()
-        else:
-            self.lr_scheduler = lr_config["learning_rate"]
-        logger.debug("build lr ({}) success..".format(self.lr_scheduler))
-
-    def build_optimizer(self):
-        opt_config = copy.deepcopy(self.config["Optimizer"])
-        grad_clip = None
-        grad_clip_config = opt_config.pop('grad_clip', None)
-        if grad_clip_config is not None:
-            grad_clip_name = grad_clip_config.pop('name',
-                                                  'ClipGradByGlobalNorm')
-            grad_clip = eval(grad_clip_name)(**grad_clip_config)
-        no_weight_decay_name = opt_config.pop('no_weight_decay_name', [])
-
-        param_group = defaultdict(list)
-        for n, p in self.model.named_parameters():
-            state = copy.deepcopy(p.__dict__)
-            if any(nd in n for nd in no_weight_decay_name):
-                state['no_weight_decay'] = True
-            param_group[str(state)].append(p)
-
-        # fuse params
-        for key in param_group:
-            if 'gpu' not in paddle.get_device():
-                continue
-            if "'is_distributed': True" in key:
-                continue
-            if "'has_sparse_grad': True" in key:
-                continue
-            param_group[key] = get_fused_params(param_group[key])
-
-        # bulid optimizer params
-        params = []
-        for key in param_group:
-            group = {'params': param_group[key]}
-
-            if "'is_distributed': True" in key:
-                group['is_distributed'] = True
-
-            if 'no_weight_decay' in key:
-                group['weight_decay'] = 0.0
-
-            params.append(group)
-
-        optim_name = opt_config.pop('name')
-        self.optimizer = eval(optim_name)(params,
-                                          lr=self.lr_scheduler,
-                                          grad_clip=grad_clip,
-                                          **opt_config)
-
-        logger.debug("build optimizer ({}) success..".format(self.optimizer))
-
-    def build_metrics(self, mode):
-        cfg_metric = self.config.get("Metric", None)
-        metrics = []
-        if cfg_metric is not None:
-            metric_func_list = cfg_metric[mode]
-            for item in metric_func_list:
-                func_name = list(item.keys())[0]
-                metrics.append(eval(func_name)(**item[func_name]))
-        setattr(self, f"{mode.lower()}_metrics", metrics)
-        logger.debug(f"Build {mode} metrics succeed.")
-
-    def build_distill_loss(self):
-        cfg_loss = self.config["Distillation"].get("soft_loss", None)
-        assert cfg_loss is not None, "distillation loss should not be None"
-        self.distill_loss = MTLoss(self.task_names, cfg_loss)
-        logger.debug("build distill loss success.")
+            self.loss_func = build_mtl_loss(self.task_names,
+                                            self.config["Loss"][self.mode])
 
     def load_model(self):
         if self.checkpoint:
@@ -367,14 +175,6 @@ class MTLEngine(object):
                                self.scaler)
         elif self.pretrained_model:
             self.model.load_pretrained(self.pretrained_model, self.rank)
-        if self.distillation:
-            teacher_model_path = self.config["Global"].get(
-                "teacher_checkpoint", None)
-            assert teacher_model_path is not None, "Lack of teacher checkpoint, " \
-                                                   "which must be loaded first in distillation mode "
-            self.teacher_model.load_pretrained(teacher_model_path, self.rank)
-            self.teacher_model.eval()
-            logger.info(f"Teacher model initialized.")
 
     def train(self):
         self.load_model()
@@ -385,7 +185,7 @@ class MTLEngine(object):
             metric_results = {}
             if self.eval_during_train and self.eval_unit == "epoch" \
                     and (epoch + 1) % self.eval_interval == 0:
-                metric_results = self.test()
+                metric_results = self.eval()
             # save model
             if (epoch + 1) % self.save_interval == 0 or (epoch + 1
                                                          ) == self.epochs:
@@ -399,20 +199,13 @@ class MTLEngine(object):
     def train_one_epoch(self, epoch):
         step = 0
         avg_loss = 0  # average loss in the lasted `self.print_batch_step` steps
-        for images, labels, tasks in self.train_dataloader:
+        for images, targets in self.train_dataloader:
             start = time.time()
             step += 1
             # compute loss
             with paddle.amp.auto_cast(self.fp16_params):
                 logits = self.model(images)
-                _, total_loss = self.loss_func(logits, labels, tasks)
-                if self.distillation:
-                    with paddle.no_grad():
-                        teacher_logits = self.teacher_model(images)
-                    _, total_soft_loss = self.distill_loss(
-                        logits, teacher_logits, tasks)
-                    total_loss = self.soft_weight * total_soft_loss + (
-                        1 - self.soft_weight) * total_loss
+                _, total_loss = self.loss_func(logits, targets)
             scaled = self.scaler.scale(total_loss)
             scaled.backward()
             grad_sync(self.optimizer.param_groups)
@@ -449,8 +242,10 @@ class MTLEngine(object):
         results = {}
         bs = {}
         self.model.eval()
-        for images, labels, tasks in self.eval_dataloader:
+        for images, targets in self.eval_dataloader:
             step += 1
+            labels = targets["label"]
+            tasks = targets["task"]
             logits = self.model(images)
             for idx, task_name in enumerate(self.task_names):
                 cond = tasks == idx
@@ -458,19 +253,22 @@ class MTLEngine(object):
                     continue
                 preds = logits[task_name][cond]
                 labels = labels[cond]
-                for eval_metric in self.eval_metrics:
-                    task_metric = eval_metric(preds, labels)
-                    metric_name = str(eval_metric).replace("()", "")
-                    results[idx] = results.get(idx, {metric_name: {}})
-                    for key in task_metric:
+                results[idx] = results.get(idx, {})
+                task_metric = self.eval_metrics(preds, labels)
+                for metric_name in task_metric:
+                    results[idx][metric_name] = results[idx].get(metric_name,
+                                                                 {})
+                    for key in task_metric[metric_name]:
                         results[idx][metric_name][key] = \
-                            results[idx][metric_name].get(key, 0) + task_metric[key]
+                            results[idx][metric_name].get(key, 0) + task_metric[metric_name][key]
                 bs[idx] = bs.get(idx, 0) + 1
         self.model.train()
         for idx in results:
             for metric in results[idx]:
                 for key in results[idx][metric]:
                     results[idx][metric][key] /= bs[idx]
+        for task_id in results:
+            logger.info(f"metrics - task{task_id}: {results[task_id]}")
         return results
 
     @paddle.no_grad()
@@ -479,19 +277,23 @@ class MTLEngine(object):
         results = {}
         bs = {}
         self.model.eval()
-        for images, targets, tasks in self.test_dataloader:
+        for images, targets in self.test_dataloader:
             step += 1
+            labels = targets["label"]
+            tasks = targets["task"]
             logits = self.model(images)
-            for idx, task_id in enumerate(tasks[0]):
-                preds = logits[self.task_names[task_id]]
-                labels = targets[:, idx]
-                for metric in self.test_metrics:
-                    task_metric = metric(preds, labels)
-                    metric_name = str(metric).replace("()", "")
-                    results[idx] = results.get(idx, {metric_name: {}})
-                    for key in task_metric:
+            for idx in range(len(tasks)):
+                task_id = tasks[idx][0]
+                preds_i = logits[self.task_names[task_id]]
+                labels_i = labels[:, idx]
+                results[idx] = results.get(idx, {})
+                task_metric = self.test_metrics(preds_i, labels_i)
+                for metric_name in task_metric:
+                    results[idx][metric_name] = results[idx].get(metric_name,
+                                                                 {})
+                    for key in task_metric[metric_name]:
                         results[idx][metric_name][key] = \
-                            results[idx][metric_name].get(key, 0) + task_metric[key]
+                            results[idx][metric_name].get(key, 0) + task_metric[metric_name][key]
                 bs[idx] = bs.get(idx, 0) + 1
         self.model.train()
         for idx in results:

@@ -15,7 +15,7 @@
 Single-task Dataset and ConcatDataset are realized.
 Multi-task dataset(ConcatDataset) can be composed by multiple single-task datasets.
 """
-
+from collections import Iterable
 import warnings
 import bisect
 import cv2
@@ -55,8 +55,9 @@ class SingleTaskDataset(Dataset):
             img = self.transform_ops(img)
         if label == -1:
             label = 0
-        label = paddle.to_tensor(label, dtype=paddle.int32)
-        return img, label, self.task_id
+        label = paddle.to_tensor(np.array([label]), dtype=paddle.int32)
+        target = {"label": label, "task": self.task_id}
+        return img, target
 
     def __len__(self):
         return len(self.data_list)
@@ -80,23 +81,52 @@ class ConcatDataset(Dataset):
 
     def __init__(self, datasets, dataset_ratio=None):
         super(ConcatDataset, self).__init__()
-        assert len(datasets) > 0, 'datasets should not be an empty iterable'
-        self.datasets = list(datasets)
+        assert isinstance(datasets,
+                          Iterable), "datasets should not be iterable."
+        assert len(datasets) > 0, " datasets length should be greater than 0."
+        self.instance_datasets(datasets)
 
         if dataset_ratio is not None:
-            assert len(dataset_ratio) == len(datasets)
+            assert len(dataset_ratio) == len(self.datasets)
             self.dataset_ratio = {
                 i: dataset_ratio[i]
                 for i in range(len(dataset_ratio))
             }
         else:
-            self.dataset_ratio = {i: 1. for i in range(len(datasets))}
+            self.dataset_ratio = {i: 1. for i in range(len(self.datasets))}
 
         self.cumulative_sizes = self.cumsum(self.datasets, self.dataset_ratio)
         self.idx_ds_map = {
             idx: bisect.bisect_right(self.cumulative_sizes, idx)
             for idx in range(self.__len__())
         }
+
+    def instance_datasets(self, datasets):
+        # get class instance from config dict
+        dataset_list = []
+        for ds in datasets:
+            if isinstance(ds, SingleTaskDataset):
+                continue
+            if isinstance(ds, dict):
+                name = list(ds.keys())[0]
+                params = ds[name]
+                task_ids = params.pop("task_ids", [0])
+                if not isinstance(task_ids, list):
+                    task_ids = [task_ids]
+                label_path = params.pop("label_path")
+                if not isinstance(label_path, list):
+                    label_path = [label_path]
+                assert len(label_path) == len(
+                    task_ids), "Length of label_path should equal to task_ids."
+                for task_id, label_path in zip(task_ids, label_path):
+                    dataset = eval(name)(task_id=task_id,
+                                         label_path=label_path,
+                                         **params)
+                    dataset_list.append(dataset)
+        if len(dataset_list) > 0:
+            self.datasets = dataset_list
+        else:
+            self.datasets = list(datasets)
 
     def __len__(self):
         return self.cumulative_sizes[-1]
@@ -127,7 +157,7 @@ class MultiTaskDataset(Dataset):
     The input file includes multi-task datasets.
     """
 
-    def __init__(self, task_ids, data_root, label_path, transform_ops):
+    def __init__(self, task_id, data_root, label_path, transform_ops):
         """
 
         Args:
@@ -136,7 +166,7 @@ class MultiTaskDataset(Dataset):
             label_path:
             transform_ops:
         """
-        self.task_ids = task_ids
+        self.task_id = task_id
         self.data_root = data_root
         self.transform_ops = None
         if transform_ops is not None:
@@ -157,7 +187,8 @@ class MultiTaskDataset(Dataset):
             img = self.transform_ops(img)
         labels = [0 if label == -1 else label for label in labels]
         labels = paddle.to_tensor(np.array(labels), dtype=paddle.int32)
-        return img, labels, np.array(self.task_ids)
+        target = {"label": labels, "task": self.task_id}
+        return img, target
 
     def __len__(self):
         return len(self.data_list)
