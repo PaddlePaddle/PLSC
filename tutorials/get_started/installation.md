@@ -1,8 +1,8 @@
 ## Install PaddlePaddle from whl Package
 ```
 # [optional] modify cuda version, e.g. post112 to post116
-# require python==3.7, paddlepaddle-gpu==2.4.x
-python -m pip install paddlepaddle-gpu==2.4.0.post112 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
+# require python==3.7
+python -m pip install paddlepaddle-gpu==0.0.0.post116 -f https://www.paddlepaddle.org.cn/whl/linux/gpu/develop.html
 ```
 
 ## Install PaddlePaddle from Source Code
