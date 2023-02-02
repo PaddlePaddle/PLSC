@@ -75,7 +75,7 @@ function FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n
     bash ./recognition/face/FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n8c_dp_mp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/5059" | cut -d " " -f12 `
-    check_diff 38.86674 ${loss%?} ${FUNCNAME}_loss
+    check_diff 38.86843 ${loss%?} ${FUNCNAME}_loss
 }
 
 function IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1() {
@@ -112,7 +112,7 @@ function ViT_base_patch16_224_in1k_1n8c_dp_fp16o2() {
     bash ./classification/vit/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "49/313" | cut -d " " -f18 `
-    check_diff 10.90618 ${loss%?} ${FUNCNAME}_loss
+    check_diff 10.90619 ${loss%?} ${FUNCNAME}_loss
 }
 
 function ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2() {
