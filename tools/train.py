@@ -20,7 +20,7 @@ import paddle
 paddle.disable_static()
 
 from plsc.utils import config as cfg_util
-from plsc.engine.engine import Engine
+from plsc.engine import Engine, MTLEngine
 
 
 def main():
@@ -28,7 +28,10 @@ def main():
     config = cfg_util.get_config(
         args.config, overrides=args.override, show=False)
     config.profiler_options = args.profiler_options
-    engine = Engine(config, mode="train")
+    if args.mtl:
+        engine = MTLEngine(config, mode="Train")
+    else:
+        engine = Engine(config, mode="train")
     engine.train()
 
 

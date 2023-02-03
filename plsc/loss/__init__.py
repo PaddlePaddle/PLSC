@@ -19,6 +19,7 @@ import paddle.nn as nn
 
 from plsc.utils import logger
 from .celoss import CELoss, ViTCELoss
+from .MTLoss import MTLoss
 from .marginloss import MarginLoss
 
 
@@ -57,5 +58,12 @@ class CombinedLoss(nn.Layer):
 
 def build_loss(config):
     module_class = CombinedLoss(copy.deepcopy(config))
+    logger.debug("build loss {} success.".format(module_class))
+    return module_class
+
+
+def build_mtl_loss(task_names, cfg_loss):
+    loss_name = cfg_loss.pop("name")
+    module_class = eval(loss_name)(task_names, **cfg_loss)
     logger.debug("build loss {} success.".format(module_class))
     return module_class

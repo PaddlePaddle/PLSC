@@ -103,8 +103,6 @@ ENV/
 .DS_Store
 
 # logs and output
-**/output/
-**/log/
-
-# dataset
-**/dataset/
+output/
+log/
+dataset/

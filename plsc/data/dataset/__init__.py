@@ -64,3 +64,4 @@ def default_loader(path: str):
 from .imagenet_dataset import ImageNetDataset
 from .face_recognition_dataset import FaceIdentificationDataset, FaceVerificationDataset, FaceRandomDataset
 from .imagefolder_dataset import ImageFolder
+from .mtl_dataset import SingleTaskDataset, MultiTaskDataset, ConcatDataset

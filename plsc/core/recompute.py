@@ -33,7 +33,7 @@ def recompute_forward(func, *args, **kwargs):
 
 def recompute_warp(model, layerlist_interval=1, names=[]):
 
-    for name, layer in model._sub_layers.items():
+    for name, layer in model.named_sublayers():
         if isinstance(layer, nn.LayerList):
             for idx, sub_layer in enumerate(layer):
                 if layerlist_interval >= 1 and idx % layerlist_interval == 0:
