@@ -54,8 +54,6 @@ Optimizer:
   betas: (0.9, 0.999)
   epsilon: 1e-8
   weight_decay: 0.05
-#  use_master_param: True
-#  exp_avg_force_fp32: True
   no_weight_decay_name: ["absolute_pos_embed", "relative_position_bias_table", "norm", "bias"]
   grad_clip:
     name: ClipGradByGlobalNorm
