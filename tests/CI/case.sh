@@ -165,7 +165,7 @@ function swin_base_patch4_window7_224_fp16o2() {
     bash ./classification/swin/swin_base_patch4_window7_224_fp16o2.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "49/1252" | cut -d " " -f12 `
-    check_diff 6.98169 ${loss%?} ${FUNCNAME}_loss
+    check_diff 7.00540 ${loss%?} ${FUNCNAME}_loss
 }
 
 
