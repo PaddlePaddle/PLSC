@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+"""
+Multi-task learning trainer
+"""
 import copy
 import math
 import numpy as np
@@ -26,7 +28,8 @@ from plsc.utils import logger, io
 from plsc.utils.config import print_config
 from plsc.models import build_model
 from plsc.loss import build_mtl_loss
-from plsc.core import GradScaler, param_sync, grad_sync
+from plsc.core import GradScaler, param_sync
+from plsc.core import grad_sync, recompute_warp
 from plsc.optimizer import build_optimizer
 from plsc.metric import build_metrics
 from plsc.data import build_dataloader
@@ -142,16 +145,15 @@ class MTLEngine(object):
 
         # build model
         self.model = build_model(
-            self.config["Model"],
-            task_names=self.task_names,
-            recompute_on=self.recompute,
-            recompute_params=self.recompute_params)
+            self.config["Model"], task_names=self.task_names)
+        if self.recompute:
+            recompute_warp(self.model, **self.recompute_params)
         param_size, size_unit = self.params_counts(self.model)
         logger.info(
             f"The number of parameters is: {param_size:.3f}{size_unit}.")
         if self.dp:
             param_sync(self.model)
-            logger.info("DDP model: sync parameters finished")
+            logger.info("DDP model: sync parameters finished.")
 
         # build lr, opt, loss
         if self.mode == 'Train':

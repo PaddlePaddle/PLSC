@@ -26,10 +26,9 @@ FP16:
 
 DistributedStrategy:
   data_parallel: True
-#  recompute:
-#    layer_interval: 4
-#    names: []
-#    exclude_names: ["dropout", "pool", "downsample"]
+  recompute:
+    layerlist_interval: 4
+    names: []
 
 
 # model architecture

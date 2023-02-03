@@ -23,7 +23,6 @@ from collections import OrderedDict
 import paddle
 from paddle.nn import Layer, LayerDict, LayerList
 from plsc.models.base_model import Model
-from plsc.core.recompute import wrap_forward, recompute_forward
 from plsc.models.multi_task.ResNet_backbone import *
 from plsc.models.multi_task.head import *
 
@@ -34,12 +33,7 @@ class MTLModel(Model):
     Recomputing can be turned on.
     """
 
-    def __init__(self,
-                 task_names,
-                 backbone,
-                 heads,
-                 recompute_on=False,
-                 recompute_params=None):
+    def __init__(self, task_names, backbone, heads):
         """
 
         Args:
@@ -51,8 +45,7 @@ class MTLModel(Model):
         """
         super(MTLModel, self).__init__()
         self.task_names = task_names
-        if recompute_params is None:
-            recompute_params = {}
+
         if isinstance(backbone, Model):
             self.backbone = backbone
         else:
@@ -60,13 +53,9 @@ class MTLModel(Model):
         # {task_names: Layer}
         heads = self.instances_from_cfg(heads)
         self.heads = LayerDict(sublayers=heads)
-        self.recompute_on = recompute_on
-        if self.recompute_on:
-            self.recompute_warp(self.backbone, **recompute_params)
-            for task_name in self.heads:
-                self.recompute_warp(self.heads[task_name], **recompute_params)
 
     def instances_from_cfg(self, cfg):
+        # instantiate layer from config dict
         if isinstance(cfg, dict):
             name = cfg.pop("name", None)
             if name is not None:
@@ -91,31 +80,6 @@ class MTLModel(Model):
             if len(module_dic) > 0:
                 return module_dic
         return None
-
-    def recompute_warp(self,
-                       model,
-                       layer_interval=1,
-                       names=[],
-                       exclude_names=None):
-        # recompute layers in names list or use layer_interval setting,
-        # layers in excluded names are excluded.
-        if exclude_names is None:
-            exclude_names = ["Dropout", "dropout", "pool"]
-        for idx, (name, layer) in enumerate(model._sub_layers.items()):
-            if name in exclude_names:
-                # print(f"continue: {name}")
-                continue
-            if isinstance(layer, paddle.nn.LayerList):
-                for i, (name, sub_layer) in enumerate(layer.named_sublayers()):
-                    if name in exclude_names:
-                        continue
-                    if layer_interval >= 1 and idx % layer_interval == 0:
-                        sub_layer.forward = wrap_forward(sub_layer.forward,
-                                                         recompute_forward)
-            else:
-                if layer_interval >= 1 and idx % layer_interval == 0:
-                    layer.forward = wrap_forward(layer.forward,
-                                                 recompute_forward)
 
     def forward(self, inputs, output_task_names=None):
         output = {}

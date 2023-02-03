@@ -36,19 +36,3 @@ def build_model(config, **kwargs):
     assert isinstance(
         model, Model), 'model must inherit from plsc.models.layers.Model'
     return model
-
-
-def build_mtl_model(task_names, recompute_on, recompute_params, config):
-
-    config = copy.deepcopy(config)
-    model_type = config.pop("name")
-    mod = importlib.import_module(__name__)
-    config.update({
-        "task_names": task_names,
-        "recompute_on": recompute_on,
-        "recompute_params": recompute_params
-    })
-    model = getattr(mod, model_type)(**config)
-    assert isinstance(
-        model, Model), 'model must inherit from plsc.models.layers.Model'
-    return model
