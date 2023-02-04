@@ -21,7 +21,7 @@ python -m paddle.distributed.launch \
     --master=$PADDLE_MASTER \
     --devices=$CUDA_VISIBLE_DEVICES \
     plsc-train \
-    -c ../../task/classification/swin/configs/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o2.yaml
+    -c ../../task/classification/swin/configs/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o2.yaml \
     -o Global.print_batch_step=1 \
     -o Global.max_train_step=50 \
     -o Global.flags.FLAGS_cudnn_exhaustive_search=0 \
