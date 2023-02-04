@@ -30,6 +30,7 @@ plsc_gpu_model_list=( \
     DeiT_base_patch16_224_in1k_1n8c_dp_fp32 \
     DeiT_base_patch16_224_in1k_1n8c_dp_fp16o2 \
     cait_s24_224_in1k_1n8c_dp_fp16o2 \
+    swin_base_patch4_window7_224_fp16o2 \
 )
 
 ###### Face ######
@@ -154,6 +155,17 @@ function cait_s24_224_in1k_1n8c_dp_fp16o2() {
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "49/1251" | cut -d " " -f12 `
     check_diff 6.98169 ${loss%?} ${FUNCNAME}_loss
+}
+
+
+###### Swin ######
+function swin_base_patch4_window7_224_fp16o2() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./classification/swin/swin_base_patch4_window7_224_fp16o2.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "49/1252" | cut -d " " -f12 `
+    check_diff 7.00540 ${loss%?} ${FUNCNAME}_loss
 }
 
 
