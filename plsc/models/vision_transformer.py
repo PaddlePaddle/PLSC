@@ -150,7 +150,8 @@ class Attention(nn.Layer):
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
             xavier_uniform_(m.weight)
-            zeros_(m.bias)
+            if m.bias is not None:
+                zeros_(m.bias)
 
     def forward(self, x):
         # B= paddle.shape(x)[0]
