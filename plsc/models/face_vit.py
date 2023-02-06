@@ -98,6 +98,7 @@ class FaceViT(Model):
                 attn_drop=attn_drop_rate,
                 drop_path=dpr[i],
                 norm_layer=norm_layer,
+                act_layer=nn.ReLU6,
                 epsilon=epsilon) for i in range(depth)
         ])
 
