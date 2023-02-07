@@ -56,8 +56,8 @@ We provide more directly runnable configurations, see [Swin Configurations](./co
 
 | Model  | DType   | Pretrain     | Resolution | Configs                                                      | GPUs      | Img/sec | Top1 Acc | Official | Checkpoint                                                   | Log                                                          |
 | ------ | ------- | ------------ | ---------- | ------------------------------------------------------------ | --------- | ------- | -------- | -------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| Swin-B | FP16 O1 | ImageNet2012 | 224x224    | [config](./configs/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o1.yaml) | A100*N1C8 | 2155    | 0.83362  | 0.835    | [download](https://plsc.bj.bcebos.com/models/swin/v2.5/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o1.pdparams) | [log](https://plsc.bj.bcebos.com/models/swin/v2.5/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o1.log) |
-| Swin-B | FP16 O2 | ImageNet2012 | 224x224    | [config](./configs/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o2.yaml) | A100*N1C8 | 3006    | 0.83223  | 0.835    | [download](https://plsc.bj.bcebos.com/models/swin/v2.5/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o2.pdparams) | [log](https://plsc.bj.bcebos.com/models/swin/v2.5/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o2.log) |
+| Swin-B | FP16 O1 | ImageNet2012 | 224x224    | [config](./configs/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o1.yaml) | A100*N1C8 | 2155    | 0.83362  | 0.835    | [download](https://plsc.bj.bcebos.com/models/swin/v2.5/swin_base_patch4_window7_224_fp16o1.pdparams) | [log](https://plsc.bj.bcebos.com/models/swin/v2.5/swin_base_patch4_window7_224_fp16o1.log) |
+| Swin-B | FP16 O2 | ImageNet2012 | 224x224    | [config](./configs/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o2.yaml) | A100*N1C8 | 3006    | 0.83223  | 0.835    | [download](https://plsc.bj.bcebos.com/models/swin/v2.5/swin_base_patch4_window7_224_fp16o2.pdparams) | [log](https://plsc.bj.bcebos.com/models/swin/v2.5/swin_base_patch4_window7_224_fp16o2.log) |
 
 
 
