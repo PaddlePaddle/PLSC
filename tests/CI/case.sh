@@ -182,7 +182,7 @@ function mae_vit_base_patch16_pt_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/mae/mae_vit_base_patch16_pt_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
-    check_diff 1.0064 ${loss%?} ${FUNCNAME}_loss
+    check_diff 1.0064 ${loss} ${FUNCNAME}_loss
 }
 
 
@@ -192,7 +192,7 @@ function mae_vit_base_patch16_ft_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/mae/mae_vit_base_patch16_ft_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "599/5004" | cut -d " " -f15 `
-    check_diff 6.7559 ${loss%?} ${FUNCNAME}_loss
+    check_diff 6.7559 ${loss} ${FUNCNAME}_loss
 }
 
 
@@ -202,7 +202,7 @@ function mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/mae/mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/312" | cut -d " " -f15 `
-    check_diff 6.6991 ${loss%?} ${FUNCNAME}_loss
+    check_diff 6.6991 ${loss} ${FUNCNAME}_loss
 }
 
 
@@ -213,7 +213,7 @@ function convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/convmae/convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "99/1251" | cut -d " " -f15 `
-    check_diff 1.2954 ${loss%?} ${FUNCNAME}_loss
+    check_diff 1.2954 ${loss} ${FUNCNAME}_loss
 }
 
 
@@ -223,7 +223,7 @@ function convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/convmae/convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "599/5004" | cut -d " " -f15 `
-    check_diff 6.7890 ${loss%?} ${FUNCNAME}_loss
+    check_diff 6.7890 ${loss} ${FUNCNAME}_loss
 }
 
 
@@ -233,7 +233,7 @@ function convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/convmae/convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
-    check_diff 6.9417 ${loss%?} ${FUNCNAME}_loss
+    check_diff 6.9417 ${loss} ${FUNCNAME}_loss
 }
 
 function check_result() {
