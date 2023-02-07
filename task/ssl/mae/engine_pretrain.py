@@ -43,7 +43,6 @@ def train_one_epoch(model,
         'loss', misc.SmoothedValue(
             window_size=1, fmt='{value:.4f}'))
     header = 'Epoch: [{}]'.format(epoch)
-    print_freq = 20
 
     accum_iter = args.accum_iter
 
@@ -52,9 +51,14 @@ def train_one_epoch(model,
     if log_writer is not None:
         print('log_dir: {}'.format(log_writer.kwargs['log_dir']))
 
-    for data_iter_step, (
-            samples, _
-    ) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+    for data_iter_step, (samples, _) in enumerate(
+            metric_logger.log_every(data_loader, args.print_freq, header)):
+
+        if args.max_train_step is not None and data_iter_step >= args.max_train_step:
+            print(
+                f'step({data_iter_step}) >= max_train_step({args.max_train_step}), training stops early. This function is only used for debugging.'
+            )
+            exit(0)
 
         # we use a per iteration (instead of per epoch) lr scheduler
         if data_iter_step % accum_iter == 0:

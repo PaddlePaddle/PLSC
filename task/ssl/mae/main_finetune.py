@@ -260,18 +260,12 @@ def get_args_parser():
     parser.add_argument('--no_pin_mem', action='store_false', dest='pin_mem')
     parser.set_defaults(pin_mem=True)
 
-    # distributed training parameters
+    parser.add_argument('--print_freq', default=20, type=int)
     parser.add_argument(
-        '--world_size',
-        default=1,
+        '--max_train_step',
+        default=None,
         type=int,
-        help='number of distributed processes')
-    parser.add_argument('--local_rank', default=-1, type=int)
-    parser.add_argument('--dist_on_itp', action='store_true')
-    parser.add_argument(
-        '--dist_url',
-        default='env://',
-        help='url used to set up distributed training')
+        help='only used for debugging')
 
     return parser
 
