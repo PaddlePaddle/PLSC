@@ -79,9 +79,12 @@ class FaceViT(Model):
         self.num_patches = num_patches
 
         self.pos_embed = self.create_parameter(
-            shape=(1, num_patches, embed_dim))
+            shape=(1, num_patches, embed_dim),
+            default_initializer=paddle.nn.initializer.Constant(value=0.))
 
-        self.mask_token = self.create_parameter(shape=(1, 1, embed_dim))
+        self.mask_token = self.create_parameter(
+            shape=(1, 1, embed_dim),
+            default_initializer=paddle.nn.initializer.Constant(value=0.))
 
         self.pos_drop = nn.Dropout(p=drop_rate)
 

@@ -285,9 +285,11 @@ class VisionTransformer(Model):
         num_patches = self.patch_embed.num_patches
 
         self.pos_embed = self.create_parameter(
-            shape=(1, num_patches + 1, embed_dim))
-        self.cls_token = self.create_parameter(shape=(1, 1, embed_dim))
-        self.add_parameter("cls_token", self.cls_token)
+            shape=(1, num_patches + 1, embed_dim),
+            default_initializer=paddle.nn.initializer.Constant(value=0.))
+        self.cls_token = self.create_parameter(
+            shape=(1, 1, embed_dim),
+            default_initializer=paddle.nn.initializer.Constant(value=0.))
         self.pos_drop = nn.Dropout(p=drop_rate)
 
         dpr = np.linspace(0, drop_path_rate, depth)
@@ -318,15 +320,16 @@ class VisionTransformer(Model):
         if self.representation_size is not None:
             self.head0 = nn.Linear(embed_dim, representation_size)
             self.tanh = nn.Tanh()
-            self.head = nn.Linear(representation_size,
-                                  class_num) if class_num > 0 else Identity()
+            self.head = nn.Linear(
+                representation_size,
+                class_num) if class_num > 0 else nn.Identity()
             init.xavier_uniform_(self.head0.weight)
             init.zeros_(self.head0.bias)
             init.xavier_uniform_(self.head.weight)
             init.constant_(self.head.bias, -10.0)
         else:
-            self.head = nn.Linear(embed_dim,
-                                  class_num) if class_num > 0 else Identity()
+            self.head = nn.Linear(
+                embed_dim, class_num) if class_num > 0 else nn.Identity()
             init.zeros_(self.head.weight)
             init.zeros_(self.head.bias)
 
