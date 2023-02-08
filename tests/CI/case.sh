@@ -212,7 +212,7 @@ function convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1() {
     rm -rf log
     bash ./ssl/convmae/convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
-    loss=`tail log/workerlog.0 | grep "99/1251" | cut -d " " -f18 `
+    loss=`tail log/workerlog.0 | grep "99/1251" | cut -d " " -f16 `
     check_diff 1.2954 ${loss} ${FUNCNAME}_loss
 }
 
