@@ -201,7 +201,7 @@ function mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
     rm -rf log
     bash ./ssl/mae/mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
-    loss=`tail log/workerlog.0 | grep "199/312" | cut -d " " -f15 `
+    loss=`tail log/workerlog.0 | grep "199/312" | cut -d " " -f14 `
     check_diff 6.6991 ${loss} ${FUNCNAME}_loss
 }
 
@@ -232,7 +232,7 @@ function convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
     rm -rf log
     bash ./ssl/convmae/convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
-    loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
+    loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f14 `
     check_diff 6.9417 ${loss} ${FUNCNAME}_loss
 }
 
