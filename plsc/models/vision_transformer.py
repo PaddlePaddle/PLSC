@@ -23,10 +23,10 @@ import os
 import numpy as np
 import paddle
 import paddle.nn as nn
-from paddle.nn.initializer import Constant, Normal, XavierUniform
 
 from plsc.utils import logger
 from plsc.models.base_model import Model
+from plsc.nn import init
 
 __all__ = [
     'ViT_base_patch16_224',
@@ -45,13 +45,6 @@ __all__ = [
     'VisionTransformer',
 ]
 
-mlp_bias_normal_ = Normal(std=1e-6)
-pos_normal_ = Normal(std=0.02)
-xavier_uniform_ = XavierUniform()
-zeros_ = Constant(value=0.)
-minus_tens_ = Constant(value=-10.)
-ones_ = Constant(value=1.)
-
 
 def to_2tuple(x):
     return tuple([x] * 2)
@@ -64,7 +57,7 @@ def drop_path(x, drop_prob=0., training=False):
     """
     if drop_prob == 0. or not training:
         return x
-    keep_prob = paddle.to_tensor(1 - drop_prob)
+    keep_prob = paddle.to_tensor(1 - drop_prob, dtype=x.dtype)
     shape = (paddle.shape(x)[0], ) + (1, ) * (x.ndim - 1)
     if x.dtype == paddle.float16:
         random_tensor = keep_prob + paddle.rand(
@@ -88,14 +81,6 @@ class DropPath(nn.Layer):
         return drop_path(x, self.drop_prob, self.training)
 
 
-class Identity(nn.Layer):
-    def __init__(self):
-        super(Identity, self).__init__()
-
-    def forward(self, input):
-        return input
-
-
 class Mlp(nn.Layer):
     def __init__(self,
                  in_features,
@@ -115,8 +100,9 @@ class Mlp(nn.Layer):
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            xavier_uniform_(m.weight)
-            mlp_bias_normal_(m.bias)
+            init.xavier_uniform_(m.weight)
+            if m.bias is not None:
+                init.normal_(m.bias, std=1e-6)
 
     def forward(self, x):
         x = self.fc1(x)
@@ -149,8 +135,9 @@ class Attention(nn.Layer):
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            xavier_uniform_(m.weight)
-            zeros_(m.bias)
+            init.xavier_uniform_(m.weight)
+            if m.bias is not None:
+                init.zeros_(m.bias)
 
     def forward(self, x):
         # B= paddle.shape(x)[0]
@@ -198,7 +185,8 @@ class Block(nn.Layer):
             attn_drop=attn_drop,
             proj_drop=drop)
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else Identity()
+        self.drop_path = DropPath(
+            drop_path) if drop_path > 0. else nn.Identity()
         if isinstance(norm_layer, str):
             self.norm2 = eval(norm_layer)(dim, epsilon=epsilon)
         elif isinstance(norm_layer, Callable):
@@ -222,7 +210,14 @@ class PatchEmbed(nn.Layer):
     """ Image to Patch Embedding
     """
 
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768):
+    def __init__(self,
+                 img_size=224,
+                 patch_size=16,
+                 in_chans=3,
+                 embed_dim=768,
+                 norm_layer=None,
+                 flatten=True,
+                 bias_attr=True):
         super().__init__()
         img_size = to_2tuple(img_size)
         patch_size = to_2tuple(patch_size)
@@ -231,16 +226,26 @@ class PatchEmbed(nn.Layer):
         self.img_size = img_size
         self.patch_size = patch_size
         self.num_patches = self.grid_size[0] * self.grid_size[1]
+        self.flatten = flatten
 
         self.proj = nn.Conv2D(
-            in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
+            in_chans,
+            embed_dim,
+            kernel_size=patch_size,
+            stride=patch_size,
+            bias_attr=bias_attr)
+
+        self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
 
     def forward(self, x):
         B, C, H, W = x.shape
         assert H == self.img_size[0] and W == self.img_size[1], \
             f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
 
-        x = self.proj(x).flatten(2).transpose((0, 2, 1))
+        x = self.proj(x)
+        if self.flatten:
+            x = x.flatten(2).transpose((0, 2, 1))
+        x = self.norm(x)
         return x
 
 
@@ -280,11 +285,11 @@ class VisionTransformer(Model):
         num_patches = self.patch_embed.num_patches
 
         self.pos_embed = self.create_parameter(
-            shape=(1, num_patches + 1, embed_dim), default_initializer=zeros_)
-        self.add_parameter("pos_embed", self.pos_embed)
+            shape=(1, num_patches + 1, embed_dim),
+            default_initializer=paddle.nn.initializer.Constant(value=0.))
         self.cls_token = self.create_parameter(
-            shape=(1, 1, embed_dim), default_initializer=zeros_)
-        self.add_parameter("cls_token", self.cls_token)
+            shape=(1, 1, embed_dim),
+            default_initializer=paddle.nn.initializer.Constant(value=0.))
         self.pos_drop = nn.Dropout(p=drop_rate)
 
         dpr = np.linspace(0, drop_path_rate, depth)
@@ -315,26 +320,27 @@ class VisionTransformer(Model):
         if self.representation_size is not None:
             self.head0 = nn.Linear(embed_dim, representation_size)
             self.tanh = nn.Tanh()
-            self.head = nn.Linear(representation_size,
-                                  class_num) if class_num > 0 else Identity()
-            xavier_uniform_(self.head0.weight)
-            zeros_(self.head0.bias)
-            xavier_uniform_(self.head.weight)
-            minus_tens_(self.head.bias)
+            self.head = nn.Linear(
+                representation_size,
+                class_num) if class_num > 0 else nn.Identity()
+            init.xavier_uniform_(self.head0.weight)
+            init.zeros_(self.head0.bias)
+            init.xavier_uniform_(self.head.weight)
+            init.constant_(self.head.bias, -10.0)
         else:
-            self.head = nn.Linear(embed_dim,
-                                  class_num) if class_num > 0 else Identity()
-            zeros_(self.head.weight)
-            zeros_(self.head.bias)
+            self.head = nn.Linear(
+                embed_dim, class_num) if class_num > 0 else nn.Identity()
+            init.zeros_(self.head.weight)
+            init.zeros_(self.head.bias)
 
-        pos_normal_(self.pos_embed)
-        zeros_(self.cls_token)
+        init.normal_(self.pos_embed, std=0.02)
+        init.zeros_(self.cls_token)
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.LayerNorm):
-            zeros_(m.bias)
-            ones_(m.weight)
+            init.zeros_(m.bias)
+            init.ones_(m.weight)
 
     def forward_features(self, x):
         # B = x.shape[0]

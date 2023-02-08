@@ -57,7 +57,7 @@ def param_sync(model, src_rank=0, comm_group=None):
 
     for _, param in model._obtain_parameters_buffers().items():
 
-        if param.is_distributed:
+        if hasattr(param, 'is_distributed') and param.is_distributed:
             continue
 
         if getattr(param, "no_sync", False):

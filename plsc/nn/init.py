@@ -42,7 +42,10 @@ def normal_(x, mean=0., std=1.):
 
 @paddle.no_grad()
 def uniform_(x, a=0., b=1.):
-    return x.uniform_(min=a, max=b)
+    temp_value = paddle.tensor.random.uniform(
+        shape=x.shape, min=a, max=b, dtype=x.dtype)
+    x.copy_(temp_value, False)
+    return x
 
 
 def _calculate_fan_in_and_fan_out(tensor):

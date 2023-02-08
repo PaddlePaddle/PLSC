@@ -24,6 +24,7 @@ from .mobilefacenet import *
 from .cait import *
 from .mae import *
 from .convmae import *
+from .swin_transformer import *
 
 __all__ = ["build_model"]
 

@@ -30,6 +30,13 @@ plsc_gpu_model_list=( \
     DeiT_base_patch16_224_in1k_1n8c_dp_fp32 \
     DeiT_base_patch16_224_in1k_1n8c_dp_fp16o2 \
     cait_s24_224_in1k_1n8c_dp_fp16o2 \
+    swin_base_patch4_window7_224_fp16o2 \
+    mae_vit_base_patch16_pt_in1k_1n8c_dp_fp16o1 \
+    mae_vit_base_patch16_ft_in1k_1n8c_dp_fp16o1 \
+    mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1 \
+    convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1 \
+    convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1 \
+    convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1 \
 )
 
 ###### Face ######
@@ -75,7 +82,7 @@ function FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n
     bash ./recognition/face/FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n8c_dp_mp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/5059" | cut -d " " -f12 `
-    check_diff 38.86674 ${loss%?} ${FUNCNAME}_loss
+    check_diff 38.86843 ${loss%?} ${FUNCNAME}_loss
 }
 
 function IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1() {
@@ -112,7 +119,7 @@ function ViT_base_patch16_224_in1k_1n8c_dp_fp16o2() {
     bash ./classification/vit/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "49/313" | cut -d " " -f18 `
-    check_diff 10.90618 ${loss%?} ${FUNCNAME}_loss
+    check_diff 10.90619 ${loss%?} ${FUNCNAME}_loss
 }
 
 function ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2() {
@@ -156,6 +163,78 @@ function cait_s24_224_in1k_1n8c_dp_fp16o2() {
     check_diff 6.98169 ${loss%?} ${FUNCNAME}_loss
 }
 
+
+###### Swin ######
+function swin_base_patch4_window7_224_fp16o2() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./classification/swin/swin_base_patch4_window7_224_fp16o2.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "49/1252" | cut -d " " -f12 `
+    check_diff 7.00540 ${loss%?} ${FUNCNAME}_loss
+}
+
+
+###### MAE ######
+function mae_vit_base_patch16_pt_in1k_1n8c_dp_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./ssl/mae/mae_vit_base_patch16_pt_in1k_1n8c_dp_fp16o1.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
+    check_diff 1.0064 ${loss} ${FUNCNAME}_loss
+}
+
+
+function mae_vit_base_patch16_ft_in1k_1n8c_dp_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./ssl/mae/mae_vit_base_patch16_ft_in1k_1n8c_dp_fp16o1.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "599/5004" | cut -d " " -f15 `
+    check_diff 6.7559 ${loss} ${FUNCNAME}_loss
+}
+
+
+function mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./ssl/mae/mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "199/312" | cut -d " " -f14 `
+    check_diff 6.6991 ${loss} ${FUNCNAME}_loss
+}
+
+
+###### ConvMAE ######
+function convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./ssl/convmae/convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "99/1251" | cut -d " " -f16 `
+    check_diff 1.2954 ${loss} ${FUNCNAME}_loss
+}
+
+
+function convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./ssl/convmae/convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "599/5004" | cut -d " " -f15 `
+    check_diff 6.7890 ${loss} ${FUNCNAME}_loss
+}
+
+
+function convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./ssl/convmae/convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
+    check_diff 6.9417 ${loss} ${FUNCNAME}_loss
+}
 
 function check_result() {
     if [ $? -ne 0 ];then
