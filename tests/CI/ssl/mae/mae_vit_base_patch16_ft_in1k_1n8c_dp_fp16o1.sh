@@ -35,7 +35,7 @@ python -m paddle.distributed.launch \
     --print_freq 1 \
     --max_train_step 600 \
     --batch_size 32 \
-    --model vit_base_patch16 \
+    --model maevit_base_patch16 \
     --finetune ${PRETRAIN_CHKPT} \
     --epochs 100 \
     --blr 5e-4 --layer_decay 0.65 \

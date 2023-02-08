@@ -32,7 +32,7 @@ python -m paddle.distributed.launch \
     --print_freq 1 \
     --max_train_step 200 \
    --batch_size 512 \
-   --model vit_base_patch16 \
+   --model maevit_base_patch16 \
    --cls_token \
    --finetune ${PRETRAIN_CHKPT} \
    --epochs 90 \
