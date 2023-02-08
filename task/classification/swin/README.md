@@ -30,7 +30,7 @@ python -m paddle.distributed.launch \
 ```bash
 # [Optional] Download checkpoint
 mkdir -p pretrained/
-wget -O ./pretrained/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o2.pdparams https://plsc.bj.bcebos.com/models/swin/v2.5/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o2.pdparams
+wget -O ./pretrained/swin_base_patch4_window7_224_fp16o2.pdparams https://plsc.bj.bcebos.com/models/swin/v2.5/swin_base_patch4_window7_224_fp16o2.pdparams
 
 ```
 
@@ -44,7 +44,7 @@ python -m paddle.distributed.launch \
   --devices=$CUDA_VISIBLE_DEVICES \
   plsc-eval \
   -c ./configs/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o2.yaml \
-  -o Global.pretrained_model=pretrained/swin_base_patch4_window7_224_in1k_1n8c_dp_fp16o2 \
+  -o Global.pretrained_model=pretrained/swin_base_patch4_window7_224_fp16o2 \
   -o Global.finetune=False
 ```
 
