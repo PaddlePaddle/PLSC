@@ -30,7 +30,7 @@ python -m paddle.distributed.launch \
    main_linprobe.py \
    --accum_iter $ACCUM_ITER \
    --batch_size 512 \
-   --model vit_base_patch16 \
+   --model maevit_base_patch16 \
    --cls_token \
    --finetune ${PRETRAIN_CHKPT} \
    --epochs 90 \
@@ -45,6 +45,6 @@ python -m paddle.distributed.launch \
 #    --devices=$CUDA_VISIBLE_DEVICES \
 #    main_linprobe.py --eval \
 #    --resume output_dir/checkpoint-88.pd \
-#    --model vit_base_patch16 \
+#    --model maevit_base_patch16 \
 #    --batch_size 512 \
 #    --data_path ${IMAGENET_DIR}

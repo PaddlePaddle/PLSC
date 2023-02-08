@@ -22,6 +22,8 @@ from .iresnet import *
 from .face_vit import *
 from .mobilefacenet import *
 from .cait import *
+from .mae import *
+from .convmae import *
 from .swin_transformer import *
 
 __all__ = ["build_model"]
@@ -32,6 +34,6 @@ def build_model(config):
     model_type = config.pop("name")
     mod = importlib.import_module(__name__)
     model = getattr(mod, model_type)(**config)
-    assert isinstance(
-        model, Model), 'model must inherit from plsc.models.layers.Model'
+    assert isinstance(model,
+                      Model), 'model must inherit from plsc.models.Model'
     return model

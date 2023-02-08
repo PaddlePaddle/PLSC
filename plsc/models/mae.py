@@ -22,14 +22,19 @@ from functools import partial
 import paddle
 import paddle.nn as nn
 
-from plsc.models.vision_transformer import PatchEmbed, Block
+from plsc.models.base_model import Model
+from plsc.models.vision_transformer import VisionTransformer, PatchEmbed, Block
+from plsc.models.utils.pos_embed import get_2d_sincos_pos_embed
+from plsc.nn import init
 
-from util.pos_embed import get_2d_sincos_pos_embed
+__all__ = [
+    'MaskedAutoencoderViT', 'mae_vit_base_patch16', 'mae_vit_large_patch16',
+    'mae_vit_huge_patch14', 'MAEVisionTransformer', 'maevit_base_patch16',
+    'maevit_large_patch16', 'maevit_huge_patch14'
+]
 
-from plsc.nn.init import constant_, normal_, uniform_, xavier_uniform_, zeros_
 
-
-class MaskedAutoencoderViT(nn.Layer):
+class MaskedAutoencoderViT(Model):
     """ Masked Autoencoder with VisionTransformer backbone
     """
 
@@ -56,7 +61,7 @@ class MaskedAutoencoderViT(nn.Layer):
         num_patches = self.patch_embed.num_patches
 
         self.cls_token = self.create_parameter(shape=(1, 1, embed_dim))
-        zeros_(self.cls_token)
+        init.zeros_(self.cls_token)
         self.pos_embed = self.create_parameter(shape=(
             1, num_patches + 1, embed_dim))  # fixed sin-cos embedding
         self.pos_embed.stop_gradient = True
@@ -80,7 +85,7 @@ class MaskedAutoencoderViT(nn.Layer):
 
         self.mask_token = self.create_parameter(shape=(1, 1,
                                                        decoder_embed_dim))
-        zeros_(self.mask_token)
+        init.zeros_(self.mask_token)
 
         self.decoder_pos_embed = self.create_parameter(shape=(
             1, num_patches + 1, decoder_embed_dim))  # fixed sin-cos embedding
@@ -128,12 +133,12 @@ class MaskedAutoencoderViT(nn.Layer):
         # initialize patch_embed like nn.Linear (instead of nn.Conv2d)
         w = self.patch_embed.proj.weight.reshape(
             [self.patch_embed.proj.weight.shape[0], -1])
-        xavier_uniform_(w)
+        init.xavier_uniform_(w)
         w._share_buffer_to(self.patch_embed.proj.weight)
 
         # timm's trunc_normal_(std=.02) is effectively normal_(std=0.02) as cutoff is too big (2.)
-        normal_(self.cls_token, std=.02)
-        normal_(self.mask_token, std=.02)
+        init.normal_(self.cls_token, std=.02)
+        init.normal_(self.mask_token, std=.02)
 
         # initialize nn.Linear and nn.LayerNorm
         self.apply(self._init_weights)
@@ -141,12 +146,12 @@ class MaskedAutoencoderViT(nn.Layer):
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
             # we use xavier_uniform following official JAX ViT:
-            xavier_uniform_(m.weight)
+            init.xavier_uniform_(m.weight)
             if isinstance(m, nn.Linear) and m.bias is not None:
-                constant_(m.bias, 0)
+                init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
-            constant_(m.bias, 0)
-            constant_(m.weight, 1.0)
+            init.constant_(m.bias, 0)
+            init.constant_(m.weight, 1.0)
 
     def patchify(self, imgs):
         """
@@ -285,6 +290,44 @@ class MaskedAutoencoderViT(nn.Layer):
         return loss, pred, mask
 
 
+class MAEVisionTransformer(VisionTransformer):
+    """ Vision Transformer with support for global average pooling
+    """
+
+    def __init__(self, global_pool=False, **kwargs):
+        super(MAEVisionTransformer, self).__init__(**kwargs)
+
+        self.global_pool = global_pool
+        if self.global_pool:
+            norm_layer = kwargs['norm_layer']
+            embed_dim = kwargs['embed_dim']
+            self.fc_norm = norm_layer(embed_dim)
+
+            del self.norm  # remove the original norm
+
+    def forward_features(self, x):
+        B = x.shape[0]
+        x = self.patch_embed(x)
+
+        cls_tokens = self.cls_token.expand(
+            (B, -1, -1))  # stole cls_tokens impl from Phil Wang, thanks
+        x = paddle.concat((cls_tokens, x), axis=1)
+        x = x + self.pos_embed
+        x = self.pos_drop(x)
+
+        for blk in self.blocks:
+            x = blk(x)
+
+        if self.global_pool:
+            x = x[:, 1:, :].mean(axis=1)  # global pool without cls token
+            outcome = self.fc_norm(x)
+        else:
+            x = self.norm(x)
+            outcome = x[:, 0]
+
+        return outcome
+
+
 def mae_vit_base_patch16_dec512d8b(**kwargs):
     model = MaskedAutoencoderViT(
         patch_size=16,
@@ -327,6 +370,48 @@ def mae_vit_huge_patch14_dec512d8b(**kwargs):
         decoder_depth=8,
         decoder_num_heads=16,
         mlp_ratio=4,
+        norm_layer=partial(
+            nn.LayerNorm, epsilon=1e-6),
+        **kwargs)
+    return model
+
+
+def maevit_base_patch16(**kwargs):
+    model = MAEVisionTransformer(
+        patch_size=16,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(
+            nn.LayerNorm, epsilon=1e-6),
+        **kwargs)
+    return model
+
+
+def maevit_large_patch16(**kwargs):
+    model = MAEVisionTransformer(
+        patch_size=16,
+        embed_dim=1024,
+        depth=24,
+        num_heads=16,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(
+            nn.LayerNorm, epsilon=1e-6),
+        **kwargs)
+    return model
+
+
+def maevit_huge_patch14(**kwargs):
+    model = MAEVisionTransformer(
+        patch_size=14,
+        embed_dim=1280,
+        depth=32,
+        num_heads=16,
+        mlp_ratio=4,
+        qkv_bias=True,
         norm_layer=partial(
             nn.LayerNorm, epsilon=1e-6),
         **kwargs)

@@ -39,7 +39,7 @@ from util.misc import NativeScalerWithGradNormCount as NativeScaler
 from plsc.nn.init import trunc_normal_
 from util.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
 
-import models_vit
+from plsc.models import mae as models_mae
 from plsc.models import convmae as models_convmae
 
 from engine_finetune import train_one_epoch, evaluate
@@ -417,7 +417,7 @@ def main(args):
             global_pool=args.global_pool, )
         num_layers = len(model.blocks3) + 1
     else:
-        model = models_vit.__dict__[args.model](
+        model = models_mae.__dict__[args.model](
             num_classes=args.nb_classes,
             drop_path_rate=args.drop_path,
             global_pool=args.global_pool, )
