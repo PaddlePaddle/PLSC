@@ -75,9 +75,3 @@ def log_info(trainer, batch_size, epoch_id, iter_id):
             value=trainer.output_info[key].avg,
             step=trainer.global_step,
             writer=trainer.vdl_writer)
-
-    # clear
-    for key in trainer.output_info:
-        trainer.output_info[key].reset()
-    for key in trainer.time_info:
-        trainer.time_info[key].reset()
