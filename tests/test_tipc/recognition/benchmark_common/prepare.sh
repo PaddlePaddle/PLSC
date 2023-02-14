@@ -19,8 +19,6 @@ python setup.py develop
 
 # dataset
 mkdir dataset && cd dataset
-python ${BENCHMARK_ROOT}/paddlecloud/file_upload_download.py \
-    --remote-path ./plsc_data/MS1M_v3/ \
-    --local-path ./ \
-    --mode download
+cp -r ${BENCHMARK_ROOT}/models_data_cfs/Paddle_distributed/MS1M_v3.tgz ./
+tar -zxf MS1M_v3.tgz
 cd -

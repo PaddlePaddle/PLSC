@@ -19,10 +19,8 @@ python setup.py develop
 
 # dataset
 mkdir dataset && cd dataset
-python ${BENCHMARK_ROOT}/paddlecloud/file_upload_download.py \
-    --remote-path ./plsc_data/ILSVRC2012/ \
-    --local-path ./ \
-    --mode download
+cp -r ${BENCHMARK_ROOT}/models_data_cfs/Paddle_distributed/ILSVRC2012.tgz ./
+tar -zxf ILSVRC2012.tgz
 cd -
 
 # pretrained
