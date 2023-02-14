@@ -11,10 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 
 import paddle
 import paddle.nn as nn
 from paddle.nn.functional import layer_norm
+
 from plsc.models.base_model import Model
 from plsc.models.vision_transformer import DropPath
 from plsc.nn import init
@@ -40,16 +42,12 @@ class LayerNorm(nn.Layer):
                  data_format="channels_last"):
         super().__init__()
         # print("normalized_shape: ", normalized_shape)
-        self.weight = paddle.create_parameter(
+        self.weight = self.create_parameter(
             shape=(normalized_shape, ),
-            dtype="float32",
-            default_initializer=paddle.nn.initializer.Assign(
-                paddle.ones((normalized_shape, ))))
-        self.bias = paddle.create_parameter(
+            default_initializer=paddle.nn.initializer.Constant(value=1.))
+        self.bias = self.create_parameter(
             shape=(normalized_shape, ),
-            dtype="float32",
-            default_initializer=paddle.nn.initializer.Assign(
-                paddle.ones((normalized_shape, ))))
+            default_initializer=paddle.nn.initializer.Constant(value=1.))
         self.eps = eps
         self.data_format = data_format
         if self.data_format not in ["channels_last", "channels_first"]:
@@ -84,11 +82,10 @@ class Block(nn.Layer):
         self.pwconv2 = nn.Linear(4 * dim, dim)
         self.gamma = None
         if layer_scale_init_value > 0:
-            self.gamma = paddle.create_parameter(
+            self.gamma = self.create_parameter(
                 shape=(dim, ),
-                dtype="float32",
-                default_initializer=paddle.nn.initializer.Assign(
-                    paddle.ones((dim, )) * layer_scale_init_value))
+                default_initializer=paddle.nn.initializer.Constant(
+                    layer_scale_init_value))
         self.drop_path = DropPath(
             drop_path) if drop_path > 0. else nn.Identity()
 
@@ -200,51 +197,36 @@ class ConvNeXt(Model):
                 param_state_dict[key] = param_state_dict[key].astype(
                     state_dict[key].dtype)
         if not finetune:
-            self.set_dict(state_dict)
+            self.set_dict(param_state_dict)
 
     def save(self, path, local_rank=0, rank=0):
         if local_rank == 0:
             paddle.save(self.state_dict(), path + ".pdparams")
 
 
-def convnext_tiny(pretrained=False, in_22k=False, checkpoint=None, **kwargs):
+def convnext_tiny(**kwargs):
     model = ConvNeXt(depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], **kwargs)
-    if pretrained:
-        assert checkpoint is not None, "Model checkpoint is needed to pretrain."
-        model.load(checkpoint)
     return model
 
 
-def convnext_small(pretrained=False, in_22k=False, checkpoint=None, **kwargs):
+def convnext_small(**kwargs):
     model = ConvNeXt(depths=[3, 3, 27, 3], dims=[96, 192, 384, 768], **kwargs)
-    if pretrained:
-        assert checkpoint is not None, "Model checkpoint is needed to pretrain."
-        model.load(checkpoint)
     return model
 
 
-def convnext_base(pretrained=False, in_22k=False, checkpoint=None, **kwargs):
+def convnext_base(**kwargs):
     model = ConvNeXt(
         depths=[3, 3, 27, 3], dims=[128, 256, 512, 1024], **kwargs)
-    if pretrained:
-        assert checkpoint is not None, "Model checkpoint is needed to pretrain."
-        model.load(checkpoint)
     return model
 
 
-def convnext_large(pretrained=False, in_22k=False, checkpoint=None, **kwargs):
+def convnext_large(**kwargs):
     model = ConvNeXt(
         depths=[3, 3, 27, 3], dims=[192, 384, 768, 1536], **kwargs)
-    if pretrained:
-        assert checkpoint is not None, "Model checkpoint is needed to pretrain."
-        model.load(checkpoint)
     return model
 
 
-def convnext_xlarge(pretrained=False, in_22k=False, checkpoint=None, **kwargs):
+def convnext_xlarge(**kwargs):
     model = ConvNeXt(
         depths=[3, 3, 27, 3], dims=[256, 512, 1024, 2048], **kwargs)
-    if pretrained:
-        assert checkpoint is not None, "Model checkpoint is needed to pretrain."
-        model.load(checkpoint)
     return model
