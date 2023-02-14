@@ -46,8 +46,8 @@ function IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1() {
     bash ./recognition/face/IResNet50_MS1MV3_ArcFace_pfc10_1n8c_dp_mp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/5059" | cut -d " " -f12 `
-    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 44.48089 ${loss%?} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 44.48089 ${loss%?} 4803.02 ${ips} $FUNCNAME
 }
 
 function IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1() {
@@ -56,8 +56,8 @@ function IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1() {
     bash ./recognition/face/IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/40465" | cut -d " " -f12 `
-    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 41.22209 ${loss%?} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 41.22209 ${loss%?} 417.26 ${ips} $FUNCNAME
 }
 
 function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1() {
@@ -66,8 +66,8 @@ function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c
     bash ./recognition/face/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/2530" | cut -d " " -f12 `
-    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 38.36615 ${loss%?} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 38.36615 ${loss%?} 9184.56 ${ips} $FUNCNAME
 }
 
 function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c_dp_mp_fp16o1() {
@@ -76,8 +76,8 @@ function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c
     bash ./recognition/face/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c_dp_mp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/2530" | cut -d " " -f12 `
-    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 37.72491 ${loss%?} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 37.72491 ${loss%?} 8779.70 ${ips} $FUNCNAME
 }
 
 function FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n8c_dp_mp_fp16o1() {
@@ -86,8 +86,8 @@ function FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n
     bash ./recognition/face/FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n8c_dp_mp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/5059" | cut -d " " -f12 `
-    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 38.86843 ${loss%?} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 38.86843 ${loss%?} 2266.60 ${ips} $FUNCNAME
 }
 
 function IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1() {
@@ -96,8 +96,8 @@ function IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1() {
     bash ./recognition/face/IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/40465" | cut -d " " -f12 `
-    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 46.32475 ${loss%?} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 46.32475 ${loss%?} 619.98 ${ips} $FUNCNAME
 }
 
 function IResNet50_MS1MV3_ArcFace_pfc01_1n8c_dp8_fp16o1() {
@@ -106,8 +106,8 @@ function IResNet50_MS1MV3_ArcFace_pfc01_1n8c_dp8_fp16o1() {
     bash ./recognition/face/IResNet50_MS1MV3_ArcFace_pfc01_1n8c_dp8_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/5059" | cut -d " " -f12 `
-    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 41.84674 ${loss%?} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 41.84674 ${loss%?} 4594.02 ${ips} $FUNCNAME
 }
 
 #function MobileFaceNet_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1() {
@@ -116,8 +116,8 @@ function IResNet50_MS1MV3_ArcFace_pfc01_1n8c_dp8_fp16o1() {
 #    bash ./recognition/face/MobileFaceNet_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1.sh
 #    check_result $FUNCNAME
 #    loss=`tail log/workerlog.0 | grep "199/20233" | cut -d " " -f12 `
-#    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk '{a+=$1}END{print a/NR}'`
-#    check_diff 42.17661 ${loss%?} ${FUNCNAME}_loss ${ips}
+#    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+#    check_diff 42.17661 ${loss%?} ${FUNCNAME}_loss ${ips} $FUNCNAME
 #}
 
 ###### ViT ######
@@ -127,8 +127,8 @@ function ViT_base_patch16_224_in1k_1n8c_dp_fp16o2() {
     bash ./classification/vit/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "49/313" | cut -d " " -f18 `
-    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f24 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 10.90619 ${loss%?} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f24 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 10.90619 ${loss%?} 1976.82 ${ips} $FUNCNAME
 }
 
 function ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2() {
@@ -137,8 +137,8 @@ function ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2() {
     bash ./classification/vit/ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "49/2502" | cut -d " " -f18 `
-    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f24 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 6.90645 ${loss%?} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f24 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 6.90645 ${loss%?} 396.93 ${ips} $FUNCNAME
 }
 
 
@@ -149,8 +149,8 @@ function DeiT_base_patch16_224_in1k_1n8c_dp_fp32() {
     bash ./classification/deit/DeiT_base_patch16_224_in1k_1n8c_dp_fp32.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "49/1251" | cut -d " " -f12 `
-    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 6.90764 ${loss%?} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 6.90764 ${loss%?} 732.65 ${ips} $FUNCNAME
 }
 
 
@@ -160,8 +160,8 @@ function DeiT_base_patch16_224_in1k_1n8c_dp_fp16o2() {
     bash ./classification/deit/DeiT_base_patch16_224_in1k_1n8c_dp_fp16o2.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "49/1251" | cut -d " " -f12 `
-    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 6.91250 ${loss%?} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 6.91250 ${loss%?} 1947.68 ${ips} $FUNCNAME
 }
 
 
@@ -172,8 +172,8 @@ function cait_s24_224_in1k_1n8c_dp_fp16o2() {
     bash ./classification/cait/cait_s24_224_in1k_1n8c_dp_fp16o2.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "49/1251" | cut -d " " -f12 `
-    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 6.98169 ${loss%?} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 6.98169 ${loss%?} 1676.82 ${ips} $FUNCNAME
 }
 
 
@@ -184,8 +184,8 @@ function swin_base_patch4_window7_224_fp16o2() {
     bash ./classification/swin/swin_base_patch4_window7_224_fp16o2.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "49/1252" | cut -d " " -f12 `
-    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 7.00540 ${loss%?} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 7.00540 ${loss%?} 876.22 ${ips} $FUNCNAME
 }
 
 
@@ -196,8 +196,8 @@ function mae_vit_base_patch16_pt_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/mae/mae_vit_base_patch16_pt_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
-    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f19 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 1.0064 ${loss} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f19 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 1.0064 ${loss} 0.25 ${ips} $FUNCNAME
 }
 
 
@@ -207,8 +207,8 @@ function mae_vit_base_patch16_ft_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/mae/mae_vit_base_patch16_ft_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "599/5004" | cut -d " " -f15 `
-    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f19 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 6.7559 ${loss} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f19 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 6.7559 ${loss} 0.04 ${ips} $FUNCNAME
 }
 
 
@@ -218,8 +218,8 @@ function mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/mae/mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/312" | cut -d " " -f14 `
-    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f18 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 6.6991 ${loss} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 6.6991 ${loss} 0.53 ${ips} $FUNCNAME
 }
 
 
@@ -230,8 +230,8 @@ function convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/convmae/convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "99/1251" | cut -d " " -f16 `
-    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f20 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 1.2954 ${loss} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f20 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 1.2954 ${loss} 0.31 ${ips} $FUNCNAME
 }
 
 
@@ -241,8 +241,8 @@ function convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/convmae/convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "599/5004" | cut -d " " -f15 `
-    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f19 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 6.7890 ${loss} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f19 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 6.7890 ${loss} 0.05 ${ips} $FUNCNAME
 }
 
 
@@ -252,8 +252,8 @@ function convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/convmae/convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
-    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f19 |awk '{a+=$1}END{print a/NR}'`
-    check_diff 6.9417 ${loss} ${FUNCNAME}_loss ${ips}
+    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f19 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_diff 6.9417 ${loss} 0.18 ${ips} $FUNCNAME
 }
 
 function check_result() {
@@ -265,13 +265,16 @@ function check_result() {
 }
 
 function check_diff() {
-    echo -e "ips: $4 loss_base: $1 loss_test: $2" | tee -a $log_path/result.log
+    echo -e "loss_base: $1 loss_test: $2" | tee -a $log_path/result.log
     if [ $1 != $2 ];then
-      echo -e "\033 $3 model_diff runs failed! \033" | tee -a $log_path/result.log
+      echo -e "\033 $5 loss diff check failed! \033" | tee -a $log_path/result.log
       exit -1
     else
-      echo -e "\033 $3 model_diff runs successfully! \033" | tee -a $log_path/result.log
+      echo -e "\033 $5 loss diff check successfully! \033" | tee -a $log_path/result.log
     fi
+    diff=`awk 'BEGIN{printf "%.1f\n",('$4' - '$3')}'`
+    diff_ratio=`awk 'BEGIN{printf "%.1f\n",('$diff'/'$3')*100}'`
+    echo -e "ips_base: $3 ips_test: $4 diff_ratio: $diff_ratio% " | tee -a $log_path/result.log
 }
 
 function run_gpu_models(){
