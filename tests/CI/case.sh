@@ -248,8 +248,8 @@ function check_result() {
       exit -1
     fi
 
-    diff=$(echo $3 $4|awk '{printf "%0.2f\n", ($4-$3)/$3*100}')
-    echo -e "ips_base: $3 ips_test: $4 diff: $diff% " | tee -a $log_path/result.log
+    diff=$(echo $3 $4|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
+    echo -e "ips_base: $3 ips_test: $4 ips_diff: $diff% " | tee -a $log_path/result.log
     v1=$(echo $diff 5.0|awk '{print($1>=$2)?"0":"1"}')
     v2=$(echo $diff -5.0|awk '{print($1<=$2)?"0":"1"}')
     if [[ $v1 == 0 ]] || [[ $v2 == 0 ]];then
