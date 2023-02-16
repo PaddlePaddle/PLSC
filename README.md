@@ -26,6 +26,7 @@
 * [MoCo v3](./task/ssl/mocov3/)
 * [MAE](./task/ssl/mae/)
 * [ConvMAE](./task/ssl/mae/)
+* [ToMe](./task/accelerate/tome)
 
 ## Top News 🔥
 
