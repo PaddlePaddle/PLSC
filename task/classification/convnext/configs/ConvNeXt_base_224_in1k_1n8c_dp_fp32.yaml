@@ -9,7 +9,7 @@ Global:
   eval_during_train: True
   eval_interval: 1
   eval_unit: "epoch"
-  accum_steps: 1
+  accum_steps: 4
   epochs: 300
   print_batch_step: 10
   use_visualdl: False
@@ -20,7 +20,7 @@ FP16:
   level: O0
   GradScaler:
     init_loss_scaling: 65536.0
-    
+
 DistributedStrategy:
   data_parallel: True
 
@@ -38,21 +38,21 @@ Loss:
   Eval:
     - CELoss:
         weight: 1.0
-        
+
 LRScheduler:
     name: TimmCosine
     learning_rate: 4e-3
     eta_min: 1e-6
     warmup_epoch: 20
-    warmup_start_lr: 1e-6
+    warmup_start_lr: 0
     decay_unit: epoch
 
 Optimizer:
   name: AdamW
-  betas: (0.9, 0.999)  # todo: default?
+  betas: (0.9, 0.999)
   eps: 1e-8
   weight_decay: 0.05
-  no_weight_decay_name: ["cls_token", "pos_embed", "norm", "bias"] # todo: ?
+  no_weight_decay_name: ["norm", "bias"]
   use_master_param: True
   exp_avg_force_fp32: True
 
@@ -105,8 +105,8 @@ DataLoader:
               epsilon: 0.1
               class_num: 1000
     sampler:
-      name: RepeatedAugSampler  # todo: distributedsamper 区别
-      batch_size: 128
+      name: DistributedBatchSampler
+      batch_size: 512
       drop_last: False
       shuffle: True
     loader:
@@ -114,7 +114,7 @@ DataLoader:
       use_shared_memory: True
 
   Eval:
-    dataset: 
+    dataset:
       name: ImageNetDataset
       image_root: ./dataset/ILSVRC2012/
       cls_label_path: ./dataset/ILSVRC2012/val_list.txt
