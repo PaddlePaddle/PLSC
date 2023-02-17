@@ -45,7 +45,7 @@ LRScheduler:
     eta_min: 1e-6
     warmup_epoch: 20
     warmup_start_lr: 0
-    decay_unit: epoch
+    decay_unit: step
 
 Optimizer:
   name: AdamW
