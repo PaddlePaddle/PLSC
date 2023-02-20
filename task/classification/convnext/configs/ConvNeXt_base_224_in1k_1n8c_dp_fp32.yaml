@@ -24,6 +24,11 @@ FP16:
 DistributedStrategy:
   data_parallel: True
 
+# EMA for eval
+EMA:
+  decay: 0.9999
+  thres_steps: False
+
 # model architecture
 Model:
   name: convnext_base

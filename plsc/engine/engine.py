@@ -38,7 +38,7 @@ from plsc.scheduler import build_lr_scheduler
 from plsc.optimizer import build_optimizer
 from plsc.utils import io
 from plsc.core import recompute_warp, GradScaler, param_sync
-
+from plsc.models.utils import EMA
 from . import classification
 from . import recognition
 
@@ -283,6 +283,11 @@ class Engine(object):
                 param_sync(self.model)
                 self.data_parallel_recompute = self.config[
                     "DistributedStrategy"].get("recompute", None) is not None
+        self.enabled_ema = True if "EMA" in self.config else False
+        if self.enabled_ema:
+            ema_cfg = self.config.get("EMA", {})
+            self.ema = EMA(self.optimizer._param_groups, **ema_cfg)
+            self.ema.register()
 
     def train(self):
         assert self.mode == "train"
