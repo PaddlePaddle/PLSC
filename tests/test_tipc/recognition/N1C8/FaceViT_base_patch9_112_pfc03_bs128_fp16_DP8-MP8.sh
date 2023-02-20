@@ -18,7 +18,7 @@ bs_item=128
 run_mode=DP8-MP8
 device_num=N1C8
 yaml_path=./task/recognition/face/configs/FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n8c_dp_mp_fp16o1.yaml \
-max_iter=18117 # epoch=2
+max_iter=10117 # epoch=2
 sample_ratio=0.3
 model_parallel=True
 
