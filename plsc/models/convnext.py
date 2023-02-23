@@ -41,18 +41,17 @@ class LayerNorm(nn.Layer):
     def __init__(self, normalized_shape, eps=1e-6,
                  data_format="channels_last"):
         super().__init__()
-        # print("normalized_shape: ", normalized_shape)
+        self.normalized_shape = (normalized_shape, )
         self.weight = self.create_parameter(
-            shape=(normalized_shape, ),
+            shape=self.normalized_shape,
             default_initializer=paddle.nn.initializer.Constant(value=1.))
         self.bias = self.create_parameter(
-            shape=(normalized_shape, ),
+            shape=self.normalized_shape,
             default_initializer=paddle.nn.initializer.Constant(value=1.))
         self.eps = eps
         self.data_format = data_format
         if self.data_format not in ["channels_last", "channels_first"]:
             raise NotImplementedError
-        self.normalized_shape = (normalized_shape, )
 
     def forward(self, x):
         if self.data_format == "channels_last":
@@ -76,7 +75,7 @@ class Block(nn.Layer):
         super().__init__()
         self.dwconv = nn.Conv2D(
             dim, dim, kernel_size=7, padding=3, groups=dim)  # depthwise conv
-        self.norm = LayerNorm(dim, eps=1e-7)
+        self.norm = LayerNorm(dim, eps=1e-6)  # channel last
         self.pwconv1 = nn.Linear(dim, 4 * dim)
         self.act = nn.GELU()
         self.pwconv2 = nn.Linear(4 * dim, dim)
