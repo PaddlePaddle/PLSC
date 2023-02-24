@@ -17,7 +17,7 @@ Global:
 
 # FP16 setting
 FP16:
-  level: O0
+  level: O2
   GradScaler:
     init_loss_scaling: 65536.0
 
@@ -60,7 +60,7 @@ Optimizer:
   eps: 1e-8
   weight_decay: 0.05
   no_weight_decay_name: ["norm", "bias"]
-  use_master_param: True
+#  use_master_param: True
   exp_avg_force_fp32: True
 
 # data loader for train and eval

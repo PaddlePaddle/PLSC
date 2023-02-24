@@ -28,6 +28,7 @@ DistributedStrategy:
 EMA:
   decay: 0.9999
   thres_steps: False
+  ema_eval: True
 
 # model architecture
 Model:
@@ -51,6 +52,7 @@ LRScheduler:
     warmup_epoch: 20
     warmup_start_lr: 0
     decay_unit: step
+    warmup_prefix: True
 
 Optimizer:
   name: AdamW
@@ -65,19 +67,13 @@ Optimizer:
 DataLoader:
   Train:
     dataset:
-      name: ImageNetDataset
-      image_root: ./dataset/ILSVRC2012/
-      cls_label_path: ./dataset/ILSVRC2012/train_list.txt
-      transform_ops:
-        - DecodeImage:
-            to_rgb: True
-            channel_first: False
-        - RandCropImage:
+      name: ImageFolder
+      root: ./dataset/ILSVRC2012/train
+      transform:
+        - RandomResizedCrop:
             size: 224
             interpolation: bicubic
-            backend: pil
-        - RandFlipImage:
-            flip_code: 1
+        - RandomHorizontalFlip:
         - TimmAutoAugment:
             config_str: rand-m9-mstd0.5-inc1
             interpolation: bicubic
@@ -97,7 +93,7 @@ DataLoader:
             use_log_aspect: True
             mode: pixel
         - ToCHWImage:
-      batch_transform_ops:
+      batch_transform:
         - TransformOpSampler:
             Mixup:
               alpha: 0.8
@@ -120,18 +116,14 @@ DataLoader:
 
   Eval:
     dataset:
-      name: ImageNetDataset
-      image_root: ./dataset/ILSVRC2012/
-      cls_label_path: ./dataset/ILSVRC2012/val_list.txt
-      transform_ops:
-        - DecodeImage:
-            to_rgb: True
-            channel_first: False
-        - ResizeImage:
-            resize_short: 256
+      name: ImageFolder
+      root: ./dataset/ILSVRC2012/val
+      transform:
+        - Resize:
+            size: 256
             interpolation: bicubic
             backend: pil
-        - CenterCropImage:
+        - CenterCrop:
             size: 224
         - NormalizeImage:
             scale: 1.0/255.0

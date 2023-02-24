@@ -47,7 +47,7 @@ class LayerNorm(nn.Layer):
             default_initializer=paddle.nn.initializer.Constant(value=1.))
         self.bias = self.create_parameter(
             shape=self.normalized_shape,
-            default_initializer=paddle.nn.initializer.Constant(value=1.))
+            default_initializer=paddle.nn.initializer.Constant(value=0.))
         self.eps = eps
         self.data_format = data_format
         if self.data_format not in ["channels_last", "channels_first"]:

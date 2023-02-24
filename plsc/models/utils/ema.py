@@ -26,18 +26,17 @@ class EMA(object):
         self._thres_steps = thres_steps
         self._shadow = {}
         self._backup = {}
+        self._update_step = 0
 
     @paddle.no_grad()
     def register(self):
         """Register."""
-        self._update_step = 0
 
         for group in self._param_groups:
             for p in group['params']:
                 if p.stop_gradient is True:
                     continue
-                self._shadow[id(p)] = paddle.zeros_like(p)
-                self._shadow[id(p)].set_value(p)
+                self._shadow[p.name] = p.detach().clone()
 
     @paddle.no_grad()
     def update(self):
@@ -49,10 +48,9 @@ class EMA(object):
             for p in group['params']:
                 if p.stop_gradient is True:
                     continue
-                new_val = p.detach().clone()
-                old_val = self._shadow[id(p)]
-                new_average = decay * old_val + (1 - decay) * new_val
-                self._shadow[id(p)] = new_average
+                old_val = self._shadow[p.name]
+                new_average = decay * old_val + (1 - decay) * p
+                self._shadow[p.name] = new_average
 
         self._update_step += 1
         return decay
@@ -65,10 +63,10 @@ class EMA(object):
             for p in group['params']:
                 if p.stop_gradient is True:
                     continue
-                assert id(p) in self._shadow
+                assert p.name in self._shadow
 
-                self._backup[id(p)] = p.detach().clone()
-                p.set_value(self._shadow[id(p)])
+                self._backup[p.name] = p.detach().clone()
+                p.set_value(self._shadow[p.name])
 
     @paddle.no_grad()
     def restore(self):
@@ -78,6 +76,22 @@ class EMA(object):
             for p in group['params']:
                 if p.stop_gradient is True:
                     continue
-                assert id(p) in self._backup
-                p.set_value(self._backup[id(p)])
+                assert p.name in self._backup
+                p.set_value(self._backup[p.name])
         self._backup = {}
+
+    @paddle.no_grad()
+    def state_dict(self):
+        return {
+            'shadow': self._shadow,
+            'thres_steps': self._thres_steps,
+            'update_step': self._update_step,
+            'decay': self._decay,
+        }
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        self._shadow = state_dict['shadow']
+        self._thres_steps = state_dict['thres_steps']
+        self._update_step = state_dict['update_step']
+        self._decay = state_dict['decay']

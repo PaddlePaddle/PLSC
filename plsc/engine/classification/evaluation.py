@@ -41,8 +41,7 @@ def default_eval(engine, epoch_id=0):
         dataset) if not engine.use_dali else engine.eval_dataloader.size
     max_iter = len(engine.eval_dataloader) - 1 if platform.system(
     ) == "Windows" else len(engine.eval_dataloader)
-    if engine.enabled_ema:
-        engine.ema.apply_shadow()
+
     for iter_id, batch in enumerate(engine.eval_dataloader):
         if iter_id >= max_iter:
             break
@@ -133,8 +132,7 @@ def default_eval(engine, epoch_id=0):
                 len(engine.eval_dataloader), metric_msg, time_msg, ips_msg))
 
         tic = time.time()
-    if engine.enabled_ema:
-        engine.ema.restore()
+
     if engine.use_dali:
         engine.eval_dataloader.reset()
 
