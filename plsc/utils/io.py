@@ -217,8 +217,8 @@ def load_ema_checkpoint(checkpoint_path, ema):
     """
     # load ema state
     ema_path = checkpoint_path + '.pdema'
-    assert os.path.exists(opt_path), \
-        "EMA checkpoint path {} does not exists.".format(opt_path)
+    assert os.path.exists(ema_path), \
+        "EMA checkpoint path {} does not exists.".format(ema_path)
     ema_dict = paddle.load(ema_path)
     ema.set_state_dict(ema_dict)
 
@@ -232,7 +232,8 @@ def load_ema_checkpoint(checkpoint_path, ema):
     return metric_dict
 
 
-def save_ema_checkpoint(ema,
+def save_ema_checkpoint(model,
+                        ema,
                         model_path,
                         metric_info=None,
                         model_name="",
@@ -241,6 +242,10 @@ def save_ema_checkpoint(ema,
     """
     save ema state to the target path
     """
+    local_rank = paddle.distributed.ParallelEnv().dev_id
+    rank = paddle.distributed.get_rank()
+    world_size = paddle.distributed.get_world_size()
+
     if metric_info is None:
         metric_info = {}
 
@@ -251,6 +256,8 @@ def save_ema_checkpoint(ema,
     model_dir = os.path.join(model_path, model_name)
     _mkdir_if_not_exist(model_dir)
     model_prefix = os.path.join(model_dir, prefix)
+
+    model.save(model_prefix, local_rank, rank)
 
     ema_state_dict = ema.state_dict()
 

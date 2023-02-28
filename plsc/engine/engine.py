@@ -285,16 +285,17 @@ class Engine(object):
                     "DistributedStrategy"].get("recompute", None) is not None
 
         self.enabled_ema = True if "EMA" in self.config else False
-        if self.enabled_ema:
+        if self.enabled_ema and self.mode == 'train':
             ema_cfg = self.config.get("EMA", {})
             self.ema_eval = ema_cfg.pop('ema_eval', False)
+            self.ema_eval_start_epoch = ema_cfg.pop('eval_start_epoch', 0)
             if self.ema_eval:
                 logger.info(
-                    f'You enable ema evaluation, and it will save the best ema state.'
+                    f'You have enable ema evaluation and start from {self.ema_eval_start_epoch} epoch, and it will save the best ema state.'
                 )
             else:
                 logger.info(
-                    f'You have enable ema, and also can set ema_eval={self.ema_eval} to enable ema evaluation.'
+                    f'You have enable ema, and also can set ema_eval=True and eval_start_epoch to enable ema evaluation.'
                 )
             self.ema = EMA(self.optimizer._param_groups, **ema_cfg)
             self.ema.register()
@@ -327,7 +328,7 @@ class Engine(object):
         if self.config["Global"]["checkpoint"] is not None:
             if self.enabled_ema:
                 ema_metric_info = io.load_ema_checkpoint(
-                    self.config["Global"]["checkpoint"], self.ema)
+                    self.config["Global"]["checkpoint"] + '_ema', self.ema)
                 if ema_metric_info is not None and self.ema_eval:
                     self.ema_best_metric.update(ema_metric_info)
 
@@ -392,7 +393,7 @@ class Engine(object):
                     step=epoch_id,
                     writer=self.vdl_writer)
 
-                if self.enabled_ema and self.ema_eval:
+                if self.enabled_ema and self.ema_eval and epoch_id > self.ema_eval_start_epoch:
                     self.ema.apply_shadow()
                     ema_eval_metric_info = self.eval(epoch_id)
 
@@ -400,11 +401,12 @@ class Engine(object):
                             "metric"]:
                         self.ema_best_metric = ema_eval_metric_info.copy()
                         io.save_ema_checkpoint(
+                            self.model,
                             self.ema,
                             self.output_dir,
                             self.ema_best_metric,
                             model_name=self.config["Model"]["name"],
-                            prefix="ema_best_model",
+                            prefix="best_model_ema",
                             max_num_checkpoint=self.config["Global"][
                                 "max_num_latest_checkpoint"], )
 
@@ -419,29 +421,8 @@ class Engine(object):
                     self.ema.restore()
 
             # save model
-            if epoch_id % self.save_interval == 0:
-                if self.config["Global"]["max_num_latest_checkpoint"] != 0:
-                    io.save_checkpoint(
-                        self.model,
-                        self.optimizer,
-                        self.scaler,
-                        eval_metric_info,
-                        self.output_dir,
-                        model_name=self.config["Model"]["name"],
-                        prefix="epoch_{}".format(epoch_id),
-                        max_num_checkpoint=self.config["Global"][
-                            "max_num_latest_checkpoint"], )
-
-                    if self.enabled_ema:
-                        io.save_ema_checkpoint(
-                            self.ema,
-                            self.output_dir,
-                            ema_eval_metric_info if self.ema_eval else None,
-                            model_name=self.config["Model"]["name"],
-                            prefix="ema_epoch_{}".format(epoch_id),
-                            max_num_checkpoint=self.config["Global"][
-                                "max_num_latest_checkpoint"], )
-
+            if epoch_id % self.save_interval == 0 or epoch_id == self.config[
+                    "Global"]["epochs"]:
                 # save the latest model
                 io.save_checkpoint(
                     self.model,
@@ -454,15 +435,45 @@ class Engine(object):
                     max_num_checkpoint=self.config["Global"][
                         "max_num_latest_checkpoint"], )
 
-                if self.enabled_ema:
-                    io.save_ema_checkpoint(
-                        self.ema,
+                if self.config["Global"]["max_num_latest_checkpoint"] != 0:
+                    io.save_checkpoint(
+                        self.model,
+                        self.optimizer,
+                        self.scaler,
+                        eval_metric_info,
                         self.output_dir,
-                        ema_eval_metric_info if self.ema_eval else None,
                         model_name=self.config["Model"]["name"],
-                        prefix="ema_latest",
+                        prefix="epoch_{}".format(epoch_id),
                         max_num_checkpoint=self.config["Global"][
                             "max_num_latest_checkpoint"], )
+
+                if self.enabled_ema:
+                    if epoch_id == self.config["Global"]["epochs"]:
+                        self.ema.apply_shadow()
+
+                    io.save_ema_checkpoint(
+                        self.model,
+                        self.ema,
+                        self.output_dir,
+                        None,
+                        model_name=self.config["Model"]["name"],
+                        prefix="latest_ema",
+                        max_num_checkpoint=self.config["Global"][
+                            "max_num_latest_checkpoint"], )
+
+                    if self.config["Global"]["max_num_latest_checkpoint"] != 0:
+                        io.save_ema_checkpoint(
+                            self.model,
+                            self.ema,
+                            self.output_dir,
+                            None,
+                            model_name=self.config["Model"]["name"],
+                            prefix="epoch_{}_ema".format(epoch_id),
+                            max_num_checkpoint=self.config["Global"][
+                                "max_num_latest_checkpoint"], )
+
+                    if epoch_id == self.config["Global"]["epochs"]:
+                        self.ema.restore()
 
         if self.vdl_writer is not None:
             self.vdl_writer.close()
