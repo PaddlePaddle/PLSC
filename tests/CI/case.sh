@@ -37,6 +37,7 @@ plsc_gpu_model_list=( \
     convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1 \
     convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1 \
     convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1 \
+    ConvNeXt_base_224_in1k_1n8c_dp_fp32 \
 )
 
 ###### Face ######
@@ -234,6 +235,15 @@ function convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
     check_diff 6.9417 ${loss} ${FUNCNAME}_loss
+}
+
+function ConvNeXt_base_224_in1k_1n8c_dp_fp32() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./classification/convnext/ConvNeXt_base_224_in1k_1n8c_dp_fp32.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "50/313" | cut -d " " -f12 `
+    check_diff 6.39179 ${loss} ${FUNCNAME}_loss
 }
 
 function check_result() {
