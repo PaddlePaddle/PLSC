@@ -11,9 +11,9 @@ refer to [installation.md](../../../tutorials/get_started/installation.md)
 ```bash
 # Note: Set the following environment variables 
 # and then need to run the script on each node.
-export PADDLE_NNODES=1
-export PADDLE_MASTER="xxx.xxx.xxx.xxx:12538"
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+#export PADDLE_NNODES=4
+#export PADDLE_MASTER="xxx.xxx.xxx.xxx:12538"
+#export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
 python -m paddle.distributed.launch \
     --nnodes=$PADDLE_NNODES \
@@ -33,15 +33,16 @@ wget -O ./pretrained/ConvNeXt_base_224_in1k_dp_fp32.pdparams https://plsc.bj.bce
 ```
 
 ```bash
-export PADDLE_NNODES=1
-export PADDLE_MASTER="127.0.0.1:12538"
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+#export PADDLE_NNODES=1
+#export PADDLE_MASTER="127.0.0.1:12538"
+#export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+
 python -m paddle.distributed.launch \
   --nnodes=$PADDLE_NNODES \
   --master=$PADDLE_MASTER \
   --devices=$CUDA_VISIBLE_DEVICES \
   plsc-eval \
-  -c ./configs/ConvNeXt_base_224_in1k_4n32c_dp_fp32.yaml \
+  -c ./configs/ConvNeXt_base_224_in1k_1n8c_dp_fp32.yaml \
   -o Global.pretrained_model=pretrained/ConvNeXt_base_224_in1k_dp_fp32 \
   -o Global.finetune=False
 ```

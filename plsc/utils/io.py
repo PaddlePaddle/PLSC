@@ -229,7 +229,7 @@ def load_ema_checkpoint(checkpoint_path, ema):
         ema_metric_dict = paddle.load(ema_metric_path)
 
     logger.info("Finish load ema state from {}".format(checkpoint_path))
-    return metric_dict
+    return ema_metric_dict
 
 
 def save_ema_checkpoint(model,
