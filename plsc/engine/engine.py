@@ -325,7 +325,7 @@ class Engine(object):
             if self.use_dali:
                 self.train_dataloader.reset()
             metric_msg = ", ".join([
-                "{}: {:.5f}".format(key, self.output_info[key].avg)
+                "{}: {:.5f}".format(key, self.output_info[key].global_avg)
                 for key in self.output_info
             ])
             logger.info("[Train][Epoch {}/{}][Avg]{}".format(
