@@ -424,7 +424,7 @@ class CAEEncoder(nn.Layer):
                                            embed_dim=768,
                                            temperature=10000.,
                                            use_cls_token=False):
-        h, w = self.patch_embed.patch_shape
+        h, w = self.patch_embed.grid_size
         grid_w = paddle.arange(w, dtype=paddle.float32)
         grid_h = paddle.arange(h, dtype=paddle.float32)
         grid_w, grid_h = paddle.meshgrid(grid_w, grid_h)
@@ -474,7 +474,7 @@ class CAEEncoder(nn.Layer):
         return len(self.blocks)
 
     def forward_features(self, x, bool_masked_pos):
-        x = self.patch_embed(x, bool_masked_pos=bool_masked_pos)
+        x = self.patch_embed(x)
         batch_size, seq_len, dim = x.shape
 
         cls_tokens = self.cls_token.expand(
@@ -677,7 +677,7 @@ class CAEPretrain(Model):
                  **kwargs):
         super().__init__()
 
-        self.encoder = VisionTransformerEncoder(
+        self.encoder = CAEEncoder(
             img_size=img_size,
             patch_size=patch_size,
             in_chans=in_chans,
@@ -699,7 +699,7 @@ class CAEPretrain(Model):
             args=args)
 
         # Forward the masked patch to the teacher network. The teacher network is the same as the student by default.
-        self.teacher_network = VisionTransformerEncoder(
+        self.teacher_network = CAEEncoder(
             img_size=img_size,
             patch_size=patch_size,
             in_chans=in_chans,
@@ -728,7 +728,7 @@ class CAEPretrain(Model):
         self.args = args
         self.num_patches = self.encoder.patch_embed.num_patches
 
-        self.regressor_and_decoder = VisionTransformerRegressorDecoder(
+        self.regressor_and_decoder = CAERegressorDecoder(
             patch_size=patch_size,
             num_classes=args.decoder_num_classes,
             embed_dim=args.decoder_embed_dim,
@@ -753,9 +753,8 @@ class CAEPretrain(Model):
         else:
             self.encoder_to_decoder = None
 
-        self.mask_token = self.create_parameter(
-            [1, 1, args.decoder_embed_dim], default_initializer=zeros_)
-        trunc_normal_(self.mask_token, std=self.init_std)
+        self.mask_token = self.create_parameter([1, 1, args.decoder_embed_dim])
+        init.trunc_normal_(self.mask_token, std=self.init_std)
 
         ### init the weight
         self.apply(self._init_weights)
@@ -770,12 +769,12 @@ class CAEPretrain(Model):
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            xavier_uniform_(m.weight)
+            init.xavier_uniform_(m.weight)
             if isinstance(m, nn.Linear) and m.bias is not None:
-                zeros_(m.bias)
+                init.zeros_(m.bias)
         elif isinstance(m, nn.LayerNorm):
-            zeros_(m.bias)
-            ones_(m.weight)
+            init.zeros_(m.bias)
+            init.ones_(m.weight)
 
     def _update_ema_variables(self, ema_decay):
         for t_param, s_param in zip(self.teacher_network.parameters(),

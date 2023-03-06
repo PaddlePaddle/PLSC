@@ -34,10 +34,11 @@ from visualdl import LogWriter as SummaryWriter
 import plsc.optimizer as optim
 from plsc.scheduler import TimmCosine
 from plsc.data import preprocess as transforms
+from plsc.data import dataset as datasets
 
 import util.misc as misc
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
-from dall_e.utils import map_pixels
+import dall_e
 from util.masking_generator import MaskingGenerator, RandomMaskingGenerator
 
 from plsc.models import cae as models_cae
@@ -384,7 +385,7 @@ class DataAugmentationForCAE(object):
         if args.discrete_vae_type == "dall-e":
             self.visual_token_transform = transforms.Compose([
                 transforms.ToTensor(),
-                map_pixels,
+                dall_e.utils.map_pixels,
             ])
         elif args.discrete_vae_type == "customized":
             self.visual_token_transform = transforms.Compose([
@@ -528,7 +529,7 @@ def main(args):
         'weight_decay': 0.
     }, {
         'params': decay,
-        'weight_decay': weight_decay
+        'weight_decay': args.weight_decay
     }]
 
     lr_scheduler = TimmCosine(
@@ -559,8 +560,8 @@ def main(args):
         if args.distributed:
             data_loader_train.batch_sampler.set_epoch(epoch)
 
-        if log_writer is not None:
-            log_writer.set_step(epoch * num_training_steps_per_epoch)
+        #if log_writer is not None:
+        #    log_writer.set_step(epoch * num_training_steps_per_epoch)
 
         train_stats = train_one_epoch(
             model,

@@ -16,6 +16,8 @@ import os
 import paddle
 from paddle import nn
 import paddle.nn.functional as F
+from .encoder import Encoder
+from .decoder import Decoder
 
 
 def load_model(path: str) -> nn.Layer:
