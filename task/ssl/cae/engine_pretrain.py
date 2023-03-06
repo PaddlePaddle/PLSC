@@ -61,6 +61,7 @@ def train_one_epoch(model: nn.Layer,
     ) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         # assign learning rate & weight decay for each step
         it = start_steps + step  # global training iteration
+        optimizer.lr_step(it)
 
         samples, images, bool_masked_pos = batch
 
@@ -122,36 +123,9 @@ def train_one_epoch(model: nn.Layer,
 
         # all
         amp_black_list = {}
-        if args.amp:
-            with amp.auto_cast(
-                    enable=True, custom_black_list=amp_black_list, level='O1'):
-                # dual path cae
-                outputs, latent, latent_target = model(
-                    samples,
-                    bool_masked_pos=bool_masked_pos,
-                    return_all_tokens=False)
-
-                if args.target_mode == 'clusterID' or args.target_mode == 'random':
-                    loss_main = nn.CrossEntropyLoss()(
-                        input=outputs.astype(paddle.float32), label=labels)
-                    loss_aux = args.dual_loss_weight * loss_selector(
-                        args.dual_loss_type,
-                        latent.astype(paddle.float32),
-                        latent_target.detach().astype(paddle.float32))
-                    loss = loss_main + loss_aux
-                elif args.target_mode == 'rgb':
-                    loss_main = F.mse_loss(
-                        outputs.astype(paddle.float32),
-                        labels.astype(paddle.float32),
-                        reduction="mean")
-                    loss_aux = args.dual_loss_weight * loss_selector(
-                        args.dual_loss_type,
-                        latent.astype(paddle.float32),
-                        latent_target.detach().astype(paddle.float32))
-                    loss = loss_main + loss_aux
-                else:
-                    exit(0)
-        else:
+        with amp.auto_cast(
+                enable=True, custom_black_list=amp_black_list, level='O1'):
+            # dual path cae
             outputs, latent, latent_target = model(
                 samples,
                 bool_masked_pos=bool_masked_pos,
@@ -187,16 +161,8 @@ def train_one_epoch(model: nn.Layer,
             sys.exit(1)
 
         optimizer.clear_grad()
-        # this attribute is added by timm on one optimizer (adahessian)
-        is_second_order = hasattr(
-            optimizer, 'is_second_order') and optimizer.is_second_order
         grad_norm = loss_scaler(
-            loss,
-            optimizer,
-            clip_grad=max_norm,
-            parameters=model.parameters(),
-            create_graph=is_second_order,
-            use_amp=args.amp)
+            loss, optimizer, clip_grad=max_norm, parameters=model.parameters())
         loss_scale_value = loss_scaler.state_dict().get("scale").item()
 
         paddle.device.cuda.synchronize()
@@ -207,7 +173,7 @@ def train_one_epoch(model: nn.Layer,
 
             metric_logger.update(mlm_acc=mlm_acc)
             if log_writer is not None:
-                log_writer.update(mlm_acc=mlm_acc, head="loss")
+                log_writer.add_scalar('mlm_acc', mlm_acc, step=it)
 
         metric_logger.update(loss=loss_value)
         metric_logger.update(loss_main=loss_main_value)
@@ -219,17 +185,14 @@ def train_one_epoch(model: nn.Layer,
         metric_logger.update(grad_norm=grad_norm)
 
         if log_writer is not None:
-            log_writer.update(loss=loss_value, head="loss")
-            log_writer.update(loss=loss_main_value, head="loss_main")
-            log_writer.update(loss=loss_aux_value, head="loss_aux")
-            log_writer.update(loss_scale=loss_scale_value, head="opt")
-            log_writer.update(lr=optimizer.get_lr(), head="opt")
-            log_writer.update(weight_decay=args.weight_decay, head="opt")
-            log_writer.update(grad_norm=grad_norm, head="opt")
+            log_writer.add_scalar('loss', loss_value, step=it)
+            log_writer.add_scalar('loss_main', loss_main_value, step=it)
+            log_writer.add_scalar('loss_aux', loss_aux_value, step=it)
+            log_writer.add_scalar('loss_scale', loss_scale_value, step=it)
+            log_writer.add_scalar('lr', optimizer.get_lr(), step=it)
+            log_writer.add_scalar('weight_decay', args.weight_decay, step=it)
+            log_writer.add_scalar('grad_norm', grad_norm, step=it)
 
-            log_writer.set_step()
-        if lr_scheduler is not None:
-            lr_scheduler.step_update(start_steps + step)
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     now_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
