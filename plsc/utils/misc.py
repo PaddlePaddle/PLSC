@@ -12,7 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__all__ = ['AverageMeter']
+import builtins
+import datetime
+import os
+import time
+import numpy as np
+from collections import defaultdict, deque
+from pathlib import Path
+
+import paddle
+import paddle.distributed as dist
+
+__all__ = ['AverageMeter', 'SmoothedValue']
 
 
 class AverageMeter(object):
@@ -61,3 +72,79 @@ class AverageMeter(object):
     def value(self):
         return '{self.name}: {self.val:{self.fmt}}{self.postfix}'.format(
             self=self)
+
+
+def is_dist_avail_and_initialized():
+    if not paddle.fluid.core.is_compiled_with_cuda():
+        return False
+    if not dist.is_initialized():
+        return False
+    return True
+
+
+class SmoothedValue(object):
+    """Track a series of values and provide access to smoothed values over a
+    window or the global series average.
+    """
+
+    def __init__(self, window_size=20, fmt=None):
+        if fmt is None:
+            fmt = "{median:.4f} ({global_avg:.4f})"
+        self.deque = deque(maxlen=window_size)
+        self.total = 0.0
+        self.count = 0
+        self.fmt = fmt
+
+    def reset(self):
+        """ reset """
+        self.deque.clear()
+        self.total = 0.0
+        self.count = 0
+
+    def update(self, value, n=1):
+        self.deque.append(value)
+        self.count += n
+        self.total += value * n
+
+    def synchronize_between_processes(self):
+        """
+        Warning: does not synchronize the deque!
+        """
+        if not is_dist_avail_and_initialized():
+            return
+        t = paddle.to_tensor([self.count, self.total], dtype="float64")
+        dist.barrier()
+        dist.all_reduce(t)
+        t = t.tolist()
+        self.count = int(t[0])
+        self.total = t[1]
+
+    @property
+    def median(self):
+        d = paddle.to_tensor(list(self.deque))
+        return d.median().item()
+
+    @property
+    def avg(self):
+        d = paddle.to_tensor(list(self.deque), dtype=paddle.float32)
+        return d.mean().item()
+
+    @property
+    def global_avg(self):
+        return self.total / self.count
+
+    @property
+    def max(self):
+        return max(self.deque)
+
+    @property
+    def value(self):
+        return self.deque[-1]
+
+    def __str__(self):
+        return self.fmt.format(
+            median=self.median,
+            avg=self.avg,
+            global_avg=self.global_avg,
+            max=self.max,
+            value=self.value)
