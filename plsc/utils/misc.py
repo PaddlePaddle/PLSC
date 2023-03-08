@@ -95,6 +95,12 @@ class SmoothedValue(object):
         self.count = 0
         self.fmt = fmt
 
+    def reset(self):
+        """ reset """
+        self.deque.clear()
+        self.total = 0.0
+        self.count = 0
+
     def update(self, value, n=1):
         self.deque.append(value)
         self.count += n

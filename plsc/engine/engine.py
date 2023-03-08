@@ -27,7 +27,7 @@ import paddle.distributed as dist
 from paddle import nn
 from visualdl import LogWriter
 
-from plsc.utils.misc import AverageMeter
+from plsc.utils.misc import SmoothedValue
 from plsc.utils import logger
 from plsc.utils.config import print_config
 from plsc.data import build_dataloader
@@ -295,10 +295,8 @@ class Engine(object):
         # val: metrics list word
         self.output_info = dict()
         self.time_info = {
-            "batch_cost": AverageMeter(
-                "batch_cost", '.5f', postfix=" s,"),
-            "reader_cost": AverageMeter(
-                "reader_cost", ".5f", postfix=" s,"),
+            "batch_cost": SmoothedValue(window_size=self.print_batch_step),
+            "reader_cost": SmoothedValue(window_size=self.print_batch_step),
         }
 
         # load checkpoint and resume
