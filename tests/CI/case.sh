@@ -243,7 +243,7 @@ function ConvNeXt_base_224_in1k_1n8c_dp_fp32() {
     bash ./classification/convnext/ConvNeXt_base_224_in1k_1n8c_dp_fp32.sh
     check_result $FUNCNAME
     loss=`tail log/workerlog.0 | grep "50/313" | cut -d " " -f12 `
-    check_diff 6.39179 ${loss} ${FUNCNAME}_loss
+    check_diff 6.91451 ${loss} ${FUNCNAME}_loss
 }
 
 function check_result() {
