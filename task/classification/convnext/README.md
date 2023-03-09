@@ -33,9 +33,9 @@ wget -O ./pretrained/ConvNeXt_base_224_in1k_dp_fp32.pdparams https://plsc.bj.bce
 ```
 
 ```bash
-#export PADDLE_NNODES=1
-#export PADDLE_MASTER="127.0.0.1:12538"
-#export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+export PADDLE_NNODES=1
+export PADDLE_MASTER="127.0.0.1:12538"
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
 python -m paddle.distributed.launch \
   --nnodes=$PADDLE_NNODES \
@@ -48,14 +48,14 @@ python -m paddle.distributed.launch \
 ```
 
 ## Other Configurations
-We provide more directly runnable configurations, see [ConNeXt Configurations](./configs/).
+We provide more directly runnable configurations, see [ConvNeXt Configurations](./configs/).
 
 
 ## Models
 
-| Model         | DType | Phase    | Dataset      | Configs                                                      | GPUs       | Img/sec | Top1 Acc | Pre-trained checkpoint | Log         |
-|---------------|-------|----------| ------------ | ------------------------------------------------------------ |------------|--------|----------|------------------------|-------------|
-| convnext_base | FP32  | pretrain | ImageNet2012 | [config](./configs/ConvNeXt_base_224_in1k_1n8c_dp_fp32.yaml) | A100*N4C32 | 7800   | 0.838    | [download](https://plsc.bj.bcebos.com/models/convnext/v2.5/ConvNeXt_base_224_in1k_dp_fp32.pdparams)       | [log](https://plsc.bj.bcebos.com/models/convnext/v2.5/ConvNeXt_base_224_in1k_dp_fp32.log) |
+| Model         | DType | Phase    | Dataset      | Configs                                                       | GPUs       | Img/sec | Top1 Acc | Pre-trained checkpoint | Log         |
+|---------------|-------|----------| ------------ |---------------------------------------------------------------|------------|--------|----------|------------------------|-------------|
+| convnext_base | FP32  | pretrain | ImageNet2012 | [config](./configs/ConvNeXt_base_224_in1k_4n32c_dp_fp32.yaml) | A100*N4C32 | 7800   | 0.838    | [download](https://plsc.bj.bcebos.com/models/convnext/v2.5/ConvNeXt_base_224_in1k_dp_fp32.pdparams)       | [log](https://plsc.bj.bcebos.com/models/convnext/v2.5/ConvNeXt_base_224_in1k_dp_fp32.log) |
 
 
 
