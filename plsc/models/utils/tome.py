@@ -237,10 +237,42 @@ def make_tome_class(transformer_class):
 
             return super().forward(*args, **kwdargs)
 
+        def forward_features(self, x):
+            B = x.shape[0]
+            x = self.patch_embed(x)
+
+            T = x.shape[1]
+
+            cls_tokens = self.cls_token.expand(
+                (B, -1, -1))  # stole cls_tokens impl from Phil Wang, thanks
+            x = paddle.concat((cls_tokens, x), axis=1)
+            x = x + self.pos_embed
+            x = self.pos_drop(x)
+
+            for blk in self.blocks:
+                x = blk(x)
+
+            if self.global_pool:
+                # ---- ToMe changes this ----
+                # Global average pool proportional to token size
+                if self._tome_info["size"] is not None:
+                    x = (x * self._tome_info["size"])[:, 1:, :].sum(axis=1) / T
+                else:
+                    x = x[:, 1:, :].mean(
+                        axis=1)  # global pool without cls token
+                # ---- End of change ----
+
+                outcome = self.fc_norm(x)
+            else:
+                x = self.norm(x)
+                outcome = x[:, 0]
+
+            return outcome
+
     return ToMeVisionTransformer
 
 
-def apply_patch(model: VisionTransformer, prop_attn: bool=True):
+def apply_patch(model: VisionTransformer, prop_attn: bool=False):
     """
     Applies ToMe to this transformer. Afterward, set r using model.r.
 
