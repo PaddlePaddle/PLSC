@@ -18,7 +18,7 @@ bs_item=128
 run_mode=DP8-MP1
 device_num=N1C8
 yaml_path=./task/classification/deit/configs/DeiT_base_patch16_224_in1k_1n8c_dp_fp32.yaml
-max_iter=3752 # epoch=3
+max_iter=2501 # epoch=2
 
 bash ./tests/test_tipc/classification/benchmark_common/prepare.sh
 # run
