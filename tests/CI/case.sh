@@ -37,6 +37,7 @@ plsc_gpu_model_list=( \
     convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1 \
     convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1 \
     convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1 \
+    ConvNeXt_base_224_in1k_1n8c_dp_fp32 \
 )
 
 ###### Face ######
@@ -234,6 +235,16 @@ function convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
     loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
     ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
     check_result 6.9417 ${loss} 0.3474 ${ips} $FUNCNAME
+}
+
+function ConvNeXt_base_224_in1k_1n8c_dp_fp32() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./classification/convnext/ConvNeXt_base_224_in1k_1n8c_dp_fp32.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "50/313" | cut -d " " -f12 `
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_result 6.91451 ${loss%?} 706.8508 ${ips} $FUNCNAME
 }
 
 function check_result() {
