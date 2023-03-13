@@ -25,6 +25,7 @@ echo $OUTPUT_DIR
 DATA_PATH='./dataset/ILSVRC2012/'
 TOKENIZER_PATH=dalle-weights
 FLAGS_cudnn_exhaustive_search=True
+export FLAGS_gemm_use_half_precision_compute_type=False
 
 # ============================ pretraining ============================
 python -m paddle.distributed.launch  \
@@ -53,4 +54,4 @@ python -m paddle.distributed.launch  \
   --num_decoder_self_attention 4 \
   --dual_loss_weight 2 \
   --dual_path_ema 0 \
-  --amp \
+  --amp

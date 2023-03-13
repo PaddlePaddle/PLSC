@@ -254,7 +254,10 @@ class NativeScalerWithGradNormCount:
     state_dict_key = "amp_scaler"
 
     def __init__(self):
-        self._scaler = paddle.amp.GradScaler()
+        self._scaler = paddle.amp.GradScaler(
+            init_loss_scaling=2.**16,
+            incr_every_n_steps=2000,
+            decr_every_n_nan_or_inf=1, )  # same as pytorch
 
     def __call__(self,
                  loss,

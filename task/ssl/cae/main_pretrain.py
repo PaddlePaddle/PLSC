@@ -516,6 +516,8 @@ def main(args):
     no_decay = []
     skip_list = getattr(model_without_ddp, 'no_weight_decay', [])
     for name, param in model_without_ddp.named_parameters():
+        if 'teacher' in name:
+            continue
         if param.stop_gradient:
             continue  # frozen weights
         if len(param.shape) == 1 or name.endswith(
