@@ -367,15 +367,12 @@ class DataAugmentationForCAE(object):
                                        args.color_jitter))
         common_transform.append(transforms.RandomHorizontalFlip())
         common_transform.append(
-            transforms.TwoViewsTransform(
-                transforms.RandomResizedCrop(
-                    args.input_size,
-                    scale=(args.crop_min_size, args.crop_max_size),
-                    interpolation=args.train_interpolation),
-                transforms.RandomResizedCrop(
-                    args.second_input_size,
-                    scale=(args.crop_min_size, args.crop_max_size),
-                    interpolation=args.second_interpolation)))
+            transforms.RandomResizedCropWithTwoImages(
+                args.input_size,
+                second_size=args.second_input_size,
+                interpolation=args.train_interpolation,
+                second_interpolation=args.second_interpolation,
+                scale=(args.crop_min_size, args.crop_max_size)))
         self.common_transform = transforms.Compose(common_transform)
 
         self.patch_transform = transforms.Compose(
