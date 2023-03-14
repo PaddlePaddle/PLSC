@@ -23,6 +23,7 @@
 * [Swin](./task/classification/swin/)
 * [DeiT](./task/classification/deit/)
 * [CaiT](./task/classification/cait/)
+* [ConvNeXt](./task/classification/convnext)
 * [MoCo v3](./task/ssl/mocov3/)
 * [MAE](./task/ssl/mae/)
 * [ConvMAE](./task/ssl/mae/)
