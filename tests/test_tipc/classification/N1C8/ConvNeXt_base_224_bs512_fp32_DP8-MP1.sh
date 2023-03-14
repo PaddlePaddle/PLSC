@@ -12,17 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-model_item=ViT_base_patch16_384_ft
-fp_item=fp16
+model_item=ConvNeXt_base_224
+fp_item=fp32
 bs_item=512
 run_mode=DP8-MP1
 device_num=N1C8
-yaml_path=./task/classification/vit/configs/ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2.yaml
-max_iter=2501 # epoch=1
-accum_steps=2
-pretrained_model=./pretrained/ViT_base_patch16_224/imagenet2012-ViT-B_16-224
+yaml_path=./task/classification/convnext/configs/ConvNeXt_base_224_in1k_1n8c_dp_fp32.yaml
+max_iter=625 # epoch=2
+accum_steps=8
 
 bash ./tests/test_tipc/classification/benchmark_common/prepare.sh
 # run
 bash ./tests/test_tipc/classification/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${bs_item} ${run_mode} ${device_num} ${yaml_path} \
-${max_iter} ${accum_steps} ${pretrained_model} 2>&1;
+${max_iter} ${accum_steps} 2>&1;
