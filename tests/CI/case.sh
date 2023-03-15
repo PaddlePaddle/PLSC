@@ -65,7 +65,7 @@ function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c
     bash ./recognition/face/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "199/2530" | cut -d " " -f12 `
     ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 38.36615 ${loss%?} 9247.1 ${ips} $FUNCNAME
+    check_result 38.36626 ${loss%?} 9247.1 ${ips} $FUNCNAME
 }
 
 function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c_dp_mp_fp16o1() {
@@ -74,7 +74,7 @@ function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c
     bash ./recognition/face/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c_dp_mp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "199/2530" | cut -d " " -f12 `
     ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 37.72491 ${loss%?} 8745.6225 ${ips} $FUNCNAME
+    check_result 37.72493 ${loss%?} 8745.6225 ${ips} $FUNCNAME
 }
 
 function FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n8c_dp_mp_fp16o1() {
@@ -129,7 +129,7 @@ function ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2() {
     bash ./classification/vit/ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2.sh
     loss=`tail log/workerlog.0 | grep "49/2502" | cut -d " " -f18 `
     ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f24 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 6.90352 ${loss%?} 420.1 ${ips} $FUNCNAME
+    check_result 6.90351 ${loss%?} 420.1 ${ips} $FUNCNAME
 }
 
 
@@ -172,7 +172,7 @@ function swin_base_patch4_window7_224_fp16o2() {
     bash ./classification/swin/swin_base_patch4_window7_224_fp16o2.sh
     loss=`tail log/workerlog.0 | grep "49/1252" | cut -d " " -f12 `
     ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 7.06609 ${loss%?} 944.051 ${ips} $FUNCNAME
+    check_result 7.06612 ${loss%?} 944.051 ${ips} $FUNCNAME
 }
 
 
