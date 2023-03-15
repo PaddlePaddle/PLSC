@@ -25,6 +25,7 @@ cd -
 # pretrained
 mkdir -p pretrained/convmae && cd pretrained/convmae
 wget https://plsc.bj.bcebos.com/models/convmae/v2.5/convmae_convvit_base_pretrained_1599ep.pd
+cd -
 mkdir -p pretrained/mae && cd pretrained/mae
 wget https://plsc.bj.bcebos.com/models/mae/v2.4/mae_pretrain_vit_base_1599ep.pd
 cd -
