@@ -69,11 +69,13 @@ class TimmCosine(lr.LRScheduler):
             ) / float(self.warmup_steps) + self.warmup_start_lr
 
         last_epoch = self.last_epoch
+        T_max = self.T_max
         if self.warmup_prefix:
             last_epoch = last_epoch - self.warmup_steps
+            T_max = self.T_max - self.warmup_steps
         cur_steps = last_epoch - (self.T_max * (last_epoch // self.T_max))
         return self.eta_min + 0.5 * (self.base_lr - self.eta_min) * (
-            1 + math.cos(math.pi * cur_steps / self.T_max))
+            1 + math.cos(math.pi * cur_steps / T_max))
 
 
 class ViTLRScheduler(lr.LRScheduler):

@@ -1,11 +1,11 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,7 +18,7 @@ bs_item=512
 run_mode=DP8-MP1
 device_num=N1C8
 yaml_path=./task/classification/vit/configs/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.yaml
-max_iter=150
+max_iter=1564 # epoch=5
 
 bash ./tests/test_tipc/classification/benchmark_common/prepare.sh
 # run

@@ -37,6 +37,7 @@ plsc_gpu_model_list=( \
     convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1 \
     convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1 \
     convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1 \
+    ConvNeXt_base_224_in1k_1n8c_dp_fp32 \
 )
 
 ###### Face ######
@@ -119,7 +120,7 @@ function ViT_base_patch16_224_in1k_1n8c_dp_fp16o2() {
     bash ./classification/vit/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.sh
     loss=`tail log/workerlog.0 | grep "49/313" | cut -d " " -f18 `
     ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f24 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 10.90619 ${loss%?} 2017.95 ${ips} $FUNCNAME
+    check_result 10.47853 ${loss%?} 2140.74 ${ips} $FUNCNAME
 }
 
 function ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2() {
@@ -128,7 +129,7 @@ function ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2() {
     bash ./classification/vit/ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2.sh
     loss=`tail log/workerlog.0 | grep "49/2502" | cut -d " " -f18 `
     ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f24 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 6.90645 ${loss%?} 404.41425 ${ips} $FUNCNAME
+    check_result 6.90352 ${loss%?} 420.1 ${ips} $FUNCNAME
 }
 
 
@@ -139,7 +140,7 @@ function DeiT_base_patch16_224_in1k_1n8c_dp_fp32() {
     bash ./classification/deit/DeiT_base_patch16_224_in1k_1n8c_dp_fp32.sh
     loss=`tail log/workerlog.0 | grep "49/1251" | cut -d " " -f12 `
     ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 6.90764 ${loss%?} 746.0705 ${ips} $FUNCNAME
+    check_result 6.90003 ${loss%?} 783.895 ${ips} $FUNCNAME
 }
 
 
@@ -149,7 +150,7 @@ function DeiT_base_patch16_224_in1k_1n8c_dp_fp16o2() {
     bash ./classification/deit/DeiT_base_patch16_224_in1k_1n8c_dp_fp16o2.sh
     loss=`tail log/workerlog.0 | grep "49/1251" | cut -d " " -f12 `
     ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 6.91250 ${loss%?} 1991.8475 ${ips} $FUNCNAME
+    check_result 6.90155 ${loss%?} 2079.68 ${ips} $FUNCNAME
 }
 
 
@@ -160,7 +161,7 @@ function cait_s24_224_in1k_1n8c_dp_fp16o2() {
     bash ./classification/cait/cait_s24_224_in1k_1n8c_dp_fp16o2.sh
     loss=`tail log/workerlog.0 | grep "49/1251" | cut -d " " -f12 `
     ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 6.98169 ${loss%?} 1714.3675 ${ips} $FUNCNAME
+    check_result 6.93708 ${loss%?} 1824.29 ${ips} $FUNCNAME
 }
 
 
@@ -171,7 +172,7 @@ function swin_base_patch4_window7_224_fp16o2() {
     bash ./classification/swin/swin_base_patch4_window7_224_fp16o2.sh
     loss=`tail log/workerlog.0 | grep "49/1252" | cut -d " " -f12 `
     ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 7.00540 ${loss%?} 893.83775 ${ips} $FUNCNAME
+    check_result 7.06609 ${loss%?} 944.051 ${ips} $FUNCNAME
 }
 
 
@@ -181,8 +182,8 @@ function mae_vit_base_patch16_pt_in1k_1n8c_dp_fp16o1() {
     rm -rf log
     bash ./ssl/mae/mae_vit_base_patch16_pt_in1k_1n8c_dp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
-    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f19 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 1.0064 ${loss} 0.24672675 ${ips} $FUNCNAME
+    ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_result 1.0064 ${loss} 0.4965 ${ips} $FUNCNAME
 }
 
 
@@ -191,8 +192,8 @@ function mae_vit_base_patch16_ft_in1k_1n8c_dp_fp16o1() {
     rm -rf log
     bash ./ssl/mae/mae_vit_base_patch16_ft_in1k_1n8c_dp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "599/5004" | cut -d " " -f15 `
-    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f19 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 6.7559 ${loss} 0.04089795 ${ips} $FUNCNAME
+    ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_result 6.7559 ${loss} 0.2332 ${ips} $FUNCNAME
 }
 
 
@@ -201,8 +202,8 @@ function mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
     rm -rf log
     bash ./ssl/mae/mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "199/312" | cut -d " " -f14 `
-    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 6.6991 ${loss} 0.538188 ${ips} $FUNCNAME
+    ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_result 6.6991 ${loss} 1.1039 ${ips} $FUNCNAME
 }
 
 
@@ -212,8 +213,8 @@ function convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1() {
     rm -rf log
     bash ./ssl/convmae/convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "99/1251" | cut -d " " -f16 `
-    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f20 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 1.2954 ${loss} 0.23070725 ${ips} $FUNCNAME
+    ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_result 1.2954 ${loss} 0.8568 ${ips} $FUNCNAME
 }
 
 
@@ -222,8 +223,8 @@ function convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1() {
     rm -rf log
     bash ./ssl/convmae/convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "599/5004" | cut -d " " -f15 `
-    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f19 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 6.7890 ${loss} 0.049295875 ${ips} $FUNCNAME
+    ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_result 6.7890 ${loss} 0.2964 ${ips} $FUNCNAME
 }
 
 
@@ -232,8 +233,18 @@ function convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
     rm -rf log
     bash ./ssl/convmae/convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
-    ips=`cat log/workerlog.0 |grep time: |cut -d " " -f19 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 6.9417 ${loss} 0.18312925 ${ips} $FUNCNAME
+    ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_result 6.9417 ${loss} 0.3474 ${ips} $FUNCNAME
+}
+
+function ConvNeXt_base_224_in1k_1n8c_dp_fp32() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./classification/convnext/ConvNeXt_base_224_in1k_1n8c_dp_fp32.sh
+    check_result $FUNCNAME
+    loss=`tail log/workerlog.0 | grep "50/313" | cut -d " " -f12 `
+    ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_result 6.91451 ${loss%?} 706.8508 ${ips} $FUNCNAME
 }
 
 function check_result() {
