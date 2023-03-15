@@ -35,6 +35,7 @@ function _set_params(){
     num_workers=0                  # (可选)
     base_batch_size=$global_batch_size
     PRETRAIN_CHKPT=${9:-'pretrained/convmae/convmae_convvit_base_pretrained_1599ep.pd'}
+    accum_iter=${10:-1}
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -88,7 +89,7 @@ function _train(){
         train_cmd="python -m paddle.distributed.launch --nnodes=1 --master=127.0.0.1:12538 \
                     --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION} \
                     ./task/ssl/mae/main_finetune.py \
-                    --accum_iter 1 --print_freq 1 --max_train_step ${max_iter} \
+                    --accum_iter ${accum_iter} --print_freq 1 --max_train_step ${max_iter} \
                     --batch_size ${global_batch_size} --model ${model} --finetune ${PRETRAIN_CHKPT} \
                     --epochs 100 --blr 5e-4 --layer_decay 0.65 --weight_decay 0.05 \
                     --drop_path 0.1 --reprob 0.25 --mixup 0.8 --cutmix 1.0 \
@@ -99,7 +100,7 @@ function _train(){
         train_cmd="python -m paddle.distributed.launch --nnodes=1 --master=127.0.0.1:12538 \
                     --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION} \
                     ./task/ssl/mae/main_linprobe.py \
-                    --accum_iter 1 --print_freq 1 --max_train_step ${max_iter} \
+                    --accum_iter ${accum_iter} --print_freq 1 --max_train_step ${max_iter} \
                     --batch_size ${global_batch_size} --model ${model} ${args} --finetune ${PRETRAIN_CHKPT} \
                     --epochs 90 --blr 0.1 --weight_decay 0.0 \
                     --dist_eval --data_path ./dataset/ILSVRC2012/ "
@@ -109,7 +110,7 @@ function _train(){
         train_cmd="python -m paddle.distributed.launch --nnodes=1 --master=127.0.0.1:12538 \
                     --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION} \
                     ./task/ssl/mae/main_pretrain.py \
-                    --accum_iter 1 --print_freq 1 --max_train_step ${max_iter} \
+                    --accum_iter ${accum_iter} --print_freq 1 --max_train_step ${max_iter} \
                     --batch_size ${global_batch_size} --model ${model} --norm_pix_loss --mask_ratio 0.75 \
                     --epochs 1600 --warmup_epochs 40 --blr 1.5e-4 --weight_decay 0.05 \
                     --data_path ./dataset/ILSVRC2012/ "

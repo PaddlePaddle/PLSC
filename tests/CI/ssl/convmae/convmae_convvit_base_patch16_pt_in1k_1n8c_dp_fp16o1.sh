@@ -19,7 +19,7 @@
 #export PADDLE_JOB_ID=ConvMAE
 
 # 3 nodes for pretrain
-ACCUM_ITER=1
+ACCUM_ITER=2
 IMAGENET_DIR=./dataset/ILSVRC2012/
 python -m paddle.distributed.launch \
     --nnodes=$PADDLE_NNODES \
@@ -29,7 +29,7 @@ python -m paddle.distributed.launch \
     --accum_iter $ACCUM_ITER \
     --print_freq 1 \
     --max_train_step 100 \
-    --batch_size 128 \
+    --batch_size 64 \
     --model convmae_convvit_base_patch16 \
     --norm_pix_loss \
     --mask_ratio 0.75 \

@@ -108,7 +108,7 @@ DataLoader:
     sampler:
       name: DistributedBatchSampler
       batch_size: 512
-      drop_last: False
+      drop_last: True
       shuffle: True
     loader:
       num_workers: 8
