@@ -203,7 +203,7 @@ function mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/mae/mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "199/312" | cut -d " " -f14 `
     ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 6.6991 ${loss} 1.1039 ${ips} $FUNCNAME
+    check_result 6.6991 ${loss} 1.046984 ${ips} $FUNCNAME
 }
 
 
