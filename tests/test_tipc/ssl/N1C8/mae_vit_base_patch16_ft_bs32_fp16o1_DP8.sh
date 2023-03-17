@@ -14,7 +14,7 @@
 
 model_item=mae_vit_base_patch16_ft
 fp_item=fp16o1
-bs_item=512
+bs_item=32
 run_mode=DP8
 device_num=N1C8
 mode=ft
