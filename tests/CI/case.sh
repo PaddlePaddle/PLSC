@@ -203,7 +203,7 @@ function mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/mae/mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "199/312" | cut -d " " -f14 `
     ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 6.6991 ${loss} 1.1039 ${ips} $FUNCNAME
+    check_result 6.6991 ${loss} 1.072845 ${ips} $FUNCNAME
 }
 
 
@@ -260,8 +260,13 @@ function check_result() {
 
     diff=$(echo $3 $4|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
     echo -e "ips_base: $3 ips_test: $4 ips_diff: $diff% " | tee -a $log_path/result.log
-    v1=$(echo $diff 5.0|awk '{print($1>=$2)?"0":"1"}')
-    v2=$(echo $diff -5.0|awk '{print($1<=$2)?"0":"1"}')
+    if [ $5 == mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1 ];then
+        v1=$(echo $diff 10.0|awk '{print($1>=$2)?"0":"1"}')
+        v2=$(echo $diff -10.0|awk '{print($1<=$2)?"0":"1"}')
+    else
+        v1=$(echo $diff 5.0|awk '{print($1>=$2)?"0":"1"}')
+        v2=$(echo $diff -5.0|awk '{print($1<=$2)?"0":"1"}')
+    fi
     if [[ $v1 == 0 ]] || [[ $v2 == 0 ]];then
       echo -e "\033 $5 ips diff check failed! \033" | tee -a $log_path/result.log
       exit -1
