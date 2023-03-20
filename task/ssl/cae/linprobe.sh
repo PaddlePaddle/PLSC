@@ -32,7 +32,7 @@ python -m paddle.distributed.launch  \
   --nnodes=$PADDLE_NNODES \
   --master=$PADDLE_MASTER \
   --devices=$CUDA_VISIBLE_DEVICES \
-  main_linprob.py \
+  main_linprobe.py \
   --data_path ${DATA_PATH} \
   --output_dir ${OUTPUT_DIR}_linprob \
   --model cae_base_patch16_224_linprobe \

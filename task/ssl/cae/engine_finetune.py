@@ -48,7 +48,7 @@ def train_one_epoch(model,
     optimizer.clear_grad()
 
     if log_writer is not None:
-        print('log_dir: {}'.format(log_writer.log_dir))
+        print('log_dir: {}'.format(log_writer.kwargs['log_dir']))
 
     for data_iter_step, (samples, targets) in enumerate(
             metric_logger.log_every(data_loader, args.print_freq, header)):

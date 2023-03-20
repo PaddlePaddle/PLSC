@@ -129,6 +129,9 @@ def get_args_parser():
     parser.add_argument('--seed', default=0, type=int)
     parser.add_argument('--clip_norm', default=None, type=float)
     parser.add_argument('--resume', default='', help='resume from checkpoint')
+    parser.add_argument('--auto_resume', action='store_true')
+    parser.add_argument(
+        '--no_auto_resume', action='store_false', dest='auto_resume')
 
     parser.add_argument(
         '--start_epoch', default=0, type=int, metavar='N', help='start epoch')
@@ -224,6 +227,14 @@ def get_args_parser():
         type=str,
         help='[standard, attentive, attentive_no_parameter]')
     parser.add_argument('--linear_depth', default=1, type=int, help=' ')
+
+    parser.add_argument('--print_freq', default=20, type=int)
+    parser.add_argument(
+        '--max_train_step',
+        default=None,
+        type=int,
+        help='only used for debugging')
+
     return parser
 
 
@@ -516,7 +527,7 @@ def main(args):
 
     print("criterion = %s" % str(criterion))
 
-    misc.load_model(
+    misc.auto_load_model(
         args=args,
         model_without_ddp=model_without_ddp,
         optimizer=optimizer,

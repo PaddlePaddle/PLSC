@@ -1207,7 +1207,7 @@ class CAEViTLinearProbe(Model):
     def build_2d_sincos_position_embedding(self,
                                            embed_dim=768,
                                            temperature=10000.):
-        h, w = self.patch_embed.patch_shape
+        h, w = self.patch_embed.grid_size
         grid_w = paddle.arange(w, dtype=paddle.float32)
         grid_h = paddle.arange(h, dtype=paddle.float32)
         grid_w, grid_h = paddle.meshgrid(grid_w, grid_h)
