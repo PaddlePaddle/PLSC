@@ -18,7 +18,7 @@ bs_item=512
 run_mode=DP8-MP1
 device_num=N1C8
 yaml_path=./task/classification/convnext/configs/ConvNeXt_base_224_in1k_1n8c_dp_fp32.yaml
-max_iter=625 # epoch=2
+max_iter=623 # epoch=2
 accum_steps=8
 
 bash ./tests/test_tipc/classification/benchmark_common/prepare.sh
