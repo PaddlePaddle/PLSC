@@ -19,7 +19,7 @@ run_mode=DP8
 device_num=N1C8
 mode=pt
 model=convmae_convvit_base_patch16
-max_iter=3752 # epoch=3
+max_iter=5004 # epoch=2
 PRETRAIN_CHKPT=""
 accum_iter=2
 

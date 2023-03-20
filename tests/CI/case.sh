@@ -212,9 +212,9 @@ function convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1() {
     cd ${plsc_path}
     rm -rf log
     bash ./ssl/convmae/convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1.sh
-    loss=`tail log/workerlog.0 | grep "99/1251" | cut -d " " -f16 `
+    loss=`tail log/workerlog.0 | grep "99/2502" | cut -d " " -f16 `
     ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 1.2954 ${loss} 0.8568 ${ips} $FUNCNAME
+    check_result 1.5487 ${loss} 0.456938 ${ips} $FUNCNAME
 }
 
 
