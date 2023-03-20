@@ -18,7 +18,7 @@ from __future__ import print_function
 
 import datetime
 from plsc.utils import logger
-from plsc.utils.misc import AverageMeter
+from plsc.utils.misc import SmoothedValue
 
 
 def update_metric(trainer, out, batch, batch_size):
@@ -27,7 +27,8 @@ def update_metric(trainer, out, batch, batch_size):
         metric_dict = trainer.train_metric_func(out, batch[-1])
         for key in metric_dict:
             if key not in trainer.output_info:
-                trainer.output_info[key] = AverageMeter(key, '7.5f')
+                trainer.output_info[key] = SmoothedValue(
+                    window_size=trainer.print_batch_step)
             trainer.output_info[key].update(metric_dict[key], batch_size)
 
 
@@ -35,7 +36,8 @@ def update_loss(trainer, loss_dict, batch_size):
     # update_output_info
     for key in loss_dict:
         if key not in trainer.output_info:
-            trainer.output_info[key] = AverageMeter(key, '7.5f')
+            trainer.output_info[key] = SmoothedValue(
+                window_size=trainer.print_batch_step)
         trainer.output_info[key].update(loss_dict[key].item(), batch_size)
 
 
@@ -75,9 +77,3 @@ def log_info(trainer, batch_size, epoch_id, iter_id):
             value=trainer.output_info[key].avg,
             step=trainer.global_step,
             writer=trainer.vdl_writer)
-
-    # clear
-    for key in trainer.output_info:
-        trainer.output_info[key].reset()
-    for key in trainer.time_info:
-        trainer.time_info[key].reset()

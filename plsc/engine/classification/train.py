@@ -84,7 +84,9 @@ def default_train_one_epoch(engine, epoch_id):
         if iter_id % engine.print_batch_step == 0:
             log_info(engine, batch_size, epoch_id, iter_id)
         tic = time.time()
-
+        # ema update
+        if engine.enabled_ema:
+            engine.ema.update()
         # eval model and save model if possible
         eval_metric_info = {
             "epoch": epoch_id,

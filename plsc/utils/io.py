@@ -209,3 +209,89 @@ def export(config, net, path):
                     shape=input_shape, dtype='float32')
             ])
     logger.info("Export model to '{}'.".format(path))
+
+
+def load_ema_checkpoint(checkpoint_path, ema):
+    """
+    load ema state from checkpoint
+    """
+    # load ema state
+    ema_path = checkpoint_path + '.pdema'
+    assert os.path.exists(ema_path), \
+        "EMA checkpoint path {} does not exists.".format(ema_path)
+    ema_dict = paddle.load(ema_path)
+    ema.set_state_dict(ema_dict)
+
+    # load ema metric state
+    ema_metric_path = checkpoint_path + '.pdemastates'
+    ema_metric_dict = None
+    if os.path.exists(ema_metric_path):
+        ema_metric_dict = paddle.load(ema_metric_path)
+
+    logger.info("Finish load ema state from {}".format(checkpoint_path))
+    return ema_metric_dict
+
+
+def save_ema_checkpoint(model,
+                        ema,
+                        model_path,
+                        metric_info=None,
+                        model_name="",
+                        prefix='plsc',
+                        max_num_checkpoint=3):
+    """
+    save ema state to the target path
+    """
+    local_rank = paddle.distributed.ParallelEnv().dev_id
+    rank = paddle.distributed.get_rank()
+    world_size = paddle.distributed.get_world_size()
+
+    if metric_info is None:
+        metric_info = {}
+
+    metric_info.update({
+        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S',
+                                   time.localtime(time.time()))
+    })
+    model_dir = os.path.join(model_path, model_name)
+    _mkdir_if_not_exist(model_dir)
+    model_prefix = os.path.join(model_dir, prefix)
+
+    model.save(model_prefix, local_rank, rank)
+
+    ema_state_dict = ema.state_dict()
+
+    local_rank = paddle.distributed.ParallelEnv().dev_id
+    if local_rank == 0:
+        paddle.save(ema_state_dict, model_prefix + ".pdema")
+        paddle.save(metric_info, model_prefix + ".pdemastates")
+
+    logger.info("Already save {} ema state in {}".format(prefix, model_dir))
+
+    keep_prefixs = ['best', 'latest']
+
+    if local_rank == 0:
+        if all(p not in prefix
+               for p in keep_prefixs) and max_num_checkpoint >= 0:
+            pdstates_list = glob.glob(os.path.join(model_dir, '*.pdemastates'))
+
+            timestamp_to_path = {}
+            for path in pdstates_list:
+                if any(p in path for p in keep_prefixs):
+                    continue
+                metric_dict = paddle.load(path)
+                timestamp_to_path[metric_dict['timestamp']] = path[:-9]
+
+            # sort by ascend
+            timestamps = list(timestamp_to_path.keys())
+            timestamps.sort()
+
+            if max_num_checkpoint > 0:
+                to_remove = timestamps[:-max_num_checkpoint]
+            else:
+                to_remove = timestamps
+            for timestamp in to_remove:
+                model_prefix = timestamp_to_path[timestamp]
+                for ext in ['.pdema', '.pdemastates']:
+                    path = model_prefix + ext
+                    _remove_if_exist(path)
