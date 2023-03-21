@@ -511,7 +511,9 @@ def main(args):
     # following timm: set wd as 0 for bias and norm layers  
     decay = []
     no_decay = []
-    skip_list = getattr(model_without_ddp, 'no_weight_decay', [])
+    skip_list = {}
+    if hasattr(model_without_ddp, 'no_weight_decay'):
+        skip_list = model_without_ddp.no_weight_decay()
     for name, param in model_without_ddp.named_parameters():
         if 'teacher' in name:
             continue

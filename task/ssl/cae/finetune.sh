@@ -18,7 +18,7 @@
 # export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 # export PADDLE_JOB_ID=CAE
 
-tmp_my_name=linprob_ep90_fp16o1
+tmp_my_name=finetune_ep100_fp16o1
 my_name=${tmp_my_name%.*}
 OUTPUT_DIR='./output/'$my_name
 echo $OUTPUT_DIR
@@ -32,21 +32,23 @@ python -m paddle.distributed.launch  \
   --nnodes=$PADDLE_NNODES \
   --master=$PADDLE_MASTER \
   --devices=$CUDA_VISIBLE_DEVICES \
-  main_linprobe.py \
+  main_finetune.py \
   --data_path ${DATA_PATH} \
   --output_dir ${OUTPUT_DIR} \
   --model cae_base_patch16_224_linprobe \
   --finetune $MODEL_PATH \
   --nb_classes 1000 \
-  --batch_size 512 \
-  --epochs 90 \
-  --blr 0.1 \
-  --weight_decay 0.0 \
+  --batch_size 128 \
+  --lr 8e-3 \
+  --accum_iter 1 \
+  --warmup_epochs 5 \
+  --epochs 100 \
+  --layer_decay 0.65 \
+  --drop_path 0.1 \
+  --weight_decay 0.05 \
+  --mixup 0.8 \
+  --cutmix 1.0 \
+  --sin_pos_emb \
   --dist_eval \
-  --log_dir $OUTPUT_DIR \
-  --enable_linear_eval \
-  --use_cls \
-  --save_freq 50 \
-  --disable_rel_pos_bias \
-  --linear_type standard \
-  --exp_name $my_name 
+  --no_auto_resume \
+  --exp_name $my_name

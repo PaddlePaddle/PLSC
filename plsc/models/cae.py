@@ -1152,7 +1152,7 @@ class CAEViTLinearProbe(Model):
                 drop_path=dpr[i],
                 norm_layer=norm_layer,
                 init_values=init_values,
-                window_size=self.patch_embed.patch_shape
+                window_size=self.patch_embed.grid_size
                 if use_rel_pos_bias else None) for i in range(depth)
         ])
         self.norm = nn.Identity() if use_mean_pooling else norm_layer(
@@ -1203,6 +1203,9 @@ class CAEViTLinearProbe(Model):
         init.trunc_normal_(self.head.weight, std=.02)
         init.zeros_(self.head.bias)
         self.apply(self._init_weights)
+        self.fix_init_weight()
+        self.head.weight.set_value(self.head.weight * init_scale)
+        self.head.bias.set_value(self.head.bias * init_scale)
 
     def build_2d_sincos_position_embedding(self,
                                            embed_dim=768,
