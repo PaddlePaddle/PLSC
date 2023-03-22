@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-#
+# 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-#
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
+# 
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,18 +22,20 @@ function _set_params(){
     global_batch_size=${3:-"128"}    # （必选）global_batch_size
     run_mode=${4:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP2-MP8-PP2|DP1-MP8-PP4|DP4-MP8-PP1
     device_num=${5:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
-    yaml_path=${6:-"./task/classification/vit/configs/ViT_base_patch16_224_in1k_1n8c_dp_fp16o2.yaml"}
+    mode=${6:-"ft"}                 # (必选) ft|lp|pt
+    model=${7:-"convvit_base_patch16"} 
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
     model_repo="PLSC"          # (必选) 模型套件的名字
-    speed_unit="images/sec"         # (必选)速度指标单位
-    skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
-    keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
+    speed_unit=""         # (必选)速度指标单位
+    skip_steps=20                  # (必选)解析日志，跳过模型前几个性能不稳定的step
+    keyword="time:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
-    max_iter=${7:-150}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
+    max_iter=${8:-600}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
+    eval_interval=20000            # （可选）保障模型训练结束前不执行eval
     num_workers=0                  # (可选)
     base_batch_size=$global_batch_size
-    accum_steps=${8:-1}
-    pretrained_model=${9:-null}
+    PRETRAIN_CHKPT=${9:-'pretrained/convmae/convmae_convvit_base_pretrained_1599ep.pd'}
+    accum_iter=${10:-1}
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -68,36 +70,50 @@ function _train(){
         log_file=${train_log_file}
     fi
 
-    if [[ ${model_item} =~ "ft" ]];then # finetune
-        pretrained=" -o Global.pretrained_model=${pretrained_model} "
-    else
-        pretrained=""
-    fi
-
-    train_cmd="-o Global.print_batch_step=1 \
-               -o Global.max_train_step=${max_iter} \
-               -o Global.flags.FLAGS_cudnn_exhaustive_search=0 \
-               -o Global.flags.FLAGS_cudnn_deterministic=1 \
-               -o Global.accum_steps=${accum_steps} \
-               ${pretrained} "
     if [ ${PADDLE_TRAINER_ID} ]
     then
         PADDLE_RANK_OPTION=" --rank ${PADDLE_TRAINER_ID}"
     else
         PADDLE_RANK_OPTION=""
     fi
+    
+    if [ ${model} = "convvit_base_patch16" ];then
+        args="--global_pool"
+    else
+        args="--cls_token"
+    fi
+
     # 以下为通用执行命令，无特殊可不用修改
-    case ${run_mode} in
-    DP1-MP1) echo "run run_mode: ${run_mode}"
+    case ${mode} in
+    ft) echo "run run_mode: ${mode}_${run_mode}"
         train_cmd="python -m paddle.distributed.launch --nnodes=1 --master=127.0.0.1:12538 \
-        --devices=0 ${PADDLE_RANK_OPTION} plsc-train -c ${yaml_path} \
-        ${train_cmd}"
+                    --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION} \
+                    ./task/ssl/mae/main_finetune.py \
+                    --accum_iter ${accum_iter} --print_freq 1 --max_train_step ${max_iter} \
+                    --batch_size ${global_batch_size} --model ${model} --finetune ${PRETRAIN_CHKPT} \
+                    --epochs 100 --blr 5e-4 --layer_decay 0.65 --weight_decay 0.05 \
+                    --drop_path 0.1 --reprob 0.25 --mixup 0.8 --cutmix 1.0 \
+                    --dist_eval --data_path ./dataset/ILSVRC2012/ "
         workerlog_id=0
         ;;
-    DP8-MP8|DP8-MP1) echo "run run_mode: ${run_mode}"
+    lp) echo "run run_mode: ${mode}_${run_mode}"
         train_cmd="python -m paddle.distributed.launch --nnodes=1 --master=127.0.0.1:12538 \
-        --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION} plsc-train -c ${yaml_path} \
-        ${train_cmd}"
+                    --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION} \
+                    ./task/ssl/mae/main_linprobe.py \
+                    --accum_iter ${accum_iter} --print_freq 1 --max_train_step ${max_iter} \
+                    --batch_size ${global_batch_size} --model ${model} ${args} --finetune ${PRETRAIN_CHKPT} \
+                    --epochs 90 --blr 0.1 --weight_decay 0.0 \
+                    --dist_eval --data_path ./dataset/ILSVRC2012/ "
+        workerlog_id=0
+        ;;
+    pt) echo "run run_mode: ${mode}_${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --nnodes=1 --master=127.0.0.1:12538 \
+                    --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION} \
+                    ./task/ssl/mae/main_pretrain.py \
+                    --accum_iter ${accum_iter} --print_freq 1 --max_train_step ${max_iter} \
+                    --batch_size ${global_batch_size} --model ${model} --norm_pix_loss --mask_ratio 0.75 \
+                    --epochs 1600 --warmup_epochs 40 --blr 1.5e-4 --weight_decay 0.05 \
+                    --data_path ./dataset/ILSVRC2012/ "
         workerlog_id=0
         ;;
     *) echo "choose run_mode "; exit 1;
