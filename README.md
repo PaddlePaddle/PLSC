@@ -25,6 +25,7 @@
 * [CaiT](./task/classification/cait/)
 * [ConvNeXt](./task/classification/convnext)
 * [MoCo v3](./task/ssl/mocov3/)
+* [CAE](./task/ssl/cae/)
 * [MAE](./task/ssl/mae/)
 * [ConvMAE](./task/ssl/mae/)
 * [ToMe](./task/accelerate/tome)

@@ -5,7 +5,7 @@ CAE is a novel masked image modeling (MIM) approach for self-supervised represen
 In comparison to previous MIM methods (e.g., BEiT) that couple the encoding and pretext task completion roles, our approach benefits the separation of the representation learning (encoding) role and the pretext task completion role, improving the representation learning capacity and accordingly helping more on downstream tasks. In addition, we present the explanations about why contrastive pretraining and supervised pretraining perform similarly and why MIM potentially performs better. We demonstrate the effectiveness of our CAE through superior transfer performance in downstream tasks: semantic segmentation, and object detection and instance segmentation.
 
 <div align="center">
-  <img src="https://github.com/PaddlePaddle/VIMER/blob/main/CAE/figs/CAE2.png" width="480">
+  <img src="https://github.com/PaddlePaddle/VIMER/blob/main/CAE/figs/CAE2.png?raw=true" width="480">
 </div>
 
 This is a PaddlePaddle/GPU re-implementation of the paper [Context Autoencoder for Self-Supervised Representation Learning](https://arxiv.org/abs/2202.03026).
@@ -28,7 +28,7 @@ dataset/
 
 ### Pre-Training
 
-A typical command To pre-train Vit-Base (recommended default) with multi-nodes distributed training, run the following on **4 nodes** with 8 GPUs each::
+A typical command to pre-train Vit-Base (recommended by default) with multi-nodes distributed training, run the following on **4 nodes** with 8 GPUs each::
 
 ```
 # unset PADDLE_TRAINER_ENDPOINTS
@@ -77,7 +77,7 @@ python -m paddle.distributed.launch  \
 
 ### Fine-tuning
 
-A typical command to run finetune of Vit-Base (recommended default) with multi-nodes distributed training, run the following on **4 nodes** with 8 GPUs each:
+A typical command to finetune of Vit-Base (recommended by default) with multi-nodes distributed training, run the following on **4 nodes** with 8 GPUs each:
 
 ```
 # unset PADDLE_TRAINER_ENDPOINTS
@@ -124,7 +124,7 @@ python -m paddle.distributed.launch  \
 
 ### Linear Probing
 
-A typical command To run Linear Probing of Vit-Base (recommended default) with multi-nodes distributed training, run the following on **4 nodes** with 8 GPUs each:
+A typical command to run Linear Probing of Vit-Base (recommended by default) with multi-nodes distributed training, run the following on **4 nodes** with 8 GPUs each:
 
 ```
 # unset PADDLE_TRAINER_ENDPOINTS

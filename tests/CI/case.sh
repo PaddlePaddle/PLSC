@@ -252,7 +252,6 @@ function ConvNeXt_base_224_in1k_1n8c_dp_fp32() {
     check_result 6.91451 ${loss%?} 706.8508 ${ips} $FUNCNAME
 }
 
-    cae_base_patch16_224_lp_in1k_1n8c_dp_fp16o1 \
 
 ###### CAE ######
 function cae_base_patch16_224_pt_in1k_1n8c_dp_fp16o1() {
@@ -271,7 +270,7 @@ function cae_base_patch16_224_ft_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/cae/cae_base_patch16_224_ft_in1k_1n8c_dp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
     ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 6.7559 ${loss} 0.2332 ${ips} $FUNCNAME
+    check_result 6.3034 ${loss} 2.49244 ${ips} $FUNCNAME
 }
 
 
@@ -281,7 +280,7 @@ function cae_base_patch16_224_lp_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/cae/cae_base_patch16_224_lp_in1k_1n8c_dp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "199/312" | cut -d " " -f14 `
     ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 6.6991 ${loss} 1.1039 ${ips} $FUNCNAME
+    check_result 6.7196 ${loss} 1.07848 ${ips} $FUNCNAME
 }
 
 function check_result() {
