@@ -350,6 +350,13 @@ def get_args():
     parser.add_argument(
         '--crop_max_size', type=float, default=1.0, help='max size of crop')
 
+    parser.add_argument('--print_freq', default=10, type=int)
+    parser.add_argument(
+        '--max_train_step',
+        default=None,
+        type=int,
+        help='only used for debugging')
+
     return parser.parse_args()
 
 

@@ -54,11 +54,17 @@ def train_one_epoch(model: nn.Layer,
         'lr', misc.SmoothedValue(
             window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
-    print_freq = 10
 
-    for step, (
-            batch, _
-    ) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+    for step, (batch, _) in enumerate(
+            metric_logger.log_every(data_loader, args.print_freq, header)):
+
+        global_iter_step = step + len(data_loader) * epoch
+        if args.max_train_step is not None and global_iter_step >= args.max_train_step:
+            print(
+                f'step({global_iter_step}) >= max_train_step({args.max_train_step}), training stops early. This function is only used for debugging.'
+            )
+            exit(0)
+
         # assign learning rate & weight decay for each step
         it = start_steps + step  # global training iteration
         optimizer.lr_step(it)

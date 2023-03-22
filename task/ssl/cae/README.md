@@ -72,8 +72,8 @@ python -m paddle.distributed.launch  \
   --num_decoder_self_attention 4 \
   --dual_loss_weight 2 \
   --dual_path_ema 0
-
 ```
+**Note**: The `dalle-weights` can be download from [encoder_weight](https://vimer.bj.bcebos.com/CAE/encoder_weight.pd) and [decoder_weight](https://vimer.bj.bcebos.com/CAE/decoder_weight.pd)
 
 ### Fine-tuning
 

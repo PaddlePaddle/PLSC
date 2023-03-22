@@ -41,7 +41,6 @@ def train_one_epoch(model,
         'lr', misc.SmoothedValue(
             window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
-    print_freq = 20
 
     accum_iter = args.accum_iter
 
