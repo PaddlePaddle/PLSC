@@ -35,7 +35,7 @@ python -m paddle.distributed.launch  \
   main_finetune.py \
   --data_path ${DATA_PATH} \
   --output_dir ${OUTPUT_DIR} \
-  --model cae_base_patch16_224_linprobe \
+  --model cae_base_patch16_224 \
   --finetune $MODEL_PATH \
   --nb_classes 1000 \
   --batch_size 128 \

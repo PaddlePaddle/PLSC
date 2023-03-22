@@ -1370,7 +1370,7 @@ def cae_large_patch16_224_8k_vocab(**kwargs):
     return model
 
 
-def cae_small_patch16_224_linprobe(**kwargs):
+def cae_small_patch16_224(**kwargs):
     model = CAEViTLinearProbe(
         patch_size=16,
         embed_dim=384,
@@ -1384,7 +1384,7 @@ def cae_small_patch16_224_linprobe(**kwargs):
     return model
 
 
-def cae_base_patch16_224_linprobe(**kwargs):
+def cae_base_patch16_224(**kwargs):
     model = CAEViTLinearProbe(
         patch_size=16,
         embed_dim=768,
@@ -1398,7 +1398,7 @@ def cae_base_patch16_224_linprobe(**kwargs):
     return model
 
 
-def cae_base_patch16_384_linprobe(**kwargs):
+def cae_base_patch16_384(**kwargs):
     model = CAEViTLinearProbe(
         img_size=384,
         patch_size=16,
@@ -1413,7 +1413,7 @@ def cae_base_patch16_384_linprobe(**kwargs):
     return model
 
 
-def cae_large_patch16_224_linprobe(pretrained=False, **kwargs):
+def cae_large_patch16_224(pretrained=False, **kwargs):
     model = CAEViTLinearProbe(
         patch_size=16,
         embed_dim=1024,
@@ -1427,7 +1427,7 @@ def cae_large_patch16_224_linprobe(pretrained=False, **kwargs):
     return model
 
 
-def cae_large_patch16_384_linprobe(pretrained=False, **kwargs):
+def cae_large_patch16_384(pretrained=False, **kwargs):
     model = CAEViTLinearProbe(
         img_size=384,
         patch_size=16,
@@ -1442,7 +1442,7 @@ def cae_large_patch16_384_linprobe(pretrained=False, **kwargs):
     return model
 
 
-def cae_large_patch16_512_linprobe(pretrained=False, **kwargs):
+def cae_large_patch16_512(pretrained=False, **kwargs):
     model = CAEViTLinearProbe(
         img_size=512,
         patch_size=16,

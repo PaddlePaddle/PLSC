@@ -18,7 +18,7 @@
 # export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 # export PADDLE_JOB_ID=CAE
 
-tmp_my_name=linprob_ep90_fp16o1
+tmp_my_name=linprobe_ep90_fp16o1
 my_name=${tmp_my_name%.*}
 OUTPUT_DIR='./output/'$my_name
 echo $OUTPUT_DIR
@@ -35,7 +35,7 @@ python -m paddle.distributed.launch  \
   main_linprobe.py \
   --data_path ${DATA_PATH} \
   --output_dir ${OUTPUT_DIR} \
-  --model cae_base_patch16_224_linprobe \
+  --model cae_base_patch16_224 \
   --finetune $MODEL_PATH \
   --nb_classes 1000 \
   --batch_size 512 \
