@@ -27,7 +27,7 @@ python -m paddle.distributed.launch  \
   --devices=$CUDA_VISIBLE_DEVICES \
   ../../task/ssl/cae/main_finetune.py \
   --print_freq 1 \
-  --max_train_step 600 \
+  --max_train_step 200 \
   --data_path ${DATA_PATH} \
   --output_dir ${OUTPUT_DIR} \
   --model cae_base_patch16_224 \

@@ -259,8 +259,8 @@ function cae_base_patch16_224_pt_in1k_1n8c_dp_fp16o1() {
     cd ${plsc_path}
     rm -rf log
     bash ./ssl/cae/cae_base_patch16_224_pt_in1k_1n8c_dp_fp16o1.sh
-    loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
-    ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
+    loss=`tail log/workerlog.0 | grep "199/2502" | cut -d " " -f19 `
+    ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $16}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
     check_result 1.0064 ${loss} 0.4965 ${ips} $FUNCNAME
 }
 
@@ -269,7 +269,7 @@ function cae_base_patch16_224_ft_in1k_1n8c_dp_fp16o1() {
     cd ${plsc_path}
     rm -rf log
     bash ./ssl/cae/cae_base_patch16_224_ft_in1k_1n8c_dp_fp16o1.sh
-    loss=`tail log/workerlog.0 | grep "599/5004" | cut -d " " -f15 `
+    loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
     ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
     check_result 6.7559 ${loss} 0.2332 ${ips} $FUNCNAME
 }
