@@ -27,7 +27,6 @@ TOKENIZER_PATH=dalle-weights
 FLAGS_cudnn_exhaustive_search=True
 export FLAGS_gemm_use_half_precision_compute_type=False
 
-# ============================ pretraining ============================
 python -m paddle.distributed.launch  \
   --nnodes=$PADDLE_NNODES \
   --master=$PADDLE_MASTER \
