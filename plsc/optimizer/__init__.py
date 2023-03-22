@@ -25,6 +25,7 @@ from plsc.core.param_fuse import get_fused_params
 
 from plsc.utils import logger
 
+from .optimizer import Optimizer
 from .adamw import AdamW
 from .adafactor import Adafactor
 from .momentum import Momentum

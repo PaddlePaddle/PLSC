@@ -38,6 +38,9 @@ plsc_gpu_model_list=( \
     convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1 \
     convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1 \
     ConvNeXt_base_224_in1k_1n8c_dp_fp32 \
+    cae_base_patch16_224_pt_in1k_1n8c_dp_fp16o1 \
+    cae_base_patch16_224_ft_in1k_1n8c_dp_fp16o1 \
+    cae_base_patch16_224_lp_in1k_1n8c_dp_fp16o1 \
 )
 
 ###### Face ######
@@ -237,6 +240,8 @@ function convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1() {
     check_result 6.9417 ${loss} 0.3474 ${ips} $FUNCNAME
 }
 
+
+###### ConvNeXt ######
 function ConvNeXt_base_224_in1k_1n8c_dp_fp32() {
     cd ${plsc_path}
     rm -rf log
@@ -244,6 +249,37 @@ function ConvNeXt_base_224_in1k_1n8c_dp_fp32() {
     loss=`tail log/workerlog.0 | grep "50/312" | cut -d " " -f12 `
     ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
     check_result 6.91436 ${loss%?} 708.5226 ${ips} $FUNCNAME
+}
+
+
+###### CAE ######
+function cae_base_patch16_224_pt_in1k_1n8c_dp_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./ssl/cae/cae_base_patch16_224_pt_in1k_1n8c_dp_fp16o1.sh
+    loss=`tail log/workerlog.0 | grep "199/2502" | cut -d " " -f19 `
+    ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $16}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_result 9.6744 ${loss} 0.54708 ${ips} $FUNCNAME
+}
+
+
+function cae_base_patch16_224_ft_in1k_1n8c_dp_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./ssl/cae/cae_base_patch16_224_ft_in1k_1n8c_dp_fp16o1.sh
+    loss=`tail log/workerlog.0 | grep "199/1251" | cut -d " " -f15 `
+    ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_result 6.3034 ${loss} 2.49244 ${ips} $FUNCNAME
+}
+
+
+function cae_base_patch16_224_lp_in1k_1n8c_dp_fp16o1() {
+    cd ${plsc_path}
+    rm -rf log
+    bash ./ssl/cae/cae_base_patch16_224_lp_in1k_1n8c_dp_fp16o1.sh
+    loss=`tail log/workerlog.0 | grep "199/312" | cut -d " " -f14 `
+    ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $10}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
+    check_result 6.7196 ${loss} 1.07848 ${ips} $FUNCNAME
 }
 
 function check_result() {
