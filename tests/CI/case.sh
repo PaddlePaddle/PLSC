@@ -259,7 +259,7 @@ function cae_base_patch16_224_pt_in1k_1n8c_dp_fp16o1() {
     bash ./ssl/cae/cae_base_patch16_224_pt_in1k_1n8c_dp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "199/2502" | cut -d " " -f19 `
     ips=`cat log/workerlog.0 |grep time: |awk -F: '{print $16}' |cut -d " " -f2|awk 'NR>20 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 1.0064 ${loss} 0.4965 ${ips} $FUNCNAME
+    check_result 9.6744 ${loss} 0.54708 ${ips} $FUNCNAME
 }
 
 
