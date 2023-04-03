@@ -39,7 +39,7 @@ from util.misc import NativeScalerWithGradNormCount as NativeScaler
 from plsc.nn.init import trunc_normal_
 from util.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
 
-import models_vit
+from plsc.models import mae as models_mae
 from plsc.models import convmae as models_convmae
 
 from engine_finetune import train_one_epoch, evaluate
@@ -260,18 +260,12 @@ def get_args_parser():
     parser.add_argument('--no_pin_mem', action='store_false', dest='pin_mem')
     parser.set_defaults(pin_mem=True)
 
-    # distributed training parameters
+    parser.add_argument('--print_freq', default=20, type=int)
     parser.add_argument(
-        '--world_size',
-        default=1,
+        '--max_train_step',
+        default=None,
         type=int,
-        help='number of distributed processes')
-    parser.add_argument('--local_rank', default=-1, type=int)
-    parser.add_argument('--dist_on_itp', action='store_true')
-    parser.add_argument(
-        '--dist_url',
-        default='env://',
-        help='url used to set up distributed training')
+        help='only used for debugging')
 
     return parser
 
@@ -423,7 +417,7 @@ def main(args):
             global_pool=args.global_pool, )
         num_layers = len(model.blocks3) + 1
     else:
-        model = models_vit.__dict__[args.model](
+        model = models_mae.__dict__[args.model](
             num_classes=args.nb_classes,
             drop_path_rate=args.drop_path,
             global_pool=args.global_pool, )

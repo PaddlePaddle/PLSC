@@ -45,6 +45,7 @@ __all__ = [
     "RandCropImage",
     "RandomResizedCrop",
     "RandomResizedCropAndInterpolation",
+    "RandomResizedCropWithTwoImages",
     "RandFlipImage",
     "RandomHorizontalFlip",
     "NormalizeImage",
@@ -556,6 +557,73 @@ class RandomResizedCrop(object):
             self.size,
             self.interpolation,
             antialias=self.antialias)
+
+
+class RandomResizedCropWithTwoImages(RandomResizedCrop):
+    def __init__(
+            self,
+            size,
+            second_size=None,
+            scale=(0.08, 1.0),
+            ratio=(3. / 4., 4. / 3.),
+            interpolation='bilinear',
+            second_interpolation='lanczos',
+            antialias: Optional[bool]=None, ):
+        super().__init__(
+            size,
+            scale=scale,
+            ratio=ratio,
+            interpolation=interpolation,
+            antialias=antialias)
+
+        self.second_size = None
+        if second_size is not None:
+            self.second_size = _setup_size(
+                second_size,
+                error_msg="Please provide only two dimensions (h, w) for size.")
+
+        self.second_interpolation = second_interpolation
+
+    def __call__(self, img):
+        """
+        Args:
+            img (PIL Image or Tensor): Image to be cropped and resized.
+
+        Returns:
+            PIL Image or Tensor: Randomly cropped and resized image.
+        """
+        i, j, h, w = self.get_params(img, self.scale, self.ratio)
+        if self.second_size is not None:
+            img1 = resized_crop(
+                img,
+                i,
+                j,
+                h,
+                w,
+                self.size,
+                self.interpolation,
+                antialias=self.antialias)
+            img2 = resized_crop(
+                img,
+                i,
+                j,
+                h,
+                w,
+                self.second_size,
+                self.second_interpolation,
+                antialias=self.antialias)
+            return img1, img2
+
+        else:
+            return resized_crop(
+                img,
+                i,
+                j,
+                h,
+                w,
+                self.size,
+                self.interpolation,
+                antialias=self.antialias)
 
 
 class RandomResizedCropAndInterpolation(RandCropImage):

@@ -33,7 +33,7 @@ python -m paddle.distributed.launch \
     main_finetune.py \
     --accum_iter $ACCUM_ITER \
     --batch_size 32 \
-    --model vit_base_patch16 \
+    --model maevit_base_patch16 \
     --finetune ${PRETRAIN_CHKPT} \
     --epochs 100 \
     --blr 5e-4 --layer_decay 0.65 \
@@ -48,7 +48,7 @@ python -m paddle.distributed.launch \
 #    --devices=$CUDA_VISIBLE_DEVICES \
 #    main_finetune.py --eval \
 #    --resume output_dir/checkpoint-99.pd \
-#    --model vit_base_patch16 \
+#    --model maevit_base_patch16 \
 #    --batch_size 32 \
 #    --weight_decay 0.05 --drop_path 0.1 --reprob 0.25 --mixup 0.8 --cutmix 1.0 \
 #    --data_path ${IMAGENET_DIR}

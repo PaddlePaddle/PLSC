@@ -3,12 +3,12 @@
 
 <p align="center">
   <img src="https://user-images.githubusercontent.com/11435359/146857310-f258c86c-fde6-48e8-9cee-badd2b21bd2c.png" width="480">
-  <p style="text-align:center">MAE</p>
+  <p align="center" style="text-align:center">MAE</p>
 </p>
 
 <p align="center">
   <img src="https://github.com/Alpha-VL/ConvMAE/blob/main/figures/ConvMAE.png?raw=true" width="480">
-  <p style="text-align:center">ConvMAE</p>
+  <p align="center" style="text-align:center">ConvMAE</p>
 </p>
 
 
@@ -98,7 +98,7 @@ python -m paddle.distributed.launch \
     main_finetune.py \
     --accum_iter $ACCUM_ITER \
     --batch_size 128 \
-    --model vit_base_patch16 \
+    --model maevit_base_patch16 \
     --finetune ${PRETRAIN_CHKPT} \
     --epochs 100 \
     --blr 5e-4 --layer_decay 0.65 \
@@ -136,7 +136,7 @@ python -m paddle.distributed.launch \
    main_linprobe.py \
    --accum_iter $ACCUM_ITER \
    --batch_size 512 \
-   --model vit_base_patch16 \
+   --model maevit_base_patch16 \
    --cls_token \
    --finetune ${PRETRAIN_CHKPT} \
    --epochs 90 \

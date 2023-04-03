@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -32,7 +32,8 @@ function _set_params(){
     max_iter=${7:-150}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
     num_workers=0                  # (可选)
     base_batch_size=$global_batch_size
-    pretrained_model=${8:-null}
+    accum_steps=${8:-1}
+    pretrained_model=${9:-null}
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -66,8 +67,8 @@ function _train(){
         add_options=""
         log_file=${train_log_file}
     fi
-        
-    if [[ ${model_item} =~ "ft" ]];then # finetune 
+
+    if [[ ${model_item} =~ "ft" ]];then # finetune
         pretrained=" -o Global.pretrained_model=${pretrained_model} "
     else
         pretrained=""
@@ -77,6 +78,7 @@ function _train(){
                -o Global.max_train_step=${max_iter} \
                -o Global.flags.FLAGS_cudnn_exhaustive_search=0 \
                -o Global.flags.FLAGS_cudnn_deterministic=1 \
+               -o Global.accum_steps=${accum_steps} \
                ${pretrained} "
     if [ ${PADDLE_TRAINER_ID} ]
     then
@@ -101,7 +103,7 @@ function _train(){
     *) echo "choose run_mode "; exit 1;
     esac
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
-    timeout 40m ${train_cmd} > ${log_file} 2>&1
+    timeout 100m ${train_cmd} > ${log_file} 2>&1
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL"
     else

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./plsc-logo.png" align="middle"  width="500" />
+  <img src="./plsc-logo.png?raw=true" align="middle"  width="500" />
 </p>
 
 ------------------------------------------------------------------------------------------
@@ -20,11 +20,15 @@
 ## Available Models
 * [Face Recognition](./task/recognition/face/)
 * [ViT](./task/classification/vit/)
+* [Swin](./task/classification/swin/)
 * [DeiT](./task/classification/deit/)
 * [CaiT](./task/classification/cait/)
+* [ConvNeXt](./task/classification/convnext)
 * [MoCo v3](./task/ssl/mocov3/)
+* [CAE](./task/ssl/cae/)
 * [MAE](./task/ssl/mae/)
 * [ConvMAE](./task/ssl/mae/)
+* [ToMe](./task/accelerate/tome)
 
 ## Top News 🔥
 
