@@ -30,8 +30,7 @@ function before_hook() {
     echo ---------- install plsc ----------
     export http_proxy=${proxy};
     export https_proxy=${proxy};
-    python -m pip install -r requirements.txt --force-reinstall
-    python -m pip install protobuf==3.20 --force-reinstall
+    pip install -r requirements.txt
     python setup.py develop
 
     
