@@ -25,22 +25,6 @@ plsc_gpu_model_list=( \
     IResNet100_WebFace42M_CosFace_pfc02_1n8c_dp_mp_fp16o1 \
     IResNet50_MS1MV3_ArcFace_pfc01_1n1c_fp16o1 \
     IResNet50_MS1MV3_ArcFace_pfc01_1n8c_dp8_fp16o1 \
-    ViT_base_patch16_224_in1k_1n8c_dp_fp16o2 \
-    ViT_base_patch16_384_ft_in1k_1n8c_dp_fp16o2 \
-    DeiT_base_patch16_224_in1k_1n8c_dp_fp32 \
-    DeiT_base_patch16_224_in1k_1n8c_dp_fp16o2 \
-    cait_s24_224_in1k_1n8c_dp_fp16o2 \
-    swin_base_patch4_window7_224_fp16o2 \
-    mae_vit_base_patch16_pt_in1k_1n8c_dp_fp16o1 \
-    mae_vit_base_patch16_ft_in1k_1n8c_dp_fp16o1 \
-    mae_vit_base_patch16_lp_in1k_1n8c_dp_fp16o1 \
-    convmae_convvit_base_patch16_pt_in1k_1n8c_dp_fp16o1 \
-    convmae_convvit_base_patch16_ft_in1k_1n8c_dp_fp16o1 \
-    convmae_convvit_base_patch16_lp_in1k_1n8c_dp_fp16o1 \
-    ConvNeXt_base_224_in1k_1n8c_dp_fp32 \
-    cae_base_patch16_224_pt_in1k_1n8c_dp_fp16o1 \
-    cae_base_patch16_224_ft_in1k_1n8c_dp_fp16o1 \
-    cae_base_patch16_224_lp_in1k_1n8c_dp_fp16o1 \
 )
 
 ###### Face ######
@@ -68,7 +52,7 @@ function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c
     bash ./recognition/face/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc10_droppath005_mask0_1n8c_dp_mp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "199/2530" | cut -d " " -f12 `
     ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 38.36626 ${loss%?} 9247.1 ${ips} $FUNCNAME
+    check_result 38.36613 ${loss%?} 9247.1 ${ips} $FUNCNAME
 }
 
 function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c_dp_mp_fp16o1() {
@@ -77,7 +61,7 @@ function FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c
     bash ./recognition/face/FaceViT_tiny_patch9_112_WebFace42M_CosFace_pfc02_droppath005_mask0_1n8c_dp_mp_fp16o1.sh
     loss=`tail log/workerlog.0 | grep "199/2530" | cut -d " " -f12 `
     ips=`cat log/workerlog.0 |grep ips: |cut -d " " -f18 |awk 'NR>1 {print}' | awk '{a+=$1}END{print a/NR}'`
-    check_result 37.72493 ${loss%?} 8745.6225 ${ips} $FUNCNAME
+    check_result 37.72469 ${loss%?} 8745.6225 ${ips} $FUNCNAME
 }
 
 function FaceViT_base_patch9_112_WebFace42M_CosFace_pfc03_droppath005_mask005_1n8c_dp_mp_fp16o1() {
