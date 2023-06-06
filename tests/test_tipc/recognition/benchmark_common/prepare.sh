@@ -22,4 +22,5 @@ python setup.py develop
 mkdir dataset && cd dataset
 cp -r ${BENCHMARK_ROOT}/models_data_cfs/Paddle_distributed/MS1M_v3.tgz ./
 tar -zxf MS1M_v3.tgz
+rm -rf MS1M_v3.tgz
 cd -
